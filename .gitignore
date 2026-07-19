@@ -27,5 +27,7 @@ dist-ssr
 .react-router/
 build/
 .vercel
-.env*
+!.env*
 !.env.example
+supabase
+**/types/database.ts
