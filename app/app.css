@@ -3,6 +3,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+* {
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
 :root {
   color-scheme: light;
   --accent: #b9990a;
