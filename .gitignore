@@ -30,4 +30,5 @@ build/
 !.env*
 !.env.example
 supabase
+# Run 'supabase gen types` to generate the types automatically after login to supabase.
 **/types/database.ts
