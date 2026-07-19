@@ -43,6 +43,31 @@ bun run dev
 
 Route types are generated into `.react-router/` by `react-router typegen` (runs automatically in dev and `typecheck`).
 
+## Branching, CI, and releases
+
+Adapted from [exegia/repo-template](https://github.com/exegia/repo-template) (core CI/CD only — agentic/Claude/Copilot workflows omitted). Policy details: `.github/BRANCH-AND-RELEASE-POLICY.md`.
+
+| Flow | What happens |
+| --- | --- |
+| `feature/*` \| `bug/*` \| `doc/*` \| `chore/*` → PR to `dev` | `CI` (typecheck, lint, test, build) + conventional-commit title check; merge tags `vX.Y.Z-dev.<PR>` |
+| `dev` → PR to `next` | `CI` runs; on merge, **Preview CI** validates and deploys a Vercel preview |
+| Preview CI passes | A `next` → `main` release PR is opened automatically |
+| Release PR merged | `release-tag.yml` computes the semver bump from conventional commits, tags `vX.Y.Z`, publishes a GitHub Release |
+| Release published | **Production Deploy** ships the tagged commit to Vercel |
+
+Base-branch policy is enforced (`main` only from `next`, `next` only from `dev`); rulesets protect all three branches and require the `CI / ci` check on `main`.
+
+### One-time setup
+
+```bash
+gh auth login                          # if needed
+bunx vercel link                       # creates .vercel/project.json
+VERCEL_ORG_ID=... VERCEL_PROJECT_ID=... VERCEL_TOKEN=... \
+  .github/scripts/setup-github.sh exegia/corpora-web
+```
+
+The script creates the repo, pushes `main`, creates `dev` (default) and `next`, applies branch protections + rulesets, creates the `preview`/`production` environments, and wires the Vercel variables/secrets.
+
 ## Adding coss ui components
 
 Components are vendored (copy-paste model). To add or update one:
