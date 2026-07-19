@@ -17,6 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -28,7 +29,7 @@ const items = [
 
 export function AppSidebar() {
   return (
-    <Sidebar>
+    <Sidebar variant="inset">
       <SidebarHeader>
         <span className="px-2 py-1.5 font-heading text-lg font-bold">
           Corpora
@@ -41,9 +42,9 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <NavLink to={item.url} end={item.url === "/"}>
+                  <NavLink to={item.url} end={item.url === "/"} >
                     {({ isActive }) => (
-                      <SidebarMenuButton isActive={isActive}>
+                      <SidebarMenuButton isActive={isActive} className={cn("cursor-pointer bg-transparent", isActive && "bg-amber-400/70!")}>
                         <item.icon />
                         <span>{item.title}</span>
                       </SidebarMenuButton>
