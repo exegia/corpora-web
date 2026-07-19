@@ -3,9 +3,10 @@ import path from "node:path"
 import { reactRouter } from "@react-router/dev/vite"
 import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from "vite"
+import devtoolsJson from 'vite-plugin-devtools-json';
 
 export default defineConfig({
-  plugins: [!process.env.VITEST && reactRouter(), tailwindcss()],
+  plugins: [!process.env.VITEST && reactRouter(), tailwindcss(),  devtoolsJson()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./app"),
