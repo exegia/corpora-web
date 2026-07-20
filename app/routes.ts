@@ -5,5 +5,6 @@ export default [
   route("references", "routes/references.tsx"),
   route("library", "routes/library.tsx"),
   route("project", "routes/project.tsx"),
+  route("project/:projectId", "routes/project.$projectId.tsx"),
   route("corpus", "routes/corpus.tsx"),
 ] satisfies RouteConfig

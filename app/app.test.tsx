@@ -15,7 +15,12 @@ const Stub = createRoutesStub([
       { index: true, Component: Dashboard },
       { path: "references", Component: References },
       { path: "library", Component: Library },
-      { path: "project", Component: Project },
+      {
+        path: "project",
+        Component: Project,
+        HydrateFallback: () => null,
+        loader: () => ({ projects: [] }),
+      },
       { path: "corpus", Component: Corpus },
     ],
   },
@@ -28,12 +33,12 @@ describe("routes", () => {
     ["/", "Dashboard"],
     ["/references", "References"],
     ["/library", "Library"],
-    ["/project", "Project"],
+    ["/project", "Projects"],
     ["/corpus", "Corpus"],
-  ])("renders %s → %s", (path, heading) => {
+  ])("renders %s → %s", async (path, heading) => {
     renderAt(path)
     expect(
-      screen.getByRole("heading", { level: 1, name: heading }),
+      await screen.findByRole("heading", { level: 1, name: heading }),
     ).toBeInTheDocument()
   })
 

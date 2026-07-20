@@ -17,6 +17,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { default as Logo } from "@/components/logo";
+import { cn } from "@/lib/utils"
 
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -28,9 +30,10 @@ const items = [
 
 export function AppSidebar() {
   return (
-    <Sidebar>
-      <SidebarHeader>
-        <span className="px-2 py-1.5 font-heading text-lg font-bold">
+    <Sidebar variant="inset">
+      <SidebarHeader className="flex flex-row items-center justify-center">
+        <Logo className="fill-amber-400 w-8 h-8 transform rotate-12" />
+        <span className="font-heading text-2xl font-medium text-black">
           Corpora
         </span>
       </SidebarHeader>
@@ -41,9 +44,9 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <NavLink to={item.url} end={item.url === "/"}>
+                  <NavLink to={item.url} end={item.url === "/"} >
                     {({ isActive }) => (
-                      <SidebarMenuButton isActive={isActive}>
+                      <SidebarMenuButton isActive={isActive} className={cn("cursor-pointer bg-transparent transition-all ease-in-out duration-200", isActive && "bg-amber-400/70!")}>
                         <item.icon />
                         <span>{item.title}</span>
                       </SidebarMenuButton>
