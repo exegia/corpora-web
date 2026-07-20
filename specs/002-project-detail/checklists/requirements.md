@@ -32,5 +32,5 @@
 ## Notes
 
 - All enumerations (status, book type, language, category, license state) are taken verbatim from the shared domain vocabulary in `corpora-tauri/packages` (corpus-core models/enums and typings enums), so the spec stays consistent with the sibling desktop app without prescribing implementation.
-- Open questions were resolved with documented defaults in the Assumptions section (curated license catalog, anonymous access carried over from 001, single license/organization/creator per project) rather than [NEEDS CLARIFICATION] markers, since each has a clear default grounded in the existing domain model and 001 decisions.
-- Ready for speckit-clarify (optional) or speckit-plan.
+- Clarification session 2026-07-19 resolved five points: license catalog is SQL-seeded (read-only here), projects can hold multiple licenses, one organization per project, creators are mandatory (no anonymous creation), and creator identity comes from a pre-seeded dummy user directory selected at creation (backfill existing projects to a default user) until `corpora-auth` ships.
+- Ready for speckit-plan.

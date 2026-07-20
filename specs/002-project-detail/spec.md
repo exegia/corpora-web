@@ -5,6 +5,16 @@
 **Status**: Draft
 **Input**: User description: "Complete the project feature: project detail with metadata (Project schema), license, organization, creating-user relationship, book type from BOOK_TYPES (with conditional language type for bible/tanakh/quran/apocrypha and category type for biography/commentary/review), and status"
 
+## Clarifications
+
+### Session 2026-07-19
+
+- Q: Where do license catalog entries come from? → A: Pre-seeded into the database via a SQL seed (uploaded later); this feature provides no license-authoring UI.
+- Q: How many licenses can a project carry? → A: One or more — a project can hold multiple licenses.
+- Q: How many organizations can a project belong to? → A: One organization per project (confirmed).
+- Q: Can a project's creator be anonymous? → A: No — every project must record a creating user; anonymous creation is not permitted.
+- Q: How is the creating user established before authentication ships? → A: Seeded users — a dummy list of user records is pre-seeded in the database (like licenses); the visitor selects their user profile when creating a project, no passwords until `corpora-auth` ships; existing projects are backfilled to a seeded default user. Real users are expected to replace the dummy list soon.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - View and edit full project metadata (Priority: P1)
@@ -44,38 +54,41 @@ The user assigns a type to their project from the defined set of book types (bib
 
 ---
 
-### User Story 3 - Attach a license to a project (Priority: P3)
+### User Story 3 - Attach licenses to a project (Priority: P3)
 
-The user selects a license for their project from a catalog of known content/data/software licenses. The detail view shows the chosen license's title, link to its text, which domains it covers (content, data, software), and its lifecycle state (active, retired, superseded). When attaching a license, the user confirms agreement, and the project records when the agreement happened and by whom (once user accounts exist).
+The user selects one or more licenses for their project from a catalog of known content/data/software licenses. The catalog is pre-seeded into the database (via a SQL seed uploaded separately); this feature only reads it. The detail view lists each attached license's title, link to its text, which domains it covers (content, data, software), and its lifecycle state (active, retired, superseded). When attaching a license, the user confirms agreement, and the project records for each license when the agreement happened and by whom.
 
 **Why this priority**: Licensing matters for publishing and sharing corpus-derived work, but a project is fully usable without it. Builds on P1 only.
 
-**Independent Test**: Open a project detail, attach a license from the catalog, verify the license title and domains display on the project, verify the agreement time is recorded, then remove the license and verify the project shows no license.
+**Independent Test**: Open a project detail, attach two licenses from the catalog, verify both titles and domains display on the project with their agreement times, then remove one and verify only the other remains.
 
 **Acceptance Scenarios**:
 
-1. **Given** a project without a license, **When** the user browses licenses to attach, **Then** they can see each license's title, covered domains (content/data/software), and lifecycle state.
-2. **Given** the user attaches a license, **When** they confirm agreement, **Then** the project shows the license and the date/time agreement was given.
-3. **Given** a license marked retired or superseded, **When** the user browses licenses, **Then** the license's state is clearly indicated so the user can prefer active licenses.
-4. **Given** a project with a license, **When** the user removes or replaces it, **Then** the detail view reflects the change.
-5. **Given** a project without a license, **When** the user views the detail, **Then** the license area shows an empty state inviting them to choose one — a license is optional.
+1. **Given** a project without licenses, **When** the user browses licenses to attach, **Then** they can see each catalog license's title, covered domains (content/data/software), and lifecycle state.
+2. **Given** the user attaches a license, **When** they confirm agreement, **Then** the project lists the license with the date/time agreement was given and the agreeing user.
+3. **Given** a project that already has a license, **When** the user attaches another, **Then** both licenses are listed on the project; the same catalog license cannot be attached twice to one project.
+4. **Given** a license marked retired or superseded, **When** the user browses licenses, **Then** the license's state is clearly indicated so the user can prefer active licenses.
+5. **Given** a project with attached licenses, **When** the user removes one, **Then** the detail view reflects the change and the remaining licenses are unaffected.
+6. **Given** a project without licenses, **When** the user views the detail, **Then** the license area shows an empty state inviting them to choose one — licenses are optional.
+7. **Given** the license catalog has not yet been seeded, **When** the user opens the license picker, **Then** an empty state explains no licenses are available yet — the rest of the detail view works normally.
 
 ---
 
 ### User Story 4 - Associate an organization and creator with a project (Priority: P4)
 
-The user records which organization a project belongs to (name and optional website) and the project displays who created it. Creator attribution is captured automatically when user accounts are available; until then the field may be empty.
+The user records which organization a project belongs to (name and optional website — at most one organization per project) and the project displays who created it. Every project records its creating user — anonymous creation is not permitted. When creating a project, the visitor picks their user profile from a pre-seeded user list (dummy users until `corpora-auth` ships), and the detail view always shows the creator.
 
-**Why this priority**: Attribution and organizational context round out the project record but carry the least standalone value, and creator attribution is partially blocked on the separate authentication effort.
+**Why this priority**: Attribution and organizational context round out the project record but carry the least standalone value relative to the other stories.
 
-**Independent Test**: Open a project detail, assign an organization with a name and website, verify it displays on the project; verify the creator field displays the creating user when one exists and is absent otherwise.
+**Independent Test**: Create a project, verify a creating user is recorded and displayed on its detail; assign an organization with a name and website, verify it displays on the project.
 
 **Acceptance Scenarios**:
 
 1. **Given** a project detail view, **When** the user assigns an organization with a name, **Then** the organization (and website when provided) displays on the project.
 2. **Given** a project with an organization, **When** the user changes or removes the organization, **Then** the detail view reflects the change.
-3. **Given** a project created while no user account exists, **When** the detail is viewed, **Then** the creator field is simply absent or empty — not an error.
-4. **Given** a project created by a known user, **When** the detail is viewed, **Then** the creator's name or username is displayed.
+3. **Given** a visitor creating a project, **When** they have not selected a user profile from the seeded list, **Then** the project is not created and they are told a creator is required.
+4. **Given** any project, **When** the detail is viewed, **Then** the creator's name or username is displayed.
+5. **Given** a project created before this feature (no recorded creator), **When** the detail is viewed, **Then** it displays the seeded default user as creator.
 
 ---
 
@@ -100,28 +113,29 @@ The user records which organization a project belongs to (name and optional webs
 - **FR-007**: When the project type is biography, commentary, or review, the system MUST require a category drawn only from: biblical, religious, literary, historical, paratext.
 - **FR-008**: When the project type is lexicon, manuscript, or regular — or no type is set — the system MUST NOT require or display a language or category value.
 - **FR-009**: When a project's type changes such that a previously required conditional value (language or category) no longer applies, the system MUST clear or ignore the stale value and require the newly applicable one before saving.
-- **FR-010**: Users MUST be able to attach at most one license to a project, chosen from a license catalog; a project without a license is valid.
-- **FR-011**: The license catalog MUST describe each license with a title, an optional link to its text, whether it covers the content, data, and software domains, and its lifecycle state (active, retired, or superseded), with optional family, maintainer, generic flag, and full license text.
-- **FR-012**: When a license is attached, the system MUST record the date and time of agreement, and the agreeing user when a user account is available.
-- **FR-013**: Users MUST be able to replace or remove a project's license from the detail view.
+- **FR-010**: Users MUST be able to attach one or more licenses to a project, chosen from the license catalog; a project with no licenses is valid, and the same catalog license cannot be attached to the same project more than once.
+- **FR-011**: The license catalog MUST describe each license with a title, an optional link to its text, whether it covers the content, data, and software domains, and its lifecycle state (active, retired, or superseded), with optional family, maintainer, generic flag, and full license text. The catalog is populated by a pre-seeded data load (SQL seed, provided separately); this feature MUST NOT offer license authoring or editing, and MUST handle an empty catalog gracefully.
+- **FR-012**: For each license attached, the system MUST record the date and time of agreement and the agreeing user.
+- **FR-013**: Users MUST be able to remove any attached license from a project via the detail view without affecting the project's other licenses.
 - **FR-014**: Users MUST be able to associate a project with at most one organization, described by a required name and optional website; the association is optional and removable.
-- **FR-015**: The system MUST record the creating user on projects when a user account is available, and the detail view MUST display the creator when present; absence of a creator MUST NOT be treated as an error.
-- **FR-016**: All metadata edits (status, type, language, category, license, organization) MUST update the project's last-updated timestamp.
-- **FR-017**: Existing projects created before this feature MUST remain valid: they present as draft status (or an equivalent default), no type, no license, no organization, and no creator, without requiring migration action from the user.
+- **FR-015**: Every project MUST record its creating user — anonymous creation is not permitted — and the detail view MUST display the creator. At creation time the visitor selects their user profile from the pre-seeded user list; creation MUST fail with a clear message if no user is selected (or the user list is empty).
+- **FR-016**: All metadata edits (status, type, language, category, licenses, organization) MUST update the project's last-updated timestamp.
+- **FR-017**: Existing projects created before this feature MUST remain valid: they present as draft status (or an equivalent default), no type, no licenses, and no organization, without requiring migration action from the user; their missing creator is backfilled to a seeded default user.
+- **FR-018**: The system MUST maintain a user directory populated by a pre-seeded data load (dummy users for now, replaced by real users when `corpora-auth` ships); this feature provides user selection only — no user creation, editing, or authentication.
 
 ### Key Entities
 
-- **Project (extended)**: The existing workspace project, now carrying full metadata — identity, name, description, created/updated timestamps, lifecycle status, optional type with conditional language or category, and optional links to one license, one organization, and one creating user.
-- **License**: A reusable catalog entry describing a content/data/software license — title, optional URL and full text, domain coverage flags (content, data, software), optional family, maintainer, and generic flag, lifecycle state (active, retired, superseded), and, per attachment, the agreement time and agreeing user.
+- **Project (extended)**: The existing workspace project, now carrying full metadata — identity, name, description, created/updated timestamps, lifecycle status, optional type with conditional language or category, zero or more attached licenses, an optional single organization, and a required creating user.
+- **License**: A reusable catalog entry describing a content/data/software license — title, optional URL and full text, domain coverage flags (content, data, software), optional family, maintainer, and generic flag, lifecycle state (active, retired, superseded). The catalog is read-only in this feature, populated by a pre-seeded data load. Each project–license attachment records the agreement time and agreeing user.
 - **Organization**: A lightweight body a project can belong to — name and optional website.
-- **User**: The person who created a project — identity, username, email, and optional profile details. Referenced for attribution only; account management is owned by the separate authentication effort.
+- **User**: The person who created a project — identity, username, email, and optional profile details. A read-only, pre-seeded directory in this feature (dummy users for now); selected at project creation for attribution. Account management and authentication are owned by the separate `corpora-auth` effort.
 - **Book Type / Language / Category vocabularies**: Fixed enumerations governing project classification — book types (10 values), source languages (14 values), and categories (5 values) — with the conditional rules described in FR-006 through FR-008.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: A user can open any project and see its complete metadata (status, type, license, organization, creator where present) in a single detail view without navigating elsewhere.
+- **SC-001**: A user can open any project and see its complete metadata (status, type, attached licenses, organization, and creator) in a single detail view without navigating elsewhere.
 - **SC-002**: A user can classify a project — type plus conditional language or category — in under 30 seconds from the detail view.
 - **SC-003**: 100% of type/conditional-field combinations are enforced: no saved project ever holds a language without a scriptural type, a category without a secondary-literature type, or a missing conditional value for a type that requires one.
 - **SC-004**: A user can attach a license, including confirming agreement, in under 1 minute, and the agreement time is recorded on 100% of attachments.
@@ -129,9 +143,9 @@ The user records which organization a project belongs to (name and optional webs
 
 ## Assumptions
 
-- The license catalog is a curated, pre-seeded list (in the spirit of open-definition license registries, matching the domain model's family/maintainer/generic/domain fields); users pick from it rather than authoring license entries in v1.
-- Access remains anonymous (per the 001 project-workspace decisions): creator attribution (FR-015) and agreeing-user on license agreement (FR-012) stay empty until the separate `corpora-auth` effort ships, and the shared-pool, last-write-wins editing model carries over unchanged.
+- The license catalog is a curated, pre-seeded list (in the spirit of open-definition license registries, matching the domain model's family/maintainer/generic/domain fields) loaded via a SQL seed provided separately; users pick from it rather than authoring license entries. The feature must work (with empty states) before the seed is loaded.
+- The shared-pool, last-write-wins editing model from 001 carries over unchanged for concurrent edits; however, unlike 001, every project must have a non-anonymous creator (FR-015), established by the visitor selecting a profile from the pre-seeded user directory. User selection is honor-system (no passwords) until `corpora-auth` ships and replaces the dummy users with real accounts.
 - Organizations are simple user-entered records (name, optional website), not accounts or access-control boundaries; organization-based permissions are out of scope.
 - Project type is optional at creation; classification can happen at any time in the project's life. Book types apply to the project as a whole (the project's primary text kind), mirroring the domain vocabulary shared with books and corpora.
-- One license, one organization, and one creator per project — the domain model's single-reference shape — multi-license or multi-organization projects are out of scope.
+- Multiple licenses per project are allowed; at most one organization and exactly one creator per project. Multi-organization projects are out of scope.
 - Corpus-level type/category fields that already exist in the library remain independent of the project-level classification introduced here.
