@@ -1,7 +1,7 @@
 // Data-access layer for the license catalog + project attachments (002).
 // Contract: specs/002-project-detail/contracts/data-access.md
 // The catalog is read-only (seeded out of band, FR-011); this module only
-// reads `licenses` and writes `project_licenses`. Route modules import ONLY
+// reads `licences` and writes `project_licences`. Route modules import ONLY
 // from this module — never supabase-js directly.
 
 import {
@@ -39,7 +39,7 @@ const CATALOG_COLUMNS =
 /** Full catalog, ordered by title. Empty until the SQL seed is loaded (FR-011). */
 export async function listLicenses(): Promise<CatalogLicense[]> {
   const { data, error } = await getSupabase()
-    .from("licenses")
+    .from("licences")
     .select(CATALOG_COLUMNS)
     .order("title", { ascending: true })
   if (error) {
@@ -65,7 +65,7 @@ export async function listLicenses(): Promise<CatalogLicense[]> {
 
 /**
  * Attach a catalog license with agreement (FR-010/FR-012). The agreeing user
- * comes from the seeded directory. Duplicate attachment (composite-PK 23505)
+ * comes from the seeded directory. Duplicate attachment (unique (project_id, licence_id) 23505)
  * maps to "already-attached".
  */
 export async function attachLicense(
@@ -79,9 +79,9 @@ export async function attachLicense(
   if (!agreedByUserId.trim()) {
     throw new DataError("validation", "An agreeing user is required.")
   }
-  const { error } = await getSupabase().from("project_licenses").insert({
+  const { error } = await getSupabase().from("project_licences").insert({
     project_id: projectId,
-    license_id: licenseId,
+    licence_id: licenseId,
     agreed_by_user_id: agreedByUserId,
   })
   if (error) {
@@ -105,11 +105,11 @@ export async function detachLicense(
   licenseId: string,
 ): Promise<void> {
   const { data, error } = await getSupabase()
-    .from("project_licenses")
+    .from("project_licences")
     .delete()
     .eq("project_id", projectId)
-    .eq("license_id", licenseId)
-    .select("license_id")
+    .eq("licence_id", licenseId)
+    .select("licence_id")
   if (error) {
     throw new DataError(
       "unknown",

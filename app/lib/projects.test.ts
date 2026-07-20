@@ -212,7 +212,7 @@ const detailRow = {
   category: null,
   user_directory: creatorRow,
   organizations: null,
-  project_licenses: [],
+  project_licences: [],
   project_corpora: [],
   project_references: [],
 }
@@ -262,10 +262,10 @@ describe("getProject", () => {
           type: "bible",
           language: "aramaic",
           organizations: { id: "o1", name: "Peshitta Institute", website: null },
-          project_licenses: [
+          project_licences: [
             {
               agreed_at: "2026-07-06T00:00:00Z",
-              licenses: {
+              licences: {
                 id: "CC-BY-4.0",
                 title: "Creative Commons Attribution 4.0",
                 url: "https://example.org/cc-by",

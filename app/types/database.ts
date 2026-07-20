@@ -163,84 +163,102 @@ export type Database = {
         }
         Relationships: []
       }
-      licenses: {
+      licences: {
         Row: {
           id: string
           title: string
           url: string | null
+          maintainer: string | null
+          family: string | null
+          status: Database["public"]["Enums"]["licence_status"]
           domain_content: boolean
           domain_data: boolean
           domain_software: boolean
-          family: string | null
-          maintainer: string | null
-          is_generic: boolean | null
-          license_text: string | null
-          status: string
+          od_conformance: Database["public"]["Enums"]["licence_conformance"] | null
+          osd_conformance: Database["public"]["Enums"]["licence_conformance"] | null
+          is_generic: boolean
+          legacy_ids: string[] | null
+          created_at: string
+          updated_at: string | null
         }
         Insert: {
           id: string
           title: string
           url?: string | null
+          maintainer?: string | null
+          family?: string | null
+          status?: Database["public"]["Enums"]["licence_status"]
           domain_content?: boolean
           domain_data?: boolean
           domain_software?: boolean
-          family?: string | null
-          maintainer?: string | null
-          is_generic?: boolean | null
-          license_text?: string | null
-          status: string
+          od_conformance?: Database["public"]["Enums"]["licence_conformance"] | null
+          osd_conformance?: Database["public"]["Enums"]["licence_conformance"] | null
+          is_generic?: boolean
+          legacy_ids?: string[] | null
+          created_at?: string
+          updated_at?: string | null
         }
         Update: {
           id?: string
           title?: string
           url?: string | null
+          maintainer?: string | null
+          family?: string | null
+          status?: Database["public"]["Enums"]["licence_status"]
           domain_content?: boolean
           domain_data?: boolean
           domain_software?: boolean
-          family?: string | null
-          maintainer?: string | null
-          is_generic?: boolean | null
-          license_text?: string | null
-          status?: string
+          od_conformance?: Database["public"]["Enums"]["licence_conformance"] | null
+          osd_conformance?: Database["public"]["Enums"]["licence_conformance"] | null
+          is_generic?: boolean
+          legacy_ids?: string[] | null
+          created_at?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
-      project_licenses: {
+      project_licences: {
         Row: {
+          id: string
           project_id: string
-          license_id: string
-          agreed_at: string
-          agreed_by_user_id: string
+          licence_id: string
+          agreed_by_user_id: string | null
+          agreed_at: string | null
+          created_at: string
         }
         Insert: {
+          id?: string
           project_id: string
-          license_id: string
-          agreed_at?: string
-          agreed_by_user_id: string
+          licence_id: string
+          agreed_by_user_id?: string | null
+          agreed_at?: string | null
+          created_at?: string
         }
         Update: {
+          id?: string
           project_id?: string
-          license_id?: string
-          agreed_at?: string
-          agreed_by_user_id?: string
+          licence_id?: string
+          agreed_by_user_id?: string | null
+          agreed_at?: string | null
+          created_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "project_licenses_project_id_fkey"
+            foreignKeyName: "project_licences_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "project_licenses_license_id_fkey"
-            columns: ["license_id"]
+            foreignKeyName: "project_licences_licence_id_fkey"
+            columns: ["licence_id"]
             isOneToOne: false
-            referencedRelation: "licenses"
+            referencedRelation: "licences"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "project_licenses_agreed_by_user_id_fkey"
+            foreignKeyName: "project_licences_agreed_by_user_id_fkey"
             columns: ["agreed_by_user_id"]
             isOneToOne: false
             referencedRelation: "user_directory"
@@ -379,7 +397,10 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: Record<string, never>
-    Enums: Record<string, never>
+    Enums: {
+      licence_status: "active" | "retired" | "superseded"
+      licence_conformance: "not reviewed" | "approved" | "rejected"
+    }
     CompositeTypes: Record<string, never>
   }
 }

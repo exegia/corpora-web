@@ -66,7 +66,7 @@ describe("listLicenses", () => {
   it("maps catalog rows with domain flags, ordered by title", async () => {
     const { builders } = mockSupabase([{ data: [catalogRow], error: null }])
     const licenses = await listLicenses()
-    expect(builders[0].table).toBe("licenses")
+    expect(builders[0].table).toBe("licences")
     expect(builders[0].order).toHaveBeenCalledWith("title", { ascending: true })
     expect(licenses).toEqual([
       {
@@ -95,14 +95,14 @@ describe("listLicenses", () => {
 describe("attachLicense", () => {
   it("inserts the attachment with the agreeing user and touches the project", async () => {
     const { builders } = mockSupabase([
-      { data: null, error: null }, // insert project_licenses
+      { data: null, error: null }, // insert project_licences
       { data: null, error: null }, // touchProject update
     ])
     await attachLicense("p1", "CC-BY-4.0", "u1")
-    expect(builders[0].table).toBe("project_licenses")
+    expect(builders[0].table).toBe("project_licences")
     expect(builders[0].insert).toHaveBeenCalledWith({
       project_id: "p1",
-      license_id: "CC-BY-4.0",
+      licence_id: "CC-BY-4.0",
       agreed_by_user_id: "u1",
     })
     expect(builders[1].table).toBe("projects")
@@ -130,14 +130,14 @@ describe("attachLicense", () => {
 describe("detachLicense", () => {
   it("deletes only the one attachment, filtered by both keys (FR-013)", async () => {
     const { builders } = mockSupabase([
-      { data: [{ license_id: "CC-BY-4.0" }], error: null },
+      { data: [{ licence_id: "CC-BY-4.0" }], error: null },
       { data: null, error: null }, // touchProject
     ])
     await detachLicense("p1", "CC-BY-4.0")
-    expect(builders[0].table).toBe("project_licenses")
+    expect(builders[0].table).toBe("project_licences")
     expect(builders[0].delete).toHaveBeenCalled()
     expect(builders[0].eq).toHaveBeenCalledWith("project_id", "p1")
-    expect(builders[0].eq).toHaveBeenCalledWith("license_id", "CC-BY-4.0")
+    expect(builders[0].eq).toHaveBeenCalledWith("licence_id", "CC-BY-4.0")
   })
 
   it("maps a missing attachment to not-found", async () => {
