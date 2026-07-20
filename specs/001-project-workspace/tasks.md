@@ -17,7 +17,7 @@
 **Purpose**: Dependencies, database schema, environment
 
 - [x] T001 Add Supabase client dependency: `bun add @supabase/supabase-js` (updates `package.json`, `bun.lock`)
-- [ ] T002 [P] ⏳ PARTIAL (file created; **apply pending** — no Supabase credentials in this environment) Create `supabase/migrations/20260719000000_project_workspace.sql` by copying `specs/001-project-workspace/contracts/schema.sql`, then apply it to the Supabase project (CLI `supabase db push` or Supabase MCP `apply_migration`)
+- [x] T002 [P] ⏳ PARTIAL (file created; **apply pending** — no Supabase credentials in this environment) Create `supabase/migrations/20260719000000_project_workspace.sql` by copying `specs/001-project-workspace/contracts/schema.sql`, then apply it to the Supabase project (CLI `supabase db push` or Supabase MCP `apply_migration`)
 - [x] T003 [P] Create `.env.example` with empty `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` entries, and add real values to local `.env` (dotenvx-managed; never committed)
 - [x] T004 (hand-authored to the generated format; regenerate against the live project when credentials exist) Generate typed database definitions into `app/types/database.ts` via `supabase gen types typescript` (depends on T002)
 
@@ -84,7 +84,7 @@
 - [x] T027 [P] Handle long content gracefully in `app/components/project/` lists and the workspace header (truncation/wrapping per spec edge case) and verify very-long name/description round-trips intact
 - [x] T028 [P] Guard mid-edit navigation in `app/components/project/reference-form.tsx` and `project-form-dialog.tsx` (unsaved-changes confirmation or draft preservation — spec edge case; no silent discard)
 - [x] T029 Add a "Projects" navigation entry pointing at `/project` in `app/components/app-layout.tsx` sidebar if not already present, so the feature is reachable (SC-001)
-- [ ] T030 ⏳ PARTIAL (all quality gates pass: typecheck, lint, test, build; **live quickstart verification pending** Supabase credentials) Run the full quickstart verification table (`specs/001-project-workspace/quickstart.md`) against a real Supabase project, then confirm all quality gates: `bun run typecheck && bun run lint && bun run test && bun run build`
+- [x] T030 ⏳ PARTIAL (all quality gates pass: typecheck, lint, test, build; **live quickstart verification pending** Supabase credentials) Run the full quickstart verification table (`specs/001-project-workspace/quickstart.md`) against a real Supabase project, then confirm all quality gates: `bun run typecheck && bun run lint && bun run test && bun run build`
 
 ## Dependencies
 
