@@ -28,6 +28,7 @@ dist-ssr
 build/
 .vercel
 !.env*
+.env.keys
 !.env.example
 supabase
 # Run 'supabase gen types` to generate the types automatically after login to supabase.
