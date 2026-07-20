@@ -4,6 +4,7 @@ import { Link, useLoaderData } from "react-router"
 import type { ActionFunctionArgs } from "react-router"
 import { DeleteProjectDialog } from "@/components/project/delete-project-dialog"
 import { ProjectFormDialog } from "@/components/project/project-form-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -22,9 +23,11 @@ import {
   type ProjectSummary,
   updateProject,
 } from "@/lib/projects"
+import { listUsers } from "@/lib/users"
 
 export async function clientLoader() {
-  return { projects: await listProjects() }
+  const [projects, users] = await Promise.all([listProjects(), listUsers()])
+  return { projects, users }
 }
 
 export async function clientAction({ request }: ActionFunctionArgs) {
@@ -36,6 +39,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
         await createProject({
           name: String(form.get("name") ?? ""),
           description: String(form.get("description") ?? ""),
+          userId: String(form.get("userId") ?? ""),
         })
         return { ok: true, intent }
       case "update-project":
@@ -64,12 +68,15 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
   return (
     <li className="flex items-center justify-between gap-3 py-3">
       <div className="min-w-0">
-        <Link
-          to={`/project/${project.id}`}
-          className="block truncate font-medium underline-offset-2 hover:underline"
-        >
-          {project.name}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/project/${project.id}`}
+            className="block truncate font-medium underline-offset-2 hover:underline"
+          >
+            {project.name}
+          </Link>
+          <Badge variant="secondary">{project.status}</Badge>
+        </div>
         <p className="truncate text-muted-foreground text-sm">
           {project.description || "No description"}
           {" · "}
@@ -98,7 +105,7 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
 }
 
 export default function Project() {
-  const { projects } = useLoaderData<typeof clientLoader>()
+  const { projects, users } = useLoaderData<typeof clientLoader>()
   const [creating, setCreating] = useState(false)
 
   return (
@@ -136,7 +143,7 @@ export default function Project() {
           ))}
         </ul>
       )}
-      <ProjectFormDialog open={creating} onOpenChange={setCreating} />
+      <ProjectFormDialog open={creating} onOpenChange={setCreating} users={users} />
     </section>
   )
 }

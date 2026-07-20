@@ -9,6 +9,7 @@ import {
   listProjects,
   type ProjectSummary,
 } from "@/lib/projects"
+import { listUsers } from "@/lib/users"
 import ProjectRoute, { clientAction, clientLoader } from "@/routes/project"
 
 vi.mock("@/lib/projects", async (importOriginal) => {
@@ -22,13 +23,22 @@ vi.mock("@/lib/projects", async (importOriginal) => {
   }
 })
 
+vi.mock("@/lib/users", () => ({ listUsers: vi.fn() }))
+
 const summary: ProjectSummary = {
   id: "p1",
   name: "Peshitta Study",
   description: "Aramaic OT sources",
+  status: "draft",
+  type: null,
   createdAt: "2026-07-01T00:00:00Z",
   updatedAt: "2026-07-02T00:00:00Z",
 }
+
+const directoryUsers = [
+  { id: "u1", name: "Ada Researcher", username: "ada", email: "ada@corpora.local" },
+  { id: "u2", name: "Ben Scholar", username: "ben", email: "ben@corpora.local" },
+]
 
 function renderRoute() {
   const Stub = createRoutesStub([
@@ -48,6 +58,7 @@ function renderRoute() {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listProjects).mockResolvedValue([])
+  vi.mocked(listUsers).mockResolvedValue(directoryUsers)
 })
 
 describe("/project list", () => {
@@ -59,16 +70,17 @@ describe("/project list", () => {
     ).toBeInTheDocument()
   })
 
-  it("lists projects with name and last-updated info", async () => {
+  it("lists projects with name, status badge, and last-updated info", async () => {
     vi.mocked(listProjects).mockResolvedValue([summary])
     renderRoute()
     expect(
       await screen.findByRole("link", { name: "Peshitta Study" }),
     ).toBeInTheDocument()
+    expect(screen.getByText("draft")).toBeInTheDocument()
     expect(screen.getByText(/updated/)).toBeInTheDocument()
   })
 
-  it("creates a project from the dialog", async () => {
+  it("creates a project from the dialog with a required creator", async () => {
     const user = userEvent.setup()
     vi.mocked(createProject).mockResolvedValue(summary)
     renderRoute()
@@ -77,16 +89,36 @@ describe("/project list", () => {
       await screen.findByRole("button", { name: /new project/i }),
     )
     await user.type(await screen.findByLabelText("Name"), "Peshitta Study")
+    await user.selectOptions(
+      screen.getByLabelText("Creator"),
+      "Ada Researcher",
+    )
     await user.click(screen.getByRole("button", { name: "Create project" }))
 
     await waitFor(() =>
       expect(createProject).toHaveBeenCalledWith({
         name: "Peshitta Study",
         description: "",
+        userId: "u1",
       }),
     )
     // action success revalidates the list
     await waitFor(() => expect(listProjects).toHaveBeenCalledTimes(2))
+  })
+
+  it("blocks creation and explains when the user directory is empty (FR-015)", async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue([])
+    renderRoute()
+
+    await user.click(
+      await screen.findByRole("button", { name: /new project/i }),
+    )
+    expect(
+      await screen.findByText(/no user profiles are available/i),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Create project" })).toBeDisabled()
+    expect(createProject).not.toHaveBeenCalled()
   })
 
   it("shows the validation message when the name is missing", async () => {
@@ -99,6 +131,7 @@ describe("/project list", () => {
     await user.click(
       await screen.findByRole("button", { name: /new project/i }),
     )
+    await user.selectOptions(screen.getByLabelText("Creator"), "Ada Researcher")
     await user.click(screen.getByRole("button", { name: "Create project" }))
 
     expect(await screen.findByRole("alert")).toHaveTextContent(

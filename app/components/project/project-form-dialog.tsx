@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import type { DirectoryUser } from "@/lib/users"
 
 interface ActionResult {
   ok: boolean
@@ -25,12 +26,19 @@ export interface ProjectFormDialogProps {
   onOpenChange: (open: boolean) => void
   /** When set, the dialog edits this project; otherwise it creates one. */
   project?: { id: string; name: string; description: string | null }
+  /**
+   * Seeded user directory for the required creator select (create mode only;
+   * the creator is immutable after creation — FR-015). Honor-system selection
+   * until corpora-auth ships.
+   */
+  users?: DirectoryUser[]
 }
 
 export function ProjectFormDialog({
   open,
   onOpenChange,
   project,
+  users = [],
 }: ProjectFormDialogProps) {
   const fetcher = useFetcher<ActionResult>()
   const [dirty, setDirty] = useState(false)
@@ -100,6 +108,35 @@ export function ProjectFormDialog({
                 onChange={() => setDirty(true)}
               />
             </div>
+            {!editing && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="project-creator">Creator</Label>
+                {users.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    No user profiles are available yet, so a project cannot be
+                    created. The user directory must be seeded first.
+                  </p>
+                ) : (
+                  <select
+                    id="project-creator"
+                    name="userId"
+                    required
+                    defaultValue=""
+                    onChange={() => setDirty(true)}
+                    className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    <option value="" disabled>
+                      Pick your user profile…
+                    </option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name ?? user.username}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
             {fetcher.data?.ok === false && fetcher.data.error && (
               <p role="alert" className="text-sm text-destructive">
                 {fetcher.data.error}
@@ -114,7 +151,7 @@ export function ProjectFormDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" disabled={busy || (!editing && users.length === 0)}>
               {editing ? "Save changes" : "Create project"}
             </Button>
           </DialogFooter>
