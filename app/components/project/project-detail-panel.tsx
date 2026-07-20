@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { formatDate, formatRelativeTime } from "@/lib/format"
-import type { CatalogLicense } from "@/lib/licenses"
+import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
 import {
   type AttachedLicense,
@@ -53,7 +53,7 @@ function AttachedLicenseRow({ license }: { license: AttachedLicense }) {
 
 export interface ProjectDetailPanelProps {
   project: ProjectDetail
-  licenseCatalog: CatalogLicense[]
+  licenseCatalog: CatalogLicence[]
   organizations: Organization[]
 }
 
