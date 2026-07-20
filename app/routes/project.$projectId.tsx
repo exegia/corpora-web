@@ -5,6 +5,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { CorpusLinkList } from "@/components/project/corpus-link-list"
 import { DeleteProjectDialog } from "@/components/project/delete-project-dialog"
 import { LinkCorpusDialog } from "@/components/project/link-corpus-dialog"
+import { ProjectDetailPanel } from "@/components/project/project-detail-panel"
 import { ProjectFormDialog } from "@/components/project/project-form-dialog"
 import { ReferenceFormDialog } from "@/components/project/reference-form"
 import { ReferenceList } from "@/components/project/reference-list"
@@ -19,25 +20,62 @@ import {
 } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
 import { formatDate, formatRelativeTime } from "@/lib/format"
+import { attachLicense, detachLicense, listLicenses } from "@/lib/licenses"
+import { createOrganization, listOrganizations } from "@/lib/organizations"
 import {
+  type BookType,
+  CATEGORIZED_TYPES,
+  type CategoryType,
+  type Classification,
+  classifyProject,
   createReference,
   DataError,
   deleteProject,
   deleteReference,
   getProject,
+  type LanguageType,
   linkCorpus,
   listCorpusOptions,
+  type ProjectStatus,
   type ReferenceInput,
+  SCRIPTURAL_TYPES,
+  setProjectOrganization,
   unlinkCorpus,
   updateProject,
+  updateProjectStatus,
   updateReference,
 } from "@/lib/projects"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const projectId = params.projectId ?? ""
   const project = await getProject(projectId)
-  const corpusOptions = project ? await listCorpusOptions(projectId) : []
-  return { project, corpusOptions }
+  const [corpusOptions, licenseCatalog, organizations] = project
+    ? await Promise.all([
+        listCorpusOptions(projectId),
+        listLicenses(),
+        listOrganizations(),
+      ])
+    : [[], [], []]
+  return { project, corpusOptions, licenseCatalog, organizations }
+}
+
+/** Build the discriminated Classification from form fields (FR-006..FR-009). */
+function parseClassification(form: FormData): Classification {
+  const type = String(form.get("type") ?? "")
+  if (!type) return null
+  if ((SCRIPTURAL_TYPES as readonly string[]).includes(type)) {
+    return {
+      type: type as (typeof SCRIPTURAL_TYPES)[number],
+      language: String(form.get("language") ?? "") as LanguageType,
+    }
+  }
+  if ((CATEGORIZED_TYPES as readonly string[]).includes(type)) {
+    return {
+      type: type as (typeof CATEGORIZED_TYPES)[number],
+      category: String(form.get("category") ?? "") as CategoryType,
+    }
+  }
+  return { type: type as BookType } as Classification
 }
 
 function parseReferenceInput(form: FormData): ReferenceInput {
@@ -70,6 +108,39 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
       case "delete-project":
         await deleteProject(projectId)
         return redirect("/project")
+      case "set-status":
+        await updateProjectStatus(
+          projectId,
+          String(form.get("status") ?? "") as ProjectStatus,
+        )
+        return { ok: true, intent }
+      case "classify":
+        await classifyProject(projectId, parseClassification(form))
+        return { ok: true, intent }
+      case "attach-license":
+        await attachLicense(
+          projectId,
+          String(form.get("licenseId") ?? ""),
+          // Pre-auth: the project's creator is the agreeing user (plan Constraints)
+          String(form.get("agreedByUserId") ?? ""),
+        )
+        return { ok: true, intent }
+      case "detach-license":
+        await detachLicense(projectId, String(form.get("licenseId") ?? ""))
+        return { ok: true, intent }
+      case "set-organization": {
+        const organizationId = String(form.get("organizationId") ?? "")
+        await setProjectOrganization(projectId, organizationId || null)
+        return { ok: true, intent }
+      }
+      case "create-organization": {
+        const organization = await createOrganization({
+          name: String(form.get("name") ?? ""),
+          website: String(form.get("website") ?? ""),
+        })
+        await setProjectOrganization(projectId, organization.id)
+        return { ok: true, intent }
+      }
       case "link-corpus":
         await linkCorpus(projectId, String(form.get("corpusId") ?? ""))
         return { ok: true, intent }
@@ -119,7 +190,8 @@ function ProjectNotFound() {
 }
 
 export default function ProjectWorkspace() {
-  const { project, corpusOptions } = useLoaderData<typeof clientLoader>()
+  const { project, corpusOptions, licenseCatalog, organizations } =
+    useLoaderData<typeof clientLoader>()
   const [editing, setEditing] = useState(false)
   const [addingReference, setAddingReference] = useState(false)
 
@@ -151,6 +223,12 @@ export default function ProjectWorkspace() {
           />
         </div>
       </header>
+
+      <ProjectDetailPanel
+        project={project}
+        licenseCatalog={licenseCatalog}
+        organizations={organizations}
+      />
 
       <Separator />
 

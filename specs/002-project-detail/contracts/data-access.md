@@ -78,7 +78,10 @@ export interface DirectoryUser {
   email: string
 }
 
-/** Seeded user directory, ordered by name. Empty ⇒ UI blocks creation with a message (FR-015). */
+/**
+ * Seeded user directory, ordered by name. Empty ⇒ UI blocks creation with a message (FR-015).
+ * Reads the `user_directory` table (NOT `public.users`, which belongs to corpora-auth — research R4).
+ */
 export function listUsers(): Promise<DirectoryUser[]>
 ```
 

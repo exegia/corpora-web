@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
+  classifyProject,
   createProject,
   createReference,
   DataError,
@@ -9,8 +10,10 @@ import {
   linkCorpus,
   listCorpusOptions,
   listProjects,
+  setProjectOrganization,
   unlinkCorpus,
   updateProject,
+  updateProjectStatus,
   updateReference,
 } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
@@ -73,6 +76,8 @@ const projectRow = {
   id: "p1",
   name: "Peshitta Study",
   description: null,
+  status: "draft",
+  type: null,
   created_at: "2026-07-01T00:00:00Z",
   updated_at: "2026-07-02T00:00:00Z",
 }
@@ -90,6 +95,8 @@ describe("listProjects", () => {
         id: "p1",
         name: "Peshitta Study",
         description: null,
+        status: "draft",
+        type: null,
         createdAt: "2026-07-01T00:00:00Z",
         updatedAt: "2026-07-02T00:00:00Z",
       },
@@ -112,19 +119,61 @@ describe("listProjects", () => {
 describe("createProject", () => {
   it("rejects an empty name before any network call", async () => {
     const { from } = mockSupabase([])
-    await expect(createProject({ name: "   " })).rejects.toMatchObject({
+    await expect(
+      createProject({ name: "   ", userId: "u1" }),
+    ).rejects.toMatchObject({ code: "validation" })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("rejects a missing creator before any network call (FR-015)", async () => {
+    const { from } = mockSupabase([])
+    await expect(
+      createProject({ name: "Peshitta Study", userId: "  " }),
+    ).rejects.toMatchObject({
       code: "validation",
+      message: expect.stringContaining("creator"),
     })
     expect(from).not.toHaveBeenCalled()
   })
 
-  it("inserts a trimmed name and returns the summary", async () => {
+  it("inserts a trimmed name with the creating user and returns the summary", async () => {
     const { builders } = mockSupabase([{ data: projectRow, error: null }])
-    const project = await createProject({ name: "  Peshitta Study  " })
+    const project = await createProject({
+      name: "  Peshitta Study  ",
+      userId: "u1",
+    })
     expect(project.id).toBe("p1")
     expect(builders[0].insert).toHaveBeenCalledWith({
       name: "Peshitta Study",
       description: null,
+      user_id: "u1",
+    })
+  })
+})
+
+describe("updateProjectStatus", () => {
+  it("updates the status and touches updated_at", async () => {
+    const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
+    await updateProjectStatus("p1", "started")
+    expect(builders[0].table).toBe("projects")
+    expect(builders[0].update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "started", updated_at: expect.any(String) }),
+    )
+    expect(builders[0].eq).toHaveBeenCalledWith("id", "p1")
+  })
+
+  it("rejects an unknown status before any network call", async () => {
+    const { from } = mockSupabase([])
+    await expect(
+      updateProjectStatus("p1", "archived" as never),
+    ).rejects.toMatchObject({ code: "validation" })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("maps a missing row to not-found", async () => {
+    mockSupabase([{ data: null, error: null }])
+    await expect(updateProjectStatus("gone", "failed")).rejects.toMatchObject({
+      code: "not-found",
     })
   })
 })
@@ -154,6 +203,20 @@ describe("deleteProject", () => {
   })
 })
 
+const creatorRow = { id: "u1", name: "Ada Researcher", username: "ada" }
+
+/** Full detail row shape as the nested select returns it (002). */
+const detailRow = {
+  ...projectRow,
+  language: null,
+  category: null,
+  user_directory: creatorRow,
+  organizations: null,
+  project_licenses: [],
+  project_corpora: [],
+  project_references: [],
+}
+
 describe("getProject", () => {
   it("returns null when the project is missing", async () => {
     mockSupabase([{ data: null, error: null }])
@@ -164,7 +227,7 @@ describe("getProject", () => {
     mockSupabase([
       {
         data: {
-          ...projectRow,
+          ...detailRow,
           project_corpora: [
             {
               corpus_id: "c1",
@@ -181,7 +244,6 @@ describe("getProject", () => {
             },
             { corpus_id: "c2", linked_at: "2026-07-04T00:00:00Z", corpora: null },
           ],
-          project_references: [],
         },
         error: null,
       },
@@ -190,6 +252,117 @@ describe("getProject", () => {
     expect(project?.corpora).toHaveLength(2)
     expect(project?.corpora[0].corpus?.available).toBe(false)
     expect(project?.corpora[1].corpus).toBeNull()
+  })
+
+  it("maps creator, organization, and attached licenses (002)", async () => {
+    mockSupabase([
+      {
+        data: {
+          ...detailRow,
+          type: "bible",
+          language: "aramaic",
+          organizations: { id: "o1", name: "Peshitta Institute", website: null },
+          project_licenses: [
+            {
+              agreed_at: "2026-07-06T00:00:00Z",
+              licenses: {
+                id: "CC-BY-4.0",
+                title: "Creative Commons Attribution 4.0",
+                url: "https://example.org/cc-by",
+                domain_content: true,
+                domain_data: true,
+                domain_software: false,
+                family: "Creative Commons",
+                maintainer: null,
+                status: "active",
+              },
+              user_directory: creatorRow,
+            },
+          ],
+        },
+        error: null,
+      },
+    ])
+    const project = await getProject("p1")
+    expect(project?.creator).toEqual(creatorRow)
+    expect(project?.organization?.name).toBe("Peshitta Institute")
+    expect(project?.language).toBe("aramaic")
+    expect(project?.licenses).toEqual([
+      {
+        id: "CC-BY-4.0",
+        title: "Creative Commons Attribution 4.0",
+        url: "https://example.org/cc-by",
+        domains: { content: true, data: true, software: false },
+        status: "active",
+        family: "Creative Commons",
+        maintainer: null,
+        agreedAt: "2026-07-06T00:00:00Z",
+        agreedBy: creatorRow,
+      },
+    ])
+  })
+})
+
+describe("classifyProject", () => {
+  it.each([
+    ["scriptural type + language", { type: "bible", language: "hebrew" }, { type: "bible", language: "hebrew", category: null }],
+    ["categorized type + category", { type: "review", category: "literary" }, { type: "review", language: null, category: "literary" }],
+    ["neutral type", { type: "regular" }, { type: "regular", language: null, category: null }],
+    ["cleared classification", null, { type: null, language: null, category: null }],
+  ] as const)(
+    "writes %s atomically in one update",
+    async (_label, classification, expected) => {
+      const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
+      await classifyProject("p1", classification as never)
+      expect(builders[0].table).toBe("projects")
+      expect(builders[0].update).toHaveBeenCalledWith(
+        expect.objectContaining({ ...expected, updated_at: expect.any(String) }),
+      )
+    },
+  )
+
+  it.each([
+    ["scriptural type without a language", { type: "bible" }],
+    ["categorized type without a category", { type: "commentary" }],
+    ["unknown type", { type: "novel" }],
+  ] as const)("rejects %s before any network call", async (_label, input) => {
+    const { from } = mockSupabase([])
+    await expect(classifyProject("p1", input as never)).rejects.toMatchObject({
+      code: "validation",
+    })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("maps a missing row to not-found", async () => {
+    mockSupabase([{ data: null, error: null }])
+    await expect(
+      classifyProject("gone", { type: "regular" }),
+    ).rejects.toMatchObject({ code: "not-found" })
+  })
+})
+
+describe("setProjectOrganization", () => {
+  it("assigns an organization and touches updated_at", async () => {
+    const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
+    await setProjectOrganization("p1", "o1")
+    expect(builders[0].update).toHaveBeenCalledWith(
+      expect.objectContaining({ organization_id: "o1", updated_at: expect.any(String) }),
+    )
+  })
+
+  it("clears the organization with null", async () => {
+    const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
+    await setProjectOrganization("p1", null)
+    expect(builders[0].update).toHaveBeenCalledWith(
+      expect.objectContaining({ organization_id: null }),
+    )
+  })
+
+  it("maps a missing row to not-found", async () => {
+    mockSupabase([{ data: null, error: null }])
+    await expect(setProjectOrganization("gone", null)).rejects.toMatchObject({
+      code: "not-found",
+    })
   })
 })
 

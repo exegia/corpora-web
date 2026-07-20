@@ -2,7 +2,10 @@ import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { attachLicense, detachLicense, listLicenses } from "@/lib/licenses"
+import { createOrganization, listOrganizations } from "@/lib/organizations"
 import {
+  classifyProject,
   createReference,
   DataError,
   deleteProject,
@@ -11,8 +14,10 @@ import {
   linkCorpus,
   listCorpusOptions,
   type ProjectDetail,
+  setProjectOrganization,
   unlinkCorpus,
   updateProject,
+  updateProjectStatus,
   updateReference,
 } from "@/lib/projects"
 import WorkspaceRoute, {
@@ -27,6 +32,9 @@ vi.mock("@/lib/projects", async (importOriginal) => {
     getProject: vi.fn(),
     listCorpusOptions: vi.fn(),
     updateProject: vi.fn(),
+    updateProjectStatus: vi.fn(),
+    classifyProject: vi.fn(),
+    setProjectOrganization: vi.fn(),
     deleteProject: vi.fn(),
     linkCorpus: vi.fn(),
     unlinkCorpus: vi.fn(),
@@ -36,10 +44,28 @@ vi.mock("@/lib/projects", async (importOriginal) => {
   }
 })
 
+vi.mock("@/lib/licenses", () => ({
+  listLicenses: vi.fn(),
+  attachLicense: vi.fn(),
+  detachLicense: vi.fn(),
+}))
+
+vi.mock("@/lib/organizations", () => ({
+  listOrganizations: vi.fn(),
+  createOrganization: vi.fn(),
+}))
+
 const detail: ProjectDetail = {
   id: "p1",
   name: "Peshitta Study",
   description: "Aramaic OT sources",
+  status: "draft",
+  type: null,
+  language: null,
+  category: null,
+  creator: { id: "u1", name: "Ada Researcher", username: "ada" },
+  organization: null,
+  licenses: [],
   createdAt: "2026-07-01T00:00:00Z",
   updatedAt: "2026-07-02T00:00:00Z",
   corpora: [
@@ -100,9 +126,23 @@ function renderRoute() {
   return render(<Stub initialEntries={["/project/p1"]} />)
 }
 
+const catalogLicense = {
+  id: "CC-BY-4.0",
+  title: "Creative Commons Attribution 4.0",
+  url: null,
+  domains: { content: true, data: true, software: false },
+  status: "active" as const,
+  family: null,
+  maintainer: null,
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getProject).mockResolvedValue(detail)
+  vi.mocked(listLicenses).mockResolvedValue([catalogLicense])
+  vi.mocked(listOrganizations).mockResolvedValue([
+    { id: "o1", name: "Peshitta Institute", website: null },
+  ])
   vi.mocked(listCorpusOptions).mockResolvedValue([
     {
       id: "c1",
@@ -285,5 +325,256 @@ describe("/project/:projectId workspace", () => {
     )
 
     await waitFor(() => expect(deleteReference).toHaveBeenCalledWith("r1"))
+  })
+})
+
+describe("details panel — status (US1)", () => {
+  it("shows metadata with the current status and only the five statuses offered", async () => {
+    renderRoute()
+    const select = await screen.findByLabelText("Status")
+    expect(select).toHaveValue("draft")
+    expect(
+      within(select as HTMLElement)
+        .getAllByRole("option")
+        .map((option) => (option as HTMLOptionElement).value),
+    ).toEqual(["draft", "started", "progress", "completed", "failed"])
+    // dates appear in the panel's Dates row (in addition to the header)
+    expect(screen.getAllByText(/created/i).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("submits set-status when the status changes", async () => {
+    const user = userEvent.setup()
+    vi.mocked(updateProjectStatus).mockResolvedValue()
+    renderRoute()
+
+    await user.selectOptions(await screen.findByLabelText("Status"), "started")
+    await waitFor(() =>
+      expect(updateProjectStatus).toHaveBeenCalledWith("p1", "started"),
+    )
+  })
+
+  it("surfaces a failed status update as a visible error", async () => {
+    const user = userEvent.setup()
+    vi.mocked(updateProjectStatus).mockRejectedValue(
+      new DataError("unknown", "Could not update the project status."),
+    )
+    renderRoute()
+
+    await user.selectOptions(await screen.findByLabelText("Status"), "failed")
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Could not update the project status.",
+    )
+  })
+})
+
+describe("details panel — classification (US2)", () => {
+  it("renders Unclassified and swaps the conditional field per type", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+
+    expect(await screen.findByText("Unclassified")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Classify" }))
+
+    const typeSelect = await screen.findByLabelText("Type")
+    await user.selectOptions(typeSelect, "bible")
+    expect(screen.getByLabelText("Source language")).toBeInTheDocument()
+    expect(screen.queryByLabelText("Category")).not.toBeInTheDocument()
+
+    await user.selectOptions(typeSelect, "commentary")
+    expect(screen.getByLabelText("Category")).toBeInTheDocument()
+    expect(screen.queryByLabelText("Source language")).not.toBeInTheDocument()
+
+    await user.selectOptions(typeSelect, "regular")
+    expect(screen.queryByLabelText("Source language")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Category")).not.toBeInTheDocument()
+  })
+
+  it("blocks saving until the required conditional value is chosen", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Classify" }))
+    await user.selectOptions(await screen.findByLabelText("Type"), "bible")
+    expect(
+      screen.getByRole("button", { name: "Save classification" }),
+    ).toBeDisabled()
+
+    await user.selectOptions(screen.getByLabelText("Source language"), "hebrew")
+    expect(
+      screen.getByRole("button", { name: "Save classification" }),
+    ).toBeEnabled()
+  })
+
+  it("submits the classification and clears the stale value on a type switch", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      type: "bible",
+      language: "hebrew",
+    })
+    vi.mocked(classifyProject).mockResolvedValue()
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Classify" }))
+    await user.selectOptions(await screen.findByLabelText("Type"), "review")
+    await user.selectOptions(screen.getByLabelText("Category"), "literary")
+    await user.click(
+      screen.getByRole("button", { name: "Save classification" }),
+    )
+
+    await waitFor(() =>
+      expect(classifyProject).toHaveBeenCalledWith("p1", {
+        type: "review",
+        category: "literary",
+      }),
+    )
+  })
+})
+
+describe("details panel — licenses (US3)", () => {
+  it("shows the empty state and attaches after an agreement confirmation", async () => {
+    const user = userEvent.setup()
+    vi.mocked(attachLicense).mockResolvedValue()
+    renderRoute()
+
+    expect(await screen.findByText(/no licenses attached/i)).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Add license" }))
+    await user.click(await screen.findByRole("button", { name: "Attach" }))
+    expect(attachLicense).not.toHaveBeenCalled() // agreement step first
+    await user.click(screen.getByRole("button", { name: "Agree & attach" }))
+
+    await waitFor(() =>
+      expect(attachLicense).toHaveBeenCalledWith("p1", "CC-BY-4.0", "u1"),
+    )
+  })
+
+  it("lists attached licenses with agreement info and detaches one row only", async () => {
+    const user = userEvent.setup()
+    vi.mocked(detachLicense).mockResolvedValue()
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      licenses: [
+        {
+          ...catalogLicense,
+          agreedAt: "2026-07-06T00:00:00Z",
+          agreedBy: detail.creator,
+        },
+        {
+          ...catalogLicense,
+          id: "GPL-3.0",
+          title: "GNU GPL v3",
+          agreedAt: "2026-07-07T00:00:00Z",
+          agreedBy: detail.creator,
+        },
+      ],
+    })
+    renderRoute()
+
+    expect(
+      await screen.findByText("Creative Commons Attribution 4.0"),
+    ).toBeInTheDocument()
+    expect(screen.getAllByText(/agreed .* by ada researcher/i)).toHaveLength(2)
+
+    const row = screen
+      .getByText("GNU GPL v3")
+      .closest("li") as HTMLElement
+    await user.click(within(row).getByRole("button", { name: "Remove" }))
+    await waitFor(() =>
+      expect(detachLicense).toHaveBeenCalledWith("p1", "GPL-3.0"),
+    )
+    expect(detachLicense).toHaveBeenCalledTimes(1)
+  })
+
+  it("marks already-attached catalog entries and explains an empty catalog", async () => {
+    const user = userEvent.setup()
+    vi.mocked(listLicenses).mockResolvedValue([])
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Add license" }))
+    expect(
+      await screen.findByText(/catalog has not been seeded/i),
+    ).toBeInTheDocument()
+  })
+})
+
+describe("details panel — organization & creator (US4)", () => {
+  it("displays the creator (FR-015)", async () => {
+    renderRoute()
+    expect(await screen.findByText("Ada Researcher")).toBeInTheDocument()
+  })
+
+  it("displays the backfilled default user for pre-002 projects (FR-017)", async () => {
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      creator: { id: "u0", name: "Default User", username: "default" },
+    })
+    renderRoute()
+    expect(await screen.findByText("Default User")).toBeInTheDocument()
+  })
+
+  it("assigns an existing organization from the picker", async () => {
+    const user = userEvent.setup()
+    vi.mocked(setProjectOrganization).mockResolvedValue()
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Assign" }))
+    await user.selectOptions(
+      await screen.findByLabelText("Organization"),
+      "Peshitta Institute",
+    )
+    await user.click(screen.getByRole("button", { name: "Save" }))
+
+    await waitFor(() =>
+      expect(setProjectOrganization).toHaveBeenCalledWith("p1", "o1"),
+    )
+  })
+
+  it("creates an organization inline and assigns it", async () => {
+    const user = userEvent.setup()
+    vi.mocked(createOrganization).mockResolvedValue({
+      id: "o2",
+      name: "New Org",
+      website: null,
+    })
+    vi.mocked(setProjectOrganization).mockResolvedValue()
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Assign" }))
+    await user.click(
+      await screen.findByRole("button", { name: /create a new organization/i }),
+    )
+    await user.type(await screen.findByLabelText("Name"), "New Org")
+    await user.click(screen.getByRole("button", { name: "Create & assign" }))
+
+    await waitFor(() =>
+      expect(createOrganization).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "New Org" }),
+      ),
+    )
+    await waitFor(() =>
+      expect(setProjectOrganization).toHaveBeenCalledWith("p1", "o2"),
+    )
+  })
+
+  it("removes the organization without deleting the project", async () => {
+    const user = userEvent.setup()
+    vi.mocked(setProjectOrganization).mockResolvedValue()
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      organization: { id: "o1", name: "Peshitta Institute", website: null },
+    })
+    renderRoute()
+
+    const organizationRow = (
+      await screen.findByText("Peshitta Institute")
+    ).closest("dd") as HTMLElement
+    await user.click(
+      within(organizationRow).getByRole("button", { name: "Remove" }),
+    )
+
+    await waitFor(() =>
+      expect(setProjectOrganization).toHaveBeenCalledWith("p1", null),
+    )
+    expect(deleteProject).not.toHaveBeenCalled()
   })
 })

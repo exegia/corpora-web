@@ -1,0 +1,51 @@
+// Data-access layer for organizations (002, FR-014).
+// Contract: specs/002-project-detail/contracts/data-access.md
+// Pick-or-create records; not accounts or access-control boundaries.
+// Route modules import ONLY from this module — never supabase-js directly.
+
+import { DataError } from "@/lib/projects"
+import { getSupabase } from "@/lib/supabase"
+
+export interface Organization {
+  id: string
+  name: string
+  website: string | null
+}
+
+const ORGANIZATION_COLUMNS = "id, name, website"
+
+export async function listOrganizations(): Promise<Organization[]> {
+  const { data, error } = await getSupabase()
+    .from("organizations")
+    .select(ORGANIZATION_COLUMNS)
+    .order("name", { ascending: true })
+  if (error) {
+    throw new DataError(
+      "unknown",
+      `Could not load organizations: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  return (data ?? []) as Organization[]
+}
+
+export async function createOrganization(input: {
+  name: string
+  website?: string
+}): Promise<Organization> {
+  const name = input.name.trim()
+  if (!name) {
+    throw new DataError("validation", "An organization name is required.")
+  }
+  const { data, error } = await getSupabase()
+    .from("organizations")
+    .insert({ name, website: input.website?.trim() || null })
+    .select(ORGANIZATION_COLUMNS)
+    .single()
+  if (error || !data) {
+    throw new DataError(
+      "unknown",
+      `Could not create the organization: ${error?.message ?? "unexpected error"}`,
+    )
+  }
+  return data as Organization
+}

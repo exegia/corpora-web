@@ -30,9 +30,11 @@ Source of truth: `corpora-tauri/packages` domain enums. Stored as the exact pers
 
 ## Tables
 
-### `users` (NEW — seeded directory, read-only to the app)
+### `user_directory` (NEW — seeded directory, read-only to the app)
 
 Mirrors `user.rs`. Populated by the migration's dummy seed (fixed UUIDs); replaced/claimed by `corpora-auth` later via `auth_id`. The app only reads it (FR-018).
+
+> **Implementation note (T001)**: originally planned as `users`, but the remote database already carries corpora-auth's `public.users` profile table (FK to `auth.users` + signup trigger), which cannot hold dummy rows. The seeded directory therefore lives in `public.user_directory`; at the auth cutover, `projects.user_id` re-points to `public.users` using the `auth_id` mapping and the directory is dropped.
 
 | Column | Type | Constraints | Notes |
 | --- | --- | --- | --- |
