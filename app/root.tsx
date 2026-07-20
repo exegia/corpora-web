@@ -20,9 +20,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body>
+      <body className="w-full h-screen relative overflow-hidden">
+        <div className="absolute left-0 top-0 w-full h-full overflow-hidden scrollbar-none">
         {children}
-        <ScrollRestoration />
+          <ScrollRestoration />
+        </div>
         <Scripts />
       </body>
     </html>

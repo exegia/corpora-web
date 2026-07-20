@@ -28,7 +28,7 @@ const items = [
   { title: "Corpus", url: "/corpus", icon: Database },
 ]
 
-export function AppSidebar() {
+const AppSidebar = () => {
   return (
     <Sidebar variant="inset">
       <SidebarHeader className="flex flex-row items-center justify-center">
@@ -61,3 +61,5 @@ export function AppSidebar() {
     </Sidebar>
   )
 }
+
+export default AppSidebar;
