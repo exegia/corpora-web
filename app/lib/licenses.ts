@@ -1,7 +1,7 @@
-// Data-access layer for the license catalog + project attachments (002).
+// Data-access layer for the licence catalog + project attachments (002).
 // Contract: specs/002-project-detail/contracts/data-access.md
 // The catalog is read-only (seeded out of band, FR-011); this module only
-// reads `licenses` and writes `project_licenses`. Route modules import ONLY
+// reads `licences` and writes `project_licences`. Route modules import ONLY
 // from this module — never supabase-js directly.
 
 import {
@@ -11,7 +11,7 @@ import {
 } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
 
-export interface CatalogLicense {
+export interface CatalogLicence {
   id: string
   title: string
   url: string | null
@@ -37,15 +37,15 @@ const CATALOG_COLUMNS =
   "id, title, url, domain_content, domain_data, domain_software, family, maintainer, status"
 
 /** Full catalog, ordered by title. Empty until the SQL seed is loaded (FR-011). */
-export async function listLicenses(): Promise<CatalogLicense[]> {
+export async function listLicences(): Promise<CatalogLicence[]> {
   const { data, error } = await getSupabase()
-    .from("licenses")
+    .from("licences")
     .select(CATALOG_COLUMNS)
     .order("title", { ascending: true })
   if (error) {
     throw new DataError(
       "unknown",
-      `Could not load the license catalog: ${error.message ?? "unexpected error"}`,
+      `Could not load the licence catalog: ${error.message ?? "unexpected error"}`,
     )
   }
   return ((data ?? []) as CatalogRow[]).map((row) => ({
@@ -64,60 +64,60 @@ export async function listLicenses(): Promise<CatalogLicense[]> {
 }
 
 /**
- * Attach a catalog license with agreement (FR-010/FR-012). The agreeing user
- * comes from the seeded directory. Duplicate attachment (composite-PK 23505)
- * maps to "already-attached".
+ * Attach a catalog licence with agreement (FR-010/FR-012). The agreeing user
+ * comes from the seeded directory. Duplicate attachment (unique
+ * project_id+licence_id, 23505) maps to "already-attached".
  */
-export async function attachLicense(
+export async function attachLicence(
   projectId: string,
-  licenseId: string,
+  licenceId: string,
   agreedByUserId: string,
 ): Promise<void> {
-  if (!licenseId.trim()) {
-    throw new DataError("validation", "Pick a license to attach.")
+  if (!licenceId.trim()) {
+    throw new DataError("validation", "Pick a licence to attach.")
   }
   if (!agreedByUserId.trim()) {
     throw new DataError("validation", "An agreeing user is required.")
   }
-  const { error } = await getSupabase().from("project_licenses").insert({
+  const { error } = await getSupabase().from("project_licences").insert({
     project_id: projectId,
-    license_id: licenseId,
+    licence_id: licenceId,
     agreed_by_user_id: agreedByUserId,
   })
   if (error) {
     if (error.code === "23505") {
       throw new DataError(
         "already-attached",
-        "This license is already attached to the project.",
+        "This licence is already attached to the project.",
       )
     }
     throw new DataError(
       "unknown",
-      `Could not attach the license: ${error.message ?? "unexpected error"}`,
+      `Could not attach the licence: ${error.message ?? "unexpected error"}`,
     )
   }
   await touchProject(projectId)
 }
 
-/** Detach one license; the project's other licenses are untouched (FR-013). */
-export async function detachLicense(
+/** Detach one licence; the project's other licences are untouched (FR-013). */
+export async function detachLicence(
   projectId: string,
-  licenseId: string,
+  licenceId: string,
 ): Promise<void> {
   const { data, error } = await getSupabase()
-    .from("project_licenses")
+    .from("project_licences")
     .delete()
     .eq("project_id", projectId)
-    .eq("license_id", licenseId)
-    .select("license_id")
+    .eq("licence_id", licenceId)
+    .select("licence_id")
   if (error) {
     throw new DataError(
       "unknown",
-      `Could not remove the license: ${error.message ?? "unexpected error"}`,
+      `Could not remove the licence: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data || data.length === 0) {
-    throw new DataError("not-found", "This license is not attached to the project.")
+    throw new DataError("not-found", "This licence is not attached to the project.")
   }
   await touchProject(projectId)
 }

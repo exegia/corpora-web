@@ -224,9 +224,9 @@ interface ProjectDetailRow extends ProjectRow {
   category: CategoryType | null
   user_directory: CreatorRow | null
   organizations: { id: string; name: string; website: string | null } | null
-  project_licenses: {
+  project_licences: {
     agreed_at: string
-    licenses: LicenseRow | null
+    licences: LicenseRow | null
     user_directory: CreatorRow | null
   }[]
   project_corpora: {
@@ -250,8 +250,8 @@ const PROJECT_COLUMNS = "id, name, description, status, type, created_at, update
 const PROJECT_DETAIL_COLUMNS = `${PROJECT_COLUMNS}, language, category,
   user_directory ( id, name, username ),
   organizations ( id, name, website ),
-  project_licenses ( agreed_at,
-    licenses ( id, title, url, domain_content, domain_data, domain_software, family, maintainer, status ),
+  project_licences ( agreed_at,
+    licences ( id, title, url, domain_content, domain_data, domain_software, family, maintainer, status ),
     user_directory ( id, name, username ) ),
   project_corpora ( corpus_id, linked_at,
     corpora ( uid, name, language, type, category, version, available ) ),
@@ -339,10 +339,10 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
     category: row.category,
     creator: row.user_directory ?? UNKNOWN_CREATOR,
     organization: row.organizations,
-    licenses: row.project_licenses
-      .filter((attachment) => attachment.licenses !== null)
+    licenses: row.project_licences
+      .filter((attachment) => attachment.licences !== null)
       .map((attachment) => {
-        const license = attachment.licenses as LicenseRow
+        const license = attachment.licences as LicenseRow
         return {
           id: license.id,
           title: license.title,
