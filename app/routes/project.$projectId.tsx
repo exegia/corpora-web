@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
 import { formatDate, formatRelativeTime } from "@/lib/format"
-import { attachLicense, detachLicense, listLicenses } from "@/lib/licenses"
+import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organizations"
 import {
   type BookType,
@@ -52,7 +52,7 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
   const [corpusOptions, licenseCatalog, organizations] = project
     ? await Promise.all([
         listCorpusOptions(projectId),
-        listLicenses(),
+        listLicences(),
         listOrganizations(),
       ])
     : [[], [], []]
@@ -118,7 +118,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
         await classifyProject(projectId, parseClassification(form))
         return { ok: true, intent }
       case "attach-license":
-        await attachLicense(
+        await attachLicence(
           projectId,
           String(form.get("licenseId") ?? ""),
           // Pre-auth: the project's creator is the agreeing user (plan Constraints)
@@ -126,7 +126,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
         )
         return { ok: true, intent }
       case "detach-license":
-        await detachLicense(projectId, String(form.get("licenseId") ?? ""))
+        await detachLicence(projectId, String(form.get("licenseId") ?? ""))
         return { ok: true, intent }
       case "set-organization": {
         const organizationId = String(form.get("organizationId") ?? "")

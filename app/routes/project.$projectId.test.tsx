@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { attachLicense, detachLicense, listLicenses } from "@/lib/licenses"
+import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organizations"
 import {
   classifyProject,
@@ -45,9 +45,9 @@ vi.mock("@/lib/projects", async (importOriginal) => {
 })
 
 vi.mock("@/lib/licenses", () => ({
-  listLicenses: vi.fn(),
-  attachLicense: vi.fn(),
-  detachLicense: vi.fn(),
+  listLicences: vi.fn(),
+  attachLicence: vi.fn(),
+  detachLicence: vi.fn(),
 }))
 
 vi.mock("@/lib/organizations", () => ({
@@ -139,7 +139,7 @@ const catalogLicense = {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getProject).mockResolvedValue(detail)
-  vi.mocked(listLicenses).mockResolvedValue([catalogLicense])
+  vi.mocked(listLicences).mockResolvedValue([catalogLicense])
   vi.mocked(listOrganizations).mockResolvedValue([
     { id: "o1", name: "Peshitta Institute", website: null },
   ])
@@ -434,23 +434,23 @@ describe("details panel — classification (US2)", () => {
 describe("details panel — licenses (US3)", () => {
   it("shows the empty state and attaches after an agreement confirmation", async () => {
     const user = userEvent.setup()
-    vi.mocked(attachLicense).mockResolvedValue()
+    vi.mocked(attachLicence).mockResolvedValue()
     renderRoute()
 
     expect(await screen.findByText(/no licenses attached/i)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Add license" }))
     await user.click(await screen.findByRole("button", { name: "Attach" }))
-    expect(attachLicense).not.toHaveBeenCalled() // agreement step first
+    expect(attachLicence).not.toHaveBeenCalled() // agreement step first
     await user.click(screen.getByRole("button", { name: "Agree & attach" }))
 
     await waitFor(() =>
-      expect(attachLicense).toHaveBeenCalledWith("p1", "CC-BY-4.0", "u1"),
+      expect(attachLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0", "u1"),
     )
   })
 
   it("lists attached licenses with agreement info and detaches one row only", async () => {
     const user = userEvent.setup()
-    vi.mocked(detachLicense).mockResolvedValue()
+    vi.mocked(detachLicence).mockResolvedValue()
     vi.mocked(getProject).mockResolvedValue({
       ...detail,
       licenses: [
@@ -480,14 +480,14 @@ describe("details panel — licenses (US3)", () => {
       .closest("li") as HTMLElement
     await user.click(within(row).getByRole("button", { name: "Remove" }))
     await waitFor(() =>
-      expect(detachLicense).toHaveBeenCalledWith("p1", "GPL-3.0"),
+      expect(detachLicence).toHaveBeenCalledWith("p1", "GPL-3.0"),
     )
-    expect(detachLicense).toHaveBeenCalledTimes(1)
+    expect(detachLicence).toHaveBeenCalledTimes(1)
   })
 
   it("marks already-attached catalog entries and explains an empty catalog", async () => {
     const user = userEvent.setup()
-    vi.mocked(listLicenses).mockResolvedValue([])
+    vi.mocked(listLicences).mockResolvedValue([])
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Add license" }))

@@ -11,9 +11,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import type { CatalogLicense } from "@/lib/licenses"
+import type { CatalogLicence } from "@/lib/licenses"
 
-function domainBadges(license: CatalogLicense) {
+function domainBadges(license: CatalogLicence) {
   const domains: string[] = []
   if (license.domains.content) domains.push("content")
   if (license.domains.data) domains.push("data")
@@ -26,7 +26,7 @@ function CatalogRow({
   attached,
   agreedByUserId,
 }: {
-  license: CatalogLicense
+  license: CatalogLicence
   attached: boolean
   agreedByUserId: string
 }) {
@@ -113,7 +113,7 @@ function CatalogRow({
 }
 
 export interface LicenseDialogProps {
-  catalog: CatalogLicense[]
+  catalog: CatalogLicence[]
   attachedIds: string[]
   /** Agreeing user — the project's creator until corpora-auth ships (FR-012). */
   agreedByUserId: string

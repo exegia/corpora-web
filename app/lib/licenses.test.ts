@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { attachLicense, detachLicense, listLicenses } from "@/lib/licenses"
+import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
 import { getSupabase } from "@/lib/supabase"
 
 vi.mock("@/lib/supabase", () => ({ getSupabase: vi.fn() }))
@@ -62,11 +62,11 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe("listLicenses", () => {
+describe("listLicences", () => {
   it("maps catalog rows with domain flags, ordered by title", async () => {
     const { builders } = mockSupabase([{ data: [catalogRow], error: null }])
-    const licenses = await listLicenses()
-    expect(builders[0].table).toBe("licenses")
+    const licenses = await listLicences()
+    expect(builders[0].table).toBe("licences")
     expect(builders[0].order).toHaveBeenCalledWith("title", { ascending: true })
     expect(licenses).toEqual([
       {
@@ -83,26 +83,26 @@ describe("listLicenses", () => {
 
   it("returns an empty catalog before the seed is loaded (FR-011)", async () => {
     mockSupabase([{ data: [], error: null }])
-    await expect(listLicenses()).resolves.toEqual([])
+    await expect(listLicences()).resolves.toEqual([])
   })
 
   it("surfaces failures as DataError", async () => {
     mockSupabase([{ data: null, error: { message: "boom" } }])
-    await expect(listLicenses()).rejects.toMatchObject({ code: "unknown" })
+    await expect(listLicences()).rejects.toMatchObject({ code: "unknown" })
   })
 })
 
-describe("attachLicense", () => {
+describe("attachLicence", () => {
   it("inserts the attachment with the agreeing user and touches the project", async () => {
     const { builders } = mockSupabase([
       { data: null, error: null }, // insert project_licenses
       { data: null, error: null }, // touchProject update
     ])
-    await attachLicense("p1", "CC-BY-4.0", "u1")
-    expect(builders[0].table).toBe("project_licenses")
+    await attachLicence("p1", "CC-BY-4.0", "u1")
+    expect(builders[0].table).toBe("project_licences")
     expect(builders[0].insert).toHaveBeenCalledWith({
       project_id: "p1",
-      license_id: "CC-BY-4.0",
+      licence_id: "CC-BY-4.0",
       agreed_by_user_id: "u1",
     })
     expect(builders[1].table).toBe("projects")
@@ -113,36 +113,36 @@ describe("attachLicense", () => {
 
   it("maps a duplicate attachment to already-attached (FR-010)", async () => {
     mockSupabase([{ data: null, error: { code: "23505" } }])
-    await expect(attachLicense("p1", "CC-BY-4.0", "u1")).rejects.toMatchObject({
+    await expect(attachLicence("p1", "CC-BY-4.0", "u1")).rejects.toMatchObject({
       code: "already-attached",
     })
   })
 
   it("requires an agreeing user before any network call (FR-012)", async () => {
     const { from } = mockSupabase([])
-    await expect(attachLicense("p1", "CC-BY-4.0", " ")).rejects.toMatchObject({
+    await expect(attachLicence("p1", "CC-BY-4.0", " ")).rejects.toMatchObject({
       code: "validation",
     })
     expect(from).not.toHaveBeenCalled()
   })
 })
 
-describe("detachLicense", () => {
+describe("detachLicence", () => {
   it("deletes only the one attachment, filtered by both keys (FR-013)", async () => {
     const { builders } = mockSupabase([
-      { data: [{ license_id: "CC-BY-4.0" }], error: null },
+      { data: [{ licence_id: "CC-BY-4.0" }], error: null },
       { data: null, error: null }, // touchProject
     ])
-    await detachLicense("p1", "CC-BY-4.0")
-    expect(builders[0].table).toBe("project_licenses")
+    await detachLicence("p1", "CC-BY-4.0")
+    expect(builders[0].table).toBe("project_licences")
     expect(builders[0].delete).toHaveBeenCalled()
     expect(builders[0].eq).toHaveBeenCalledWith("project_id", "p1")
-    expect(builders[0].eq).toHaveBeenCalledWith("license_id", "CC-BY-4.0")
+    expect(builders[0].eq).toHaveBeenCalledWith("licence_id", "CC-BY-4.0")
   })
 
   it("maps a missing attachment to not-found", async () => {
     mockSupabase([{ data: [], error: null }])
-    await expect(detachLicense("p1", "GPL-3.0")).rejects.toMatchObject({
+    await expect(detachLicence("p1", "GPL-3.0")).rejects.toMatchObject({
       code: "not-found",
     })
   })
