@@ -567,7 +567,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
-          language: string | null
+          language: string[] | null
           name: string
           organization_id: string | null
           owner_id: string | null
@@ -585,7 +585,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          language?: string | null
+          language?: string[] | null
           name: string
           organization_id?: string | null
           owner_id?: string | null
@@ -603,7 +603,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          language?: string | null
+          language?: string[] | null
           name?: string
           organization_id?: string | null
           owner_id?: string | null
