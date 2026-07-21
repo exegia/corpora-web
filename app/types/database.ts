@@ -1,9 +1,3 @@
-// Typed database definitions for the Supabase client.
-//
-// Generated from the live Supabase project (ivaecofevxactmmupvyp) via
-// `supabase gen types typescript`. Regenerate and replace wholesale after any
-// schema change.
-
 export type Json =
   | string
   | number
@@ -233,6 +227,50 @@ export type Database = {
           type?: string
         }
         Relationships: []
+      }
+      corpus_commits: {
+        Row: {
+          author_email: string | null
+          author_name: string | null
+          branch: string | null
+          committed_at: string | null
+          created_at: string
+          id: string
+          message: string
+          project_id: string
+          sha: string
+        }
+        Insert: {
+          author_email?: string | null
+          author_name?: string | null
+          branch?: string | null
+          committed_at?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          project_id: string
+          sha: string
+        }
+        Update: {
+          author_email?: string | null
+          author_name?: string | null
+          branch?: string | null
+          committed_at?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          project_id?: string
+          sha?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corpus_commits_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       devices: {
         Row: {
@@ -522,6 +560,10 @@ export type Database = {
       projects: {
         Row: {
           category: string | null
+          corpus_filename: string | null
+          corpus_path: string | null
+          corpus_source: string | null
+          corpus_uploaded_at: string | null
           created_at: string
           description: string | null
           id: string
@@ -536,6 +578,10 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          corpus_filename?: string | null
+          corpus_path?: string | null
+          corpus_source?: string | null
+          corpus_uploaded_at?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -550,6 +596,10 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          corpus_filename?: string | null
+          corpus_path?: string | null
+          corpus_source?: string | null
+          corpus_uploaded_at?: string | null
           created_at?: string
           description?: string | null
           id?: string
