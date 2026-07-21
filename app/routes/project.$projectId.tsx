@@ -253,21 +253,12 @@ export default function ProjectWorkspace() {
 
       <Separator />
 
-      <div>
-        <h2 className="font-semibold text-lg">Corpus</h2>
-        <p className="mt-1 text-muted-foreground text-sm">
-          The document this project publishes, imported from the corpus
-          library.
-        </p>
-        <div className="mt-3">
-          <CorpusSection
-            corpus={project.corpus}
-            commits={project.commits}
-            documents={documents}
-            readOnly={readOnly}
-          />
-        </div>
-      </div>
+      <CorpusSection
+        corpus={project.corpus}
+        commits={project.commits}
+        documents={documents}
+        readOnly={readOnly}
+      />
 
       <Separator />
 

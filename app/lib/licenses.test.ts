@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
+import {
+  attachLicence,
+  detachLicence,
+  getLicence,
+  listLicences,
+  updateLicence,
+} from "@/lib/licenses"
 import { getSupabase } from "@/lib/supabase"
 
 vi.mock("@/lib/supabase", () => ({ getSupabase: vi.fn() }))
@@ -16,7 +22,15 @@ interface MockBuilder {
   [method: string]: any
 }
 
-const CHAIN_METHODS = ["select", "insert", "update", "delete", "eq", "order"]
+const CHAIN_METHODS = [
+  "select",
+  "insert",
+  "update",
+  "delete",
+  "eq",
+  "order",
+  "maybeSingle",
+]
 
 function createBuilder(table: string, result: MockResult): MockBuilder {
   const builder = { calls: [], table } as unknown as MockBuilder
@@ -89,6 +103,94 @@ describe("listLicences", () => {
   it("surfaces failures as DataError", async () => {
     mockSupabase([{ data: null, error: { message: "boom" } }])
     await expect(listLicences()).rejects.toMatchObject({ code: "unknown" })
+  })
+})
+
+const detailRow = {
+  ...catalogRow,
+  is_generic: false,
+  legacy_ids: ["CC-BY-4"],
+  od_conformance: "approved",
+  osd_conformance: null,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: null,
+}
+
+describe("getLicence", () => {
+  it("maps the full detail row including conformance fields", async () => {
+    const { builders } = mockSupabase([{ data: detailRow, error: null }])
+    const licence = await getLicence("CC-BY-4.0")
+    expect(builders[0].table).toBe("licences")
+    expect(builders[0].eq).toHaveBeenCalledWith("id", "CC-BY-4.0")
+    expect(licence).toMatchObject({
+      id: "CC-BY-4.0",
+      domains: { content: true, data: true, software: false },
+      isGeneric: false,
+      legacyIds: ["CC-BY-4"],
+      odConformance: "approved",
+      osdConformance: null,
+      createdAt: "2026-01-01T00:00:00Z",
+    })
+  })
+
+  it("returns null when the licence does not exist", async () => {
+    mockSupabase([{ data: null, error: null }])
+    await expect(getLicence("nope")).resolves.toBeNull()
+  })
+
+  it("surfaces failures as DataError", async () => {
+    mockSupabase([{ data: null, error: { message: "boom" } }])
+    await expect(getLicence("CC-BY-4.0")).rejects.toMatchObject({
+      code: "unknown",
+    })
+  })
+})
+
+describe("updateLicence", () => {
+  const input = {
+    title: "Creative Commons Attribution 4.0",
+    url: "https://example.org/cc-by",
+    family: "Creative Commons",
+    maintainer: "CC",
+    status: "active" as const,
+    domains: { content: true, data: false, software: false },
+  }
+
+  it("updates the stored fields and stamps updated_at", async () => {
+    const { builders } = mockSupabase([
+      { data: { id: "CC-BY-4.0" }, error: null },
+    ])
+    await updateLicence("CC-BY-4.0", input)
+    expect(builders[0].table).toBe("licences")
+    expect(builders[0].update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: input.title,
+        url: input.url,
+        family: input.family,
+        maintainer: "CC",
+        status: "active",
+        domain_content: true,
+        domain_data: false,
+        domain_software: false,
+        updated_at: expect.any(String),
+      }),
+    )
+    expect(builders[0].eq).toHaveBeenCalledWith("id", "CC-BY-4.0")
+  })
+
+  it("requires a title before any network call", async () => {
+    const { from } = mockSupabase([])
+    await expect(
+      updateLicence("CC-BY-4.0", { ...input, title: "  " }),
+    ).rejects.toMatchObject({ code: "validation" })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("maps a missing licence to not-found", async () => {
+    mockSupabase([{ data: null, error: null }])
+    await expect(updateLicence("nope", input)).rejects.toMatchObject({
+      code: "not-found",
+    })
   })
 })
 

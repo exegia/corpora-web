@@ -4,6 +4,7 @@ import {
   Database,
   FolderKanban,
   LayoutDashboard,
+  Scale,
 } from "lucide-react"
 import { NavLink } from "react-router"
 import {
@@ -26,6 +27,7 @@ const items = [
   { title: "Library", url: "/library", icon: BookOpen },
   { title: "Project", url: "/project", icon: FolderKanban },
   { title: "Corpus", url: "/corpus", icon: Database },
+  { title: "Licenses", url: "/licenses", icon: Scale },
 ]
 
 const AppSidebar = () => {

@@ -1,4 +1,4 @@
-import { FileArchive } from "lucide-react"
+import { FileArchive, SearchIcon } from "lucide-react"
 import { useState } from "react"
 import { Link, useFetcher } from "react-router"
 import {
@@ -8,22 +8,34 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogDescription,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  Card,
+  CardFrame,
+  CardFrameAction,
+  CardFrameHeader,
+  CardFrameTitle,
+  CardPanel,
+} from "@/components/ui/card"
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
+import {
+  Sheet,
+  SheetDescription,
+  SheetHeader,
+  SheetPanel,
+  SheetPopup,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import type { CorpusDocument } from "@/lib/corpus"
 import { formatRelativeTime } from "@/lib/format"
 import type { CorpusCommit, ProjectCorpus } from "@/lib/projects"
@@ -75,7 +87,11 @@ function ImportOptionRow({
   )
 }
 
-function ImportCorpusDialog({
+/**
+ * Browse the corpus library in a right inset sheet (mirrors LicenseSheet):
+ * search the documents loaded from the db and import one into the project.
+ */
+function ImportCorpusSheet({
   documents,
   attachedId,
   disabled,
@@ -85,22 +101,44 @@ function ImportCorpusDialog({
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+
+  const needle = query.trim().toLowerCase()
+  const results = needle
+    ? documents.filter((document) =>
+        [document.name, document.filename, document.source]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(needle)),
+      )
+    : documents
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger
         render={<Button size="sm" variant="outline" disabled={disabled} />}
       >
         Import corpus
-      </DialogTrigger>
-      <DialogPopup>
-        <DialogHeader>
-          <DialogTitle>Import a corpus</DialogTitle>
-          <DialogDescription>
+      </SheetTrigger>
+      <SheetPopup side="right" variant="inset" showBackdrop={false}>
+        <SheetHeader>
+          <SheetTitle>Import a corpus</SheetTitle>
+          <SheetDescription>
             Pick the document this project publishes from the corpus library.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogPanel>
+          </SheetDescription>
+          <InputGroup>
+            <InputGroupInput
+              aria-label="Search corpora"
+              placeholder="Search corpora…"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+            />
+            <InputGroupAddon>
+              <SearchIcon aria-hidden="true" />
+            </InputGroupAddon>
+          </InputGroup>
+        </SheetHeader>
+        <SheetPanel>
           {documents.length === 0 ? (
             <p className="py-4 text-muted-foreground text-sm">
               The corpus library is empty. Upload a .corpus document on the{" "}
@@ -109,9 +147,13 @@ function ImportCorpusDialog({
               </Link>{" "}
               page first.
             </p>
+          ) : results.length === 0 ? (
+            <p className="py-4 text-muted-foreground text-sm">
+              No corpus matches “{query}”.
+            </p>
           ) : (
             <ul className="divide-y">
-              {documents.map((document) => (
+              {results.map((document) => (
                 <ImportOptionRow
                   key={document.id}
                   document={document}
@@ -120,9 +162,9 @@ function ImportCorpusDialog({
               ))}
             </ul>
           )}
-        </DialogPanel>
-      </DialogPopup>
-    </Dialog>
+        </SheetPanel>
+      </SheetPopup>
+    </Sheet>
   )
 }
 
@@ -134,9 +176,10 @@ export interface CorpusSectionProps {
 }
 
 /**
- * The project's corpus (003): imported from the corpus library, where the
- * .corpus documents are uploaded and their version history lives. Removing
- * here only detaches — the document stays in the library.
+ * The project's corpus (003) in a CardFrame, like the Details panel:
+ * imported from the corpus library, where the .corpus documents are uploaded
+ * and their version history lives. Removing here only detaches — the
+ * document stays in the library.
  */
 export function CorpusSection({
   corpus,
@@ -146,60 +189,64 @@ export function CorpusSection({
 }: CorpusSectionProps) {
   const detachFetcher = useFetcher<{ ok: boolean; error?: string }>()
 
-  if (!corpus) {
-    return (
-      <Empty className="py-8 md:py-10">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <FileArchive />
-          </EmptyMedia>
-          <EmptyTitle>No corpus attached</EmptyTitle>
-          <EmptyDescription>
-            Import the document this project publishes from the corpus library.
-          </EmptyDescription>
-        </EmptyHeader>
-        {!readOnly && (
-          <EmptyContent>
-            <ImportCorpusDialog documents={documents} attachedId={null} />
-          </EmptyContent>
-        )}
-      </Empty>
-    )
-  }
-
   return (
-    <div className="flex flex-col gap-4">
-      <CorpusDocumentCard
-        document={corpus}
-        actions={
-          !readOnly && (
-            <>
-              <ImportCorpusDialog
-                documents={documents}
-                attachedId={corpus.id}
-                disabled={readOnly}
+    <CardFrame>
+      <CardFrameHeader>
+        <CardFrameTitle render={<h2 />}>Corpus</CardFrameTitle>
+        {!readOnly && (
+          <CardFrameAction>
+            <ImportCorpusSheet
+              documents={documents}
+              attachedId={corpus?.id ?? null}
+            />
+          </CardFrameAction>
+        )}
+      </CardFrameHeader>
+      <Card>
+        <CardPanel>
+          {!corpus ? (
+            <Empty className="py-8 md:py-10">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <FileArchive />
+                </EmptyMedia>
+                <EmptyTitle>No corpus attached</EmptyTitle>
+                <EmptyDescription>
+                  Import the document this project publishes from the corpus
+                  library.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <CorpusDocumentCard
+                document={corpus}
+                actions={
+                  !readOnly && (
+                    <detachFetcher.Form method="post">
+                      <input type="hidden" name="intent" value="detach-corpus" />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="ghost"
+                        disabled={detachFetcher.state !== "idle"}
+                      >
+                        Remove
+                      </Button>
+                    </detachFetcher.Form>
+                  )
+                }
               />
-              <detachFetcher.Form method="post">
-                <input type="hidden" name="intent" value="detach-corpus" />
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant="ghost"
-                  disabled={detachFetcher.state !== "idle"}
-                >
-                  Remove
-                </Button>
-              </detachFetcher.Form>
-            </>
-          )
-        }
-      />
-      {detachFetcher.data?.ok === false && detachFetcher.data.error && (
-        <p role="alert" className="text-destructive text-sm">
-          {detachFetcher.data.error}
-        </p>
-      )}
-      <CommitHistory commits={commits} />
-    </div>
+              {detachFetcher.data?.ok === false && detachFetcher.data.error && (
+                <p role="alert" className="text-destructive text-sm">
+                  {detachFetcher.data.error}
+                </p>
+              )}
+              <CommitHistory commits={commits} />
+            </div>
+          )}
+        </CardPanel>
+      </Card>
+    </CardFrame>
   )
 }

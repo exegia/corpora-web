@@ -1,8 +1,9 @@
 // Data-access layer for the licence catalog + project attachments (002).
 // Contract: specs/002-project-detail/contracts/data-access.md
-// The catalog is read-only (seeded out of band, FR-011); this module only
-// reads `licences` and writes `project_licences`. Route modules import ONLY
-// from this module — never supabase-js directly.
+// The catalog is seeded out of band (FR-011); reads are open, writes to
+// `licences` are reserved for the superadmin (licence detail route). This
+// module also writes `project_licences`. Route modules import ONLY from this
+// module — never supabase-js directly.
 
 import {
   DataError,
@@ -10,6 +11,8 @@ import {
   touchProject,
 } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
+
+export type LicenceConformance = "not reviewed" | "approved" | "rejected"
 
 export interface CatalogLicence {
   id: string
@@ -19,6 +22,16 @@ export interface CatalogLicence {
   status: LicenseStatus
   family: string | null
   maintainer: string | null
+}
+
+/** One catalog entry with every stored column, for the licence detail route. */
+export interface LicenceDetail extends CatalogLicence {
+  isGeneric: boolean
+  legacyIds: string[]
+  odConformance: LicenceConformance | null
+  osdConformance: LicenceConformance | null
+  createdAt: string
+  updatedAt: string | null
 }
 
 interface CatalogRow {
@@ -33,8 +46,35 @@ interface CatalogRow {
   status: LicenseStatus
 }
 
+interface DetailRow extends CatalogRow {
+  is_generic: boolean
+  legacy_ids: string[] | null
+  od_conformance: LicenceConformance | null
+  osd_conformance: LicenceConformance | null
+  created_at: string
+  updated_at: string | null
+}
+
 const CATALOG_COLUMNS =
   "id, title, url, domain_content, domain_data, domain_software, family, maintainer, status"
+
+const DETAIL_COLUMNS = `${CATALOG_COLUMNS}, is_generic, legacy_ids, od_conformance, osd_conformance, created_at, updated_at`
+
+function toCatalogLicence(row: CatalogRow): CatalogLicence {
+  return {
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    domains: {
+      content: row.domain_content,
+      data: row.domain_data,
+      software: row.domain_software,
+    },
+    status: row.status,
+    family: row.family,
+    maintainer: row.maintainer,
+  }
+}
 
 /** Full catalog, ordered by title. Empty until the SQL seed is loaded (FR-011). */
 export async function listLicences(): Promise<CatalogLicence[]> {
@@ -48,19 +88,78 @@ export async function listLicences(): Promise<CatalogLicence[]> {
       `Could not load the licence catalog: ${error.message ?? "unexpected error"}`,
     )
   }
-  return ((data ?? []) as CatalogRow[]).map((row) => ({
-    id: row.id,
-    title: row.title,
-    url: row.url,
-    domains: {
-      content: row.domain_content,
-      data: row.domain_data,
-      software: row.domain_software,
-    },
-    status: row.status,
-    family: row.family,
-    maintainer: row.maintainer,
-  }))
+  return ((data ?? []) as CatalogRow[]).map(toCatalogLicence)
+}
+
+/** One licence with its conformance + provenance fields, or null when gone. */
+export async function getLicence(id: string): Promise<LicenceDetail | null> {
+  const { data, error } = await getSupabase()
+    .from("licences")
+    .select(DETAIL_COLUMNS)
+    .eq("id", id)
+    .maybeSingle()
+  if (error) {
+    throw new DataError(
+      "unknown",
+      `Could not load the licence: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  if (!data) return null
+  const row = data as unknown as DetailRow
+  return {
+    ...toCatalogLicence(row),
+    isGeneric: row.is_generic,
+    legacyIds: row.legacy_ids ?? [],
+    odConformance: row.od_conformance,
+    osdConformance: row.osd_conformance,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export interface LicenceUpdate {
+  title: string
+  url: string | null
+  family: string | null
+  maintainer: string | null
+  status: LicenseStatus
+  domains: { content: boolean; data: boolean; software: boolean }
+}
+
+/** Superadmin-only edit of a catalog entry (guarded at the route action). */
+export async function updateLicence(
+  id: string,
+  input: LicenceUpdate,
+): Promise<void> {
+  const title = input.title.trim()
+  if (!title) {
+    throw new DataError("validation", "A licence title is required.")
+  }
+  const { data, error } = await getSupabase()
+    .from("licences")
+    .update({
+      title,
+      url: input.url?.trim() || null,
+      family: input.family?.trim() || null,
+      maintainer: input.maintainer?.trim() || null,
+      status: input.status,
+      domain_content: input.domains.content,
+      domain_data: input.domains.data,
+      domain_software: input.domains.software,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle()
+  if (error) {
+    throw new DataError(
+      "unknown",
+      `Could not update the licence: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  if (!data) {
+    throw new DataError("not-found", "This licence no longer exists.")
+  }
 }
 
 /**

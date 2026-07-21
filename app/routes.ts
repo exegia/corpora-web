@@ -7,4 +7,6 @@ export default [
   route("project", "routes/project.tsx"),
   route("project/:projectId", "routes/project.$projectId.tsx"),
   route("corpus", "routes/corpus.tsx"),
+  route("licenses", "routes/licenses.tsx"),
+  route("licenses/:licenceId", "routes/licenses.$licenceId.tsx"),
 ] satisfies RouteConfig
