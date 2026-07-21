@@ -1,18 +1,7 @@
-import {
-  BlockTypeSelect,
-  BoldItalicUnderlineToggles,
-  headingsPlugin,
-  listsPlugin,
-  MDXEditor,
-  type MDXEditorMethods,
-  quotePlugin,
-  thematicBreakPlugin,
-  toolbarPlugin,
-} from "@mdxeditor/editor"
 import { FileQuestion } from "lucide-react"
 import { Suspense, useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import "@mdxeditor/editor/style.css"
+import { useRemarkSync } from "react-remark"
 import { Await, Link, useFetcher, useLoaderData } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Badge } from "@/components/ui/badge"
@@ -38,6 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectItem,
@@ -141,8 +131,10 @@ function domainList(licence: LicenceDetail): string[] {
 }
 
 /**
- * The stored licence text in MDXEditor: read-only for everyone, with a
- * simple Edit → Save flow for the superadmin persisting back to the db.
+ * The stored licence text rendered as markdown with react-remark: a read-only
+ * view for everyone, with a simple raw-markdown Edit → Save flow for the
+ * superadmin persisting back to the db. react-remark only renders — the edit
+ * surface is a plain textarea over the markdown source.
  */
 function LicenceTextSection({
   licence,
@@ -155,10 +147,12 @@ function LicenceTextSection({
 }) {
   useReadySound()
   const fetcher = useFetcher<{ ok: boolean; error?: string }>()
-  const editorRef = useRef<MDXEditorMethods>(null)
   const submittedRef = useRef(false)
   const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(text ?? "")
   const busy = fetcher.state !== "idle"
+  // Synchronous render — the stored text carries no async remark plugins.
+  const rendered = useRemarkSync(text ?? "")
 
   // Leave edit mode only once the save lands; a failed save keeps the
   // editor open with its error visible.
@@ -168,6 +162,12 @@ function LicenceTextSection({
       setEditing(false)
     }
   }, [fetcher.state, fetcher.data])
+
+  // Re-seed the draft from the (revalidated) stored text whenever we are not
+  // actively editing — so a saved edit and Cancel both reset cleanly.
+  useEffect(() => {
+    if (!editing) setDraft(text ?? "")
+  }, [text, editing])
 
   const hasText = text !== null
 
@@ -193,10 +193,7 @@ function LicenceTextSection({
                   onClick={() => {
                     submittedRef.current = true
                     fetcher.submit(
-                      {
-                        intent: "save-licence-text",
-                        text: editorRef.current?.getMarkdown() ?? "",
-                      },
+                      { intent: "save-licence-text", text: draft },
                       { method: "post" },
                     )
                   }}
@@ -236,42 +233,20 @@ function LicenceTextSection({
               )}
               {superadmin && " Use Edit to write it by hand."}
             </p>
-          ) : (
-            // Remount on mode change so Cancel discards the draft and a
-            // saved text re-renders from the revalidated loader data.
-            <MDXEditor
-              key={editing ? "edit" : `view:${licence.updatedAt ?? ""}`}
-              ref={editorRef}
-              markdown={text ?? ""}
-              readOnly={!editing}
-              autoFocus={editing ? { defaultSelection: "rootStart" } : false}
-              plugins={[
-                headingsPlugin(),
-                quotePlugin(),
-                listsPlugin(),
-                thematicBreakPlugin(),
-                ...(editing
-                  ? [
-                      toolbarPlugin({
-                        toolbarContents: () => (
-                          <>
-                            <BlockTypeSelect />
-                            <BoldItalicUnderlineToggles />
-                          </>
-                        ),
-                      }),
-                    ]
-                  : []),
-              ]}
-              className={
-                editing
-                  ? "rounded-lg border bg-white dark:bg-neutral-950"
-                  : ""
-              }
-              contentEditableClassName={`font-sans ${
-                editing ? "min-h-40 p-4" : "!p-0"
-              }`}
+          ) : editing ? (
+            // react-remark has no editor, so the source is edited as raw
+            // markdown in a textarea. Controlled so Save reads `draft`; focus
+            // the textarea on open to match the previous editor's behaviour.
+            <Textarea
+              autoFocus
+              aria-label="Licence markdown source"
+              value={draft}
+              onChange={(event) => setDraft(event.currentTarget.value)}
+              className="min-h-96 font-mono text-sm leading-relaxed"
             />
+          ) : (
+            // Read-only markdown rendered to React elements by react-remark.
+            <div className="licence-prose">{rendered}</div>
           )}
           {fetcher.data?.ok === false && fetcher.data.error && (
             <p role="alert" className="mt-2 text-destructive text-sm">

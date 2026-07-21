@@ -15,7 +15,6 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@dotenvx/dotenvx": "^2.14.0",
-    "@mdxeditor/editor": "^4.1.0",
     "@supabase/supabase-js": "^2.110.7",
     "@tailwindcss/vite": "^4",
     "buffer": "^6.0.3",
@@ -30,6 +29,7 @@
     "react": "^19.2.7",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.7",
+    "react-remark": "^2.1.0",
     "react-router": "^8.2.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4"
