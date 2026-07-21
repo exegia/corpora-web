@@ -14,6 +14,7 @@ const SECTION_LABELS: Record<string, string> = {
   library: "Library",
   project: "Projects",
   corpus: "Corpus",
+  licenses: "Licenses",
 }
 
 interface Crumb {
@@ -30,6 +31,18 @@ function isProjectDetailData(
     data !== null &&
     "project" in data &&
     typeof (data as { project: unknown }).project === "object"
+  )
+}
+
+/** Route data shaped like the licence detail loader's result. */
+function isLicenceDetailData(
+  data: unknown,
+): data is { licence: { title: string } | null } {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "licence" in data &&
+    typeof (data as { licence: unknown }).licence === "object"
   )
 }
 
@@ -52,6 +65,13 @@ function useCrumbs(): Crumb[] {
     const project =
       detail && isProjectDetailData(detail.loaderData) ? detail.loaderData.project : null
     crumbs.push({ label: project?.name ?? "Project", href: pathname })
+  }
+
+  if (section === "licenses" && segments.length > 1) {
+    const detail = matches.find((match) => isLicenceDetailData(match.loaderData))
+    const licence =
+      detail && isLicenceDetailData(detail.loaderData) ? detail.loaderData.licence : null
+    crumbs.push({ label: licence?.title ?? "License", href: pathname })
   }
 
   return crumbs
