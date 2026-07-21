@@ -95,7 +95,7 @@ export type CategorizedType = (typeof CATEGORIZED_TYPES)[number]
 
 /** Discriminated classification value — illegal combinations are untypeable. */
 export type Classification =
-  | { type: ScripturalType; language: LanguageType }
+  | { type: ScripturalType; languages: LanguageType[] }
   | { type: CategorizedType; category: CategoryType }
   | { type: "lexicon" | "manuscript" | "regular" }
   | null
@@ -183,7 +183,8 @@ export interface AttachedLicense {
 export type LicenseStatus = "active" | "retired" | "superseded"
 
 export interface ProjectDetail extends ProjectSummary {
-  language: LanguageType | null
+  /** Source languages for scriptural types; empty when not applicable. */
+  languages: LanguageType[]
   category: CategoryType | null
   /** Never null — every project records its creator (FR-015). */
   creator: ProjectCreator
@@ -243,7 +244,7 @@ interface CreatorRow {
 }
 
 interface ProjectDetailRow extends ProjectRow {
-  language: LanguageType | null
+  language: LanguageType[] | null
   category: CategoryType | null
   corpus_source: CorpusSource | null
   corpus_path: string | null
@@ -361,7 +362,7 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
   const row = data as unknown as ProjectDetailRow
   return {
     ...toSummary(row),
-    language: row.language,
+    languages: row.language ?? [],
     category: row.category,
     creator: row.user_directory ?? UNKNOWN_CREATOR,
     organization: row.organizations,
@@ -470,7 +471,7 @@ export async function classifyProject(
 ): Promise<void> {
   const patch: {
     type: BookType | null
-    language: LanguageType | null
+    language: LanguageType[] | null
     category: CategoryType | null
     updated_at: string
   } = {
@@ -484,11 +485,22 @@ export async function classifyProject(
     const { type } = classification
     patch.type = type
     if ((SCRIPTURAL_TYPES as readonly string[]).includes(type)) {
-      const language = "language" in classification ? classification.language : null
-      if (!language || !LANGUAGE_TYPES.includes(language)) {
-        throw new DataError("validation", "This type requires a source language.")
+      const languages =
+        "languages" in classification ? classification.languages : []
+      if (languages.length === 0) {
+        throw new DataError(
+          "validation",
+          "This type requires at least one source language.",
+        )
       }
-      patch.language = language
+      const allowed = languageOptionsFor(type)
+      if (languages.some((language) => !allowed.includes(language))) {
+        throw new DataError(
+          "validation",
+          `That language is not available for ${type}.`,
+        )
+      }
+      patch.language = [...new Set(languages)]
     } else if ((CATEGORIZED_TYPES as readonly string[]).includes(type)) {
       const category = "category" in classification ? classification.category : null
       if (!category || !CATEGORY_TYPES.includes(category)) {

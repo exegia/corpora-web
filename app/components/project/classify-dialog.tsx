@@ -4,7 +4,6 @@ import {
   BookOpenText,
   Feather,
   Landmark,
-  Languages,
   MessageSquareText,
   MoonStar,
   NotebookPen,
@@ -16,6 +15,17 @@ import type { LucideIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useFetcher } from "react-router"
 import { Button } from "@/components/ui/button"
+import {
+  Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxEmpty,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxPopup,
+  ComboboxValue,
+} from "@/components/ui/combobox"
 import {
   Dialog,
   DialogDescription,
@@ -82,38 +92,47 @@ export interface ClassifyDialogProps {
   onOpenChange: (open: boolean) => void
   current: {
     type: BookType | null
-    language: LanguageType | null
+    languages: LanguageType[]
     category: CategoryType | null
   }
 }
 
 /**
  * Type + conditional classification (FR-005..FR-009): scriptural types require
- * a language, secondary-literature types a category, the rest neither. The
- * language vocabulary narrows per type (LANGUAGES_BY_TYPE — e.g. quran offers
- * only arabic and english). The DB CHECK constraint remains the enforcement
- * of record.
+ * one or more source languages, secondary-literature types a category, the
+ * rest neither. The language vocabulary narrows per type (LANGUAGES_BY_TYPE —
+ * e.g. quran offers only arabic and english). The DB CHECK constraint remains
+ * the enforcement of record.
  */
 export function ClassifyDialog({ open, onOpenChange, current }: ClassifyDialogProps) {
   const fetcher = useFetcher<{ ok: boolean; error?: string }>()
   const submittedRef = useRef(false)
   const [type, setType] = useState<BookType | "">(current.type ?? "")
-  const [language, setLanguage] = useState<LanguageType | "">(current.language ?? "")
+  const [languages, setLanguages] = useState<LanguageType[]>(current.languages)
   const [category, setCategory] = useState<CategoryType | "">(current.category ?? "")
   const busy = fetcher.state !== "idle"
 
   const needsLanguage = (SCRIPTURAL_TYPES as readonly string[]).includes(type)
   const needsCategory = (CATEGORIZED_TYPES as readonly string[]).includes(type)
-  const languageOptions = languageOptionsFor(type)
-  const incomplete = (needsLanguage && !language) || (needsCategory && !category)
+  const languageItems = (languageOptionsFor(type) as LanguageType[]).map(
+    (language) => ({
+      value: language,
+      label: language.charAt(0).toUpperCase() + language.slice(1),
+    }),
+  )
+  const selectedLanguageItems = languageItems.filter((item) =>
+    languages.includes(item.value),
+  )
+  const incomplete =
+    (needsLanguage && languages.length === 0) || (needsCategory && !category)
 
   useEffect(() => {
     if (open) {
       setType(current.type ?? "")
-      setLanguage(current.language ?? "")
+      setLanguages(current.languages)
       setCategory(current.category ?? "")
     }
-  }, [open, current.type, current.language, current.category])
+  }, [open, current.type, current.languages, current.category])
 
   useEffect(() => {
     if (submittedRef.current && fetcher.state === "idle" && fetcher.data?.ok) {
@@ -125,7 +144,7 @@ export function ClassifyDialog({ open, onOpenChange, current }: ClassifyDialogPr
   const submit = () => {
     submittedRef.current = true
     fetcher.submit(
-      { intent: "classify", type, language, category },
+      { intent: "classify", type, languages: languages.join(","), category },
       { method: "post" },
     )
   }
@@ -137,8 +156,8 @@ export function ClassifyDialog({ open, onOpenChange, current }: ClassifyDialogPr
           <DialogTitle>Classify project</DialogTitle>
           <DialogDescription>
             Pick the kind of book this project is about. Scriptural types ask
-            for a source language; commentary, biography, and review ask for a
-            category.
+            for one or more source languages; commentary, biography, and review
+            ask for a category.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel className="flex flex-col gap-4">
@@ -149,15 +168,15 @@ export function ClassifyDialog({ open, onOpenChange, current }: ClassifyDialogPr
               onValueChange={(next) => {
                 const nextType = String(next ?? "") as BookType | ""
                 setType(nextType)
-                // FR-009: a type switch drops the no-longer-applicable value,
-                // and a language outside the new type's vocabulary is cleared.
+                // FR-009: a type switch drops the no-longer-applicable values,
+                // and languages outside the new type's vocabulary are cleared.
                 if (!(SCRIPTURAL_TYPES as readonly string[]).includes(nextType)) {
-                  setLanguage("")
-                } else if (
-                  language &&
-                  !languageOptionsFor(nextType).includes(language)
-                ) {
-                  setLanguage("")
+                  setLanguages([])
+                } else {
+                  const allowed = languageOptionsFor(nextType)
+                  setLanguages((selected) =>
+                    selected.filter((language) => allowed.includes(language)),
+                  )
                 }
                 if (!(CATEGORIZED_TYPES as readonly string[]).includes(nextType)) {
                   setCategory("")
@@ -183,32 +202,47 @@ export function ClassifyDialog({ open, onOpenChange, current }: ClassifyDialogPr
           </div>
           {needsLanguage && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="classify-language">Source language</Label>
-              <Select
-                value={language}
+              <Label htmlFor="classify-languages">Source languages</Label>
+              <Combobox
+                items={languageItems}
+                multiple
+                value={selectedLanguageItems}
                 onValueChange={(next) =>
-                  setLanguage(String(next ?? "") as LanguageType | "")
+                  setLanguages(
+                    (next as { value: LanguageType }[]).map((item) => item.value),
+                  )
                 }
               >
-                <SelectTrigger className="w-full" id="classify-language">
-                  <SelectValue placeholder="Pick a language…">
-                    {(value: LanguageType | "") =>
-                      value ? (
-                        <IconLabel icon={Languages} text={value} />
-                      ) : (
-                        "Pick a language…"
-                      )
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup>
-                  {languageOptions.map((lang) => (
-                    <SelectItem key={lang} value={lang}>
-                      <IconLabel icon={Languages} text={lang} />
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
+                <ComboboxChips>
+                  <ComboboxValue>
+                    {(value: { value: LanguageType; label: string }[]) => (
+                      <>
+                        {value?.map((item) => (
+                          <ComboboxChip key={item.value} aria-label={item.label}>
+                            {item.label}
+                          </ComboboxChip>
+                        ))}
+                        <ComboboxChipsInput
+                          id="classify-languages"
+                          placeholder={
+                            value.length > 0 ? undefined : "Pick languages…"
+                          }
+                        />
+                      </>
+                    )}
+                  </ComboboxValue>
+                </ComboboxChips>
+                <ComboboxPopup>
+                  <ComboboxEmpty>No language found.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(item: { value: LanguageType; label: string }) => (
+                      <ComboboxItem key={item.value} value={item}>
+                        {item.label}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxPopup>
+              </Combobox>
             </div>
           )}
           {needsCategory && (

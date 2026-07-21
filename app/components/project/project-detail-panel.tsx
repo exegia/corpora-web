@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, ShieldCheck } from "lucide-react"
+import { CheckCircle2, Circle, Scale, ShieldCheck } from "lucide-react"
 import { useState } from "react"
 import { useFetcher } from "react-router"
 import { ClassifyDialog } from "@/components/project/classify-dialog"
@@ -6,6 +6,13 @@ import { LicenseSheet } from "@/components/project/license-sheet"
 import { OrganizationDialog } from "@/components/project/organization-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardFrame,
+  CardFrameHeader,
+  CardFrameTitle,
+  CardPanel,
+} from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -73,6 +80,7 @@ function ReviewChecklist({ project }: { project: ProjectDetail }) {
   )
 }
 
+/** One attached licence, styled like the corpus card: leading icon + meta. */
 function AttachedLicenseRow({
   license,
   readOnly,
@@ -84,25 +92,31 @@ function AttachedLicenseRow({
   const busy = fetcher.state !== "idle"
 
   return (
-    <li className="flex items-center justify-between gap-3 py-2">
-      <div className="min-w-0">
-        <p className="truncate font-medium text-sm">
-          {license.title}
-          {license.status !== "active" && (
-            <Badge variant="destructive" className="ms-2">
-              {license.status}
-            </Badge>
-          )}
-        </p>
-        <p className="truncate text-muted-foreground text-xs">
-          Agreed {formatDate(license.agreedAt)} by{" "}
-          {license.agreedBy.name ?? license.agreedBy.username}
-        </p>
-        {fetcher.data?.ok === false && fetcher.data.error && (
-          <p role="alert" className="text-destructive text-xs">
-            {fetcher.data.error}
+    <li className="flex items-center justify-between gap-3 rounded-lg border p-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <Scale
+          aria-hidden="true"
+          className="size-5 shrink-0 text-muted-foreground"
+        />
+        <div className="min-w-0">
+          <p className="truncate font-medium text-sm">
+            {license.title}
+            {license.status !== "active" && (
+              <Badge variant="destructive" className="ms-2">
+                {license.status}
+              </Badge>
+            )}
           </p>
-        )}
+          <p className="truncate text-muted-foreground text-xs">
+            Agreed {formatDate(license.agreedAt)} by{" "}
+            {license.agreedBy.name ?? license.agreedBy.username}
+          </p>
+          {fetcher.data?.ok === false && fetcher.data.error && (
+            <p role="alert" className="text-destructive text-xs">
+              {fetcher.data.error}
+            </p>
+          )}
+        </div>
       </div>
       {!readOnly && (
         <fetcher.Form method="post" className="shrink-0">
@@ -139,7 +153,12 @@ export function ProjectDetailPanel({
   const [classifying, setClassifying] = useState(false)
   const [editingOrganization, setEditingOrganization] = useState(false)
 
-  const classification = [project.type, project.language ?? project.category]
+  const classification = [
+    project.type,
+    project.languages.length > 0
+      ? project.languages.join(", ")
+      : project.category,
+  ]
     .filter(Boolean)
     .join(" · ")
 
@@ -152,185 +171,199 @@ export function ProjectDetailPanel({
     !["ready-for-review", "published"].includes(project.status) && issues.length > 0
 
   return (
-    <div className="rounded-lg border p-4">
-      <h2 className="font-semibold text-lg">Details</h2>
-      {project.status === "ready-for-review" && (
-        <p
-          role="status"
-          className="mt-2 flex items-center gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-amber-700 text-sm dark:text-amber-400"
-        >
-          <ShieldCheck aria-hidden="true" className="size-4 shrink-0" />
-          In review — the project is read-only until the superadmin publishes
-          it or returns it to draft.
-        </p>
-      )}
-      <dl className="mt-3 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <dt>
-            <Label htmlFor="project-status">Status</Label>
-          </dt>
-          <dd>
-            <Select
-              value={project.status}
-              disabled={statusFetcher.state !== "idle" || statusOptions.length === 1}
-              onValueChange={(status) =>
-                statusFetcher.submit(
-                  { intent: "set-status", status: String(status) },
-                  { method: "post" },
-                )
-              }
+    <CardFrame>
+      <CardFrameHeader>
+        <CardFrameTitle render={<h2 />}>Details</CardFrameTitle>
+      </CardFrameHeader>
+      <Card>
+        <CardPanel>
+          {project.status === "ready-for-review" && (
+            <p
+              role="status"
+              className="mb-3 flex items-center gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-amber-700 text-sm dark:text-amber-400"
             >
-              <SelectTrigger className="w-full" id="project-status">
-                <SelectValue>
-                  {(status: ProjectStatus) => <StatusLabel status={status} />}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectPopup>
-                {statusOptions.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    <StatusLabel status={status} />
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-            {showChecklist && <ReviewChecklist project={project} />}
-            {project.status === "ready-for-review" && !superadmin && (
-              <p className="mt-1 text-muted-foreground text-xs">
-                Waiting for the superadmin to approve.
-              </p>
-            )}
-            {statusFetcher.data?.ok === false && statusFetcher.data.error && (
-              <p role="alert" className="mt-1 text-destructive text-xs">
-                {statusFetcher.data.error}
-              </p>
-            )}
-          </dd>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <dt className="font-medium">Classification</dt>
-          <dd className="flex items-center justify-between gap-2">
-            <span className={classification ? "capitalize" : "text-muted-foreground"}>
-              {classification || "Unclassified"}
-            </span>
-            {!readOnly && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setClassifying(true)}
-              >
-                Classify
-              </Button>
-            )}
-          </dd>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <dt className="font-medium">Creator</dt>
-          <dd>{project.creator.name ?? project.creator.username}</dd>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <dt className="font-medium">Organization</dt>
-          <dd className="flex items-center justify-between gap-2">
-            {project.organization ? (
-              <span className="min-w-0 truncate">
-                {project.organization.name}
-                {project.organization.website && (
-                  <>
-                    {" · "}
-                    <a
-                      href={project.organization.website}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-muted-foreground underline-offset-2 hover:underline"
-                    >
-                      {project.organization.website}
-                    </a>
-                  </>
-                )}
-              </span>
-            ) : (
-              <span className="text-muted-foreground">No organization</span>
-            )}
-            {!readOnly && (
-              <span className="flex shrink-0 items-center gap-1">
-                {project.organization && (
-                  <orgClearFetcher.Form method="post">
-                    <input type="hidden" name="intent" value="set-organization" />
-                    <input type="hidden" name="organizationId" value="" />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="ghost"
-                      disabled={orgClearFetcher.state !== "idle"}
-                    >
-                      Remove
-                    </Button>
-                  </orgClearFetcher.Form>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setEditingOrganization(true)}
-                >
-                  {project.organization ? "Change" : "Assign"}
-                </Button>
-              </span>
-            )}
-          </dd>
-          {orgClearFetcher.data?.ok === false && orgClearFetcher.data.error && (
-            <p role="alert" className="text-destructive text-xs">
-              {orgClearFetcher.data.error}
+              <ShieldCheck aria-hidden="true" className="size-4 shrink-0" />
+              In review — the project is read-only until the superadmin
+              publishes it or returns it to draft.
             </p>
           )}
-        </div>
+          <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+            <div className="flex flex-col gap-1">
+              <dt>
+                <Label htmlFor="project-status">Status</Label>
+              </dt>
+              <dd>
+                <Select
+                  value={project.status}
+                  disabled={
+                    statusFetcher.state !== "idle" || statusOptions.length === 1
+                  }
+                  onValueChange={(status) =>
+                    statusFetcher.submit(
+                      { intent: "set-status", status: String(status) },
+                      { method: "post" },
+                    )
+                  }
+                >
+                  <SelectTrigger className="w-full" id="project-status">
+                    <SelectValue>
+                      {(status: ProjectStatus) => <StatusLabel status={status} />}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        <StatusLabel status={status} />
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+                {showChecklist && <ReviewChecklist project={project} />}
+                {project.status === "ready-for-review" && !superadmin && (
+                  <p className="mt-1 text-muted-foreground text-xs">
+                    Waiting for the superadmin to approve.
+                  </p>
+                )}
+                {statusFetcher.data?.ok === false && statusFetcher.data.error && (
+                  <p role="alert" className="mt-1 text-destructive text-xs">
+                    {statusFetcher.data.error}
+                  </p>
+                )}
+              </dd>
+            </div>
 
-        <div className="flex flex-col gap-1">
-          <dt className="font-medium">Dates</dt>
-          <dd className="text-muted-foreground">
-            Created {formatDate(project.createdAt)} · updated{" "}
-            <span title={project.updatedAt}>
-              {formatRelativeTime(project.updatedAt)}
-            </span>
-          </dd>
-        </div>
-      </dl>
+            <div className="flex flex-col gap-1">
+              <dt className="font-medium">Classification</dt>
+              <dd className="flex items-center justify-between gap-2">
+                <span
+                  className={classification ? "capitalize" : "text-muted-foreground"}
+                >
+                  {classification || "Unclassified"}
+                </span>
+                {!readOnly && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setClassifying(true)}
+                  >
+                    Classify
+                  </Button>
+                )}
+              </dd>
+            </div>
 
-      <div className="mt-4">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="font-medium text-sm">Licences</h3>
-          <LicenseSheet
-            catalog={licenseCatalog}
-            attachedIds={project.licenses.map((license) => license.id)}
-            agreedByUserId={project.creator.id}
-            disabled={readOnly}
-          />
-        </div>
-        {project.licenses.length === 0 ? (
-          <p className="py-2 text-muted-foreground text-sm">
-            No licences attached. A licence is required before the project can
-            go to review — attach one from the catalog.
-          </p>
-        ) : (
-          <ul className="divide-y">
-            {project.licenses.map((license) => (
-              <AttachedLicenseRow
-                key={license.id}
-                license={license}
-                readOnly={readOnly}
+            <div className="flex flex-col gap-1">
+              <dt className="font-medium">Creator</dt>
+              <dd>{project.creator.name ?? project.creator.username}</dd>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <dt className="font-medium">Organization</dt>
+              <dd className="flex items-center justify-between gap-2">
+                {project.organization ? (
+                  <span className="min-w-0 truncate">
+                    {project.organization.name}
+                    {project.organization.website && (
+                      <>
+                        {" · "}
+                        <a
+                          href={project.organization.website}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-muted-foreground underline-offset-2 hover:underline"
+                        >
+                          {project.organization.website}
+                        </a>
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">No organization</span>
+                )}
+                {!readOnly && (
+                  <span className="flex shrink-0 items-center gap-1">
+                    {project.organization && (
+                      <orgClearFetcher.Form method="post">
+                        <input
+                          type="hidden"
+                          name="intent"
+                          value="set-organization"
+                        />
+                        <input type="hidden" name="organizationId" value="" />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="ghost"
+                          disabled={orgClearFetcher.state !== "idle"}
+                        >
+                          Remove
+                        </Button>
+                      </orgClearFetcher.Form>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditingOrganization(true)}
+                    >
+                      {project.organization ? "Change" : "Assign"}
+                    </Button>
+                  </span>
+                )}
+              </dd>
+              {orgClearFetcher.data?.ok === false && orgClearFetcher.data.error && (
+                <p role="alert" className="text-destructive text-xs">
+                  {orgClearFetcher.data.error}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <dt className="font-medium">Dates</dt>
+              <dd className="text-muted-foreground">
+                Created {formatDate(project.createdAt)} · updated{" "}
+                <span title={project.updatedAt}>
+                  {formatRelativeTime(project.updatedAt)}
+                </span>
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-medium text-sm">Licences</h3>
+              <LicenseSheet
+                catalog={licenseCatalog}
+                attachedIds={project.licenses.map((license) => license.id)}
+                agreedByUserId={project.creator.id}
+                disabled={readOnly}
               />
-            ))}
-          </ul>
-        )}
-      </div>
+            </div>
+            {project.licenses.length === 0 ? (
+              <p className="py-2 text-muted-foreground text-sm">
+                No licences attached. A licence is required before the project
+                can go to review — attach one from the catalog.
+              </p>
+            ) : (
+              <ul className="mt-2 flex flex-col gap-2">
+                {project.licenses.map((license) => (
+                  <AttachedLicenseRow
+                    key={license.id}
+                    license={license}
+                    readOnly={readOnly}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        </CardPanel>
+      </Card>
 
       <ClassifyDialog
         open={classifying}
         onOpenChange={setClassifying}
         current={{
           type: project.type,
-          language: project.language,
+          languages: project.languages,
           category: project.category,
         }}
       />
@@ -340,6 +373,6 @@ export function ProjectDetailPanel({
         organizations={organizations}
         currentId={project.organization?.id ?? null}
       />
-    </div>
+    </CardFrame>
   )
 }

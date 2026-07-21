@@ -74,7 +74,7 @@ const detail: ProjectDetail = {
   description: "Aramaic OT sources",
   status: "draft",
   type: null,
-  language: null,
+  languages: [],
   category: null,
   creator: { id: "u1", name: "Ada Researcher", username: "ada" },
   organization: null,
@@ -128,7 +128,7 @@ const readyDetail: ProjectDetail = {
   ...detail,
   licenses: [attachedLicence],
   type: "bible",
-  language: "hebrew",
+  languages: ["hebrew"],
   corpus: {
     source: "upload",
     path: "p1/peshitta.corpus",
@@ -410,17 +410,17 @@ describe("details panel — classification (US2)", () => {
 
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "bible" }))
-    expect(screen.getByLabelText("Source language")).toBeInTheDocument()
+    expect(screen.getByLabelText("Source languages")).toBeInTheDocument()
     expect(screen.queryByLabelText("Category")).not.toBeInTheDocument()
 
     await user.click(screen.getByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "commentary" }))
     expect(screen.getByLabelText("Category")).toBeInTheDocument()
-    expect(screen.queryByLabelText("Source language")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Source languages")).not.toBeInTheDocument()
 
     await user.click(screen.getByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "regular" }))
-    expect(screen.queryByLabelText("Source language")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Source languages")).not.toBeInTheDocument()
     expect(screen.queryByLabelText("Category")).not.toBeInTheDocument()
   })
 
@@ -432,11 +432,11 @@ describe("details panel — classification (US2)", () => {
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "quran" }))
 
-    await user.click(screen.getByLabelText("Source language"))
+    await user.click(screen.getByLabelText("Source languages"))
     const options = await screen.findAllByRole("option")
     expect(options.map((option) => option.textContent)).toEqual([
-      "arabic",
-      "english",
+      "Arabic",
+      "English",
     ])
   })
 
@@ -451,8 +451,10 @@ describe("details panel — classification (US2)", () => {
       screen.getByRole("button", { name: "Save classification" }),
     ).toBeDisabled()
 
-    await user.click(screen.getByLabelText("Source language"))
-    await user.click(await screen.findByRole("option", { name: "hebrew" }))
+    await user.click(screen.getByLabelText("Source languages"))
+    await user.click(await screen.findByRole("option", { name: "Hebrew" }))
+    // multiple selection keeps the popup open; close it to reach the footer
+    await user.keyboard("{Escape}")
     expect(
       screen.getByRole("button", { name: "Save classification" }),
     ).toBeEnabled()
@@ -463,7 +465,7 @@ describe("details panel — classification (US2)", () => {
     vi.mocked(getProject).mockResolvedValue({
       ...detail,
       type: "bible",
-      language: "hebrew",
+      languages: ["hebrew"],
     })
     vi.mocked(classifyProject).mockResolvedValue()
     renderRoute()
