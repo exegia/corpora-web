@@ -1,11 +1,15 @@
 import { Outlet } from "react-router"
 import { Provider, Drawer, Wrapper, Trigger } from "@/components/sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useUISounds } from "@/lib/sounds"
 import { COBreadcrumb } from "./breadcrumb"
+import { SoundToggle } from "./sound-toggle"
 import { ThemeToggle } from "./theme-toggle"
 
 
 export function AppLayout() {
+  useUISounds()
+
   return (
     <Provider className="p-2 h-screen">
       <Drawer />
@@ -13,7 +17,8 @@ export function AppLayout() {
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <Trigger />
           <COBreadcrumb />
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            <SoundToggle />
             <ThemeToggle />
           </div>
         </header>

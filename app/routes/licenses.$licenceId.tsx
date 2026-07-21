@@ -54,6 +54,7 @@ import {
   updateLicence,
 } from "@/lib/licenses"
 import { DataError, type LicenseStatus } from "@/lib/projects"
+import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import { getSuperadmin } from "@/lib/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
@@ -152,6 +153,7 @@ function LicenceTextSection({
   text: string | null
   superadmin: boolean
 }) {
+  useReadySound()
   const fetcher = useFetcher<{ ok: boolean; error?: string }>()
   const editorRef = useRef<MDXEditorMethods>(null)
   const submittedRef = useRef(false)
@@ -482,6 +484,8 @@ function LicenceEditForm({
 
 /** CardFrame placeholder while the licence text downloads on first visit. */
 function LicenceTextSkeleton() {
+  useLoadingSound()
+
   return (
     <CardFrame>
       <CardFrameHeader>
