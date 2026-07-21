@@ -1,20 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
+  allowedStatusChanges,
+  assertEditable,
   classifyProject,
   createProject,
-  createReference,
   DataError,
   deleteProject,
-  deleteReference,
   getProject,
+  isProjectReadOnly,
+  languageOptionsFor,
   linkCorpus,
   listCorpusOptions,
   listProjects,
+  type ProjectDetail,
+  refuseStatusChange,
+  reviewIssues,
   setProjectOrganization,
   unlinkCorpus,
   updateProject,
   updateProjectStatus,
-  updateReference,
 } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
 
@@ -151,10 +155,122 @@ describe("createProject", () => {
   })
 })
 
+/** Detail fixture for the pure status-workflow helpers. */
+function makeDetail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
+  return {
+    id: "p1",
+    name: "Peshitta Study",
+    description: null,
+    status: "draft",
+    type: null,
+    language: null,
+    category: null,
+    creator: { id: "u1", name: "Ada Researcher", username: "ada" },
+    organization: null,
+    licenses: [],
+    corpora: [],
+    corpus: null,
+    commits: [],
+    createdAt: "2026-07-01T00:00:00Z",
+    updatedAt: "2026-07-02T00:00:00Z",
+    ...overrides,
+  }
+}
+
+const attachedLicence = {
+  id: "CC-BY-4.0",
+  title: "Creative Commons Attribution 4.0",
+  url: null,
+  domains: { content: true, data: false, software: false },
+  status: "active" as const,
+  family: null,
+  maintainer: null,
+  agreedAt: "2026-07-06T00:00:00Z",
+  agreedBy: { id: "u1", name: "Ada Researcher", username: "ada" },
+}
+
+const readyDetail = makeDetail({
+  licenses: [attachedLicence],
+  type: "bible",
+  language: "hebrew",
+  corpus: {
+    source: "upload",
+    path: "p1/peshitta.corpus",
+    filename: "peshitta.corpus",
+    uploadedAt: "2026-07-10T00:00:00Z",
+  },
+})
+
+describe("status workflow (003)", () => {
+  it("lists every unmet review requirement", () => {
+    const issues = reviewIssues(makeDetail())
+    expect(issues).toHaveLength(3)
+    expect(issues.join(" ")).toMatch(/licence/i)
+    expect(issues.join(" ")).toMatch(/classify/i)
+    expect(issues.join(" ")).toMatch(/corpus/i)
+    expect(reviewIssues(readyDetail)).toEqual([])
+  })
+
+  it("offers ready-for-review only when the requirements pass", () => {
+    expect(allowedStatusChanges(makeDetail(), false)).toEqual([
+      "started",
+      "failed",
+    ])
+    expect(allowedStatusChanges(readyDetail, false)).toEqual([
+      "started",
+      "failed",
+      "ready-for-review",
+    ])
+  })
+
+  it("reserves review and publish decisions for the superadmin", () => {
+    const inReview = makeDetail({ status: "ready-for-review" })
+    expect(allowedStatusChanges(inReview, false)).toEqual([])
+    expect(allowedStatusChanges(inReview, true)).toEqual(["published", "draft"])
+
+    const published = makeDetail({ status: "published" })
+    expect(allowedStatusChanges(published, false)).toEqual([])
+    expect(allowedStatusChanges(published, true)).toEqual(["draft"])
+  })
+
+  it("explains why a transition is refused", () => {
+    expect(refuseStatusChange(makeDetail(), "ready-for-review", false)).toMatch(
+      /not ready for review/i,
+    )
+    expect(
+      refuseStatusChange(makeDetail({ status: "ready-for-review" }), "published", false),
+    ).toMatch(/superadmin/i)
+    expect(refuseStatusChange(readyDetail, "ready-for-review", false)).toBeNull()
+    expect(refuseStatusChange(makeDetail(), "archived" as never, true)).toMatch(
+      /not a valid/i,
+    )
+  })
+
+  it("marks only ready-for-review as read-only", () => {
+    expect(isProjectReadOnly("ready-for-review")).toBe(true)
+    expect(isProjectReadOnly("draft")).toBe(false)
+    expect(isProjectReadOnly("published")).toBe(false)
+  })
+
+  it("narrows the language vocabulary for quran and bible", () => {
+    expect(languageOptionsFor("quran")).toEqual(["arabic", "english"])
+    expect(languageOptionsFor("bible")).toEqual([
+      "greek",
+      "aramaic",
+      "hebrew",
+      "latin",
+      "french",
+      "english",
+      "syriac",
+    ])
+    expect(languageOptionsFor("tanakh").length).toBeGreaterThan(7)
+  })
+})
+
 describe("updateProjectStatus", () => {
   it("updates the status and touches updated_at", async () => {
     const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
-    await updateProjectStatus("p1", "started")
+    await updateProjectStatus(makeDetail(), "started", false)
     expect(builders[0].table).toBe("projects")
     expect(builders[0].update).toHaveBeenCalledWith(
       expect.objectContaining({ status: "started", updated_at: expect.any(String) }),
@@ -165,14 +281,60 @@ describe("updateProjectStatus", () => {
   it("rejects an unknown status before any network call", async () => {
     const { from } = mockSupabase([])
     await expect(
-      updateProjectStatus("p1", "archived" as never),
+      updateProjectStatus(makeDetail(), "archived" as never, true),
     ).rejects.toMatchObject({ code: "validation" })
     expect(from).not.toHaveBeenCalled()
   })
 
+  it("rejects a non-superadmin publish before any network call", async () => {
+    const { from } = mockSupabase([])
+    await expect(
+      updateProjectStatus(
+        makeDetail({ status: "ready-for-review" }),
+        "published",
+        false,
+      ),
+    ).rejects.toMatchObject({ code: "validation" })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("lets the superadmin publish a project in review", async () => {
+    const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
+    await updateProjectStatus(
+      makeDetail({ status: "ready-for-review" }),
+      "published",
+      true,
+    )
+    expect(builders[0].update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "published" }),
+    )
+  })
+
   it("maps a missing row to not-found", async () => {
     mockSupabase([{ data: null, error: null }])
-    await expect(updateProjectStatus("gone", "failed")).rejects.toMatchObject({
+    await expect(
+      updateProjectStatus(makeDetail({ id: "gone" }), "failed", false),
+    ).rejects.toMatchObject({ code: "not-found" })
+  })
+})
+
+describe("assertEditable", () => {
+  it("passes for a draft project", async () => {
+    mockSupabase([{ data: { status: "draft" }, error: null }])
+    await expect(assertEditable("p1")).resolves.toBeUndefined()
+  })
+
+  it("rejects edits while the project is in review", async () => {
+    mockSupabase([{ data: { status: "ready-for-review" }, error: null }])
+    await expect(assertEditable("p1")).rejects.toMatchObject({
+      code: "validation",
+      message: expect.stringContaining("read-only"),
+    })
+  })
+
+  it("maps a missing project to not-found", async () => {
+    mockSupabase([{ data: null, error: null }])
+    await expect(assertEditable("gone")).rejects.toMatchObject({
       code: "not-found",
     })
   })
@@ -205,16 +367,20 @@ describe("deleteProject", () => {
 
 const creatorRow = { id: "u1", name: "Ada Researcher", username: "ada" }
 
-/** Full detail row shape as the nested select returns it (002). */
+/** Full detail row shape as the nested select returns it (002/003). */
 const detailRow = {
   ...projectRow,
   language: null,
   category: null,
+  corpus_source: null,
+  corpus_path: null,
+  corpus_filename: null,
+  corpus_uploaded_at: null,
   user_directory: creatorRow,
   organizations: null,
   project_licences: [],
   project_corpora: [],
-  project_references: [],
+  corpus_commits: [],
 }
 
 describe("getProject", () => {
@@ -427,61 +593,58 @@ describe("unlinkCorpus", () => {
   })
 })
 
-const referenceRow = {
-  id: "r1",
-  project_id: "p1",
-  title: "Aramaic Grammar",
-  authors: null,
-  year: null,
-  publication: null,
-  url: null,
-  created_at: "2026-07-05T00:00:00Z",
-  updated_at: "2026-07-05T00:00:00Z",
-}
-
-describe("references", () => {
-  it("rejects an empty title before any network call", async () => {
-    const { from } = mockSupabase([])
-    await expect(createReference("p1", { title: " " })).rejects.toMatchObject({
-      code: "validation",
-    })
-    expect(from).not.toHaveBeenCalled()
-  })
-
-  it("creates a reference and bumps the project's updated_at", async () => {
-    const { builders } = mockSupabase([
-      { data: referenceRow, error: null },
-      { data: null, error: null },
+describe("getProject corpus mapping (003)", () => {
+  it("maps the uploaded corpus and its version history newest-first", async () => {
+    mockSupabase([
+      {
+        data: {
+          ...detailRow,
+          corpus_source: "upload",
+          corpus_path: "p1/peshitta.corpus",
+          corpus_filename: "peshitta.corpus",
+          corpus_uploaded_at: "2026-07-10T00:00:00Z",
+          corpus_commits: [
+            {
+              id: "cm1",
+              sha: "a1b2c3d",
+              message: "Initial import",
+              author_name: "Ada",
+              author_email: "ada@example.org",
+              branch: "main",
+              committed_at: "2026-07-01T00:00:00Z",
+            },
+            {
+              id: "cm2",
+              sha: "e4f5a6b",
+              message: "Fix verse numbering",
+              author_name: "Ada",
+              author_email: "ada@example.org",
+              branch: "main",
+              committed_at: "2026-07-05T00:00:00Z",
+            },
+          ],
+        },
+        error: null,
+      },
     ])
-    const reference = await createReference("p1", { title: "Aramaic Grammar" })
-    expect(reference.projectId).toBe("p1")
-    expect(builders[0].table).toBe("project_references")
-    expect(builders[1].table).toBe("projects")
-    expect(builders[1].update).toHaveBeenCalled()
-  })
-
-  it("maps a missing reference on update to not-found", async () => {
-    mockSupabase([{ data: null, error: null }])
-    await expect(updateReference("gone", { title: "X" })).rejects.toMatchObject({
-      code: "not-found",
+    const project = await getProject("p1")
+    expect(project?.corpus).toEqual({
+      source: "upload",
+      path: "p1/peshitta.corpus",
+      filename: "peshitta.corpus",
+      uploadedAt: "2026-07-10T00:00:00Z",
     })
-  })
-
-  it("deletes a reference and touches its project", async () => {
-    const { builders } = mockSupabase([
-      { data: [{ id: "r1", project_id: "p1" }], error: null },
-      { data: null, error: null },
+    expect(project?.commits.map((commit) => commit.sha)).toEqual([
+      "e4f5a6b",
+      "a1b2c3d",
     ])
-    await deleteReference("r1")
-    expect(builders[0].table).toBe("project_references")
-    expect(builders[1].table).toBe("projects")
   })
 
-  it("maps zero deleted rows to not-found", async () => {
-    mockSupabase([{ data: [], error: null }])
-    await expect(deleteReference("gone")).rejects.toMatchObject({
-      code: "not-found",
-    })
+  it("returns a null corpus when no upload or URL is recorded", async () => {
+    mockSupabase([{ data: detailRow, error: null }])
+    const project = await getProject("p1")
+    expect(project?.corpus).toBeNull()
+    expect(project?.commits).toEqual([])
   })
 })
 

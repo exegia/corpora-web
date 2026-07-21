@@ -17,11 +17,19 @@ export type DataErrorCode =
 export const PROJECT_STATUSES = [
   "draft",
   "started",
-  "progress",
-  "completed",
+  "ready-for-review",
+  "published",
   "failed",
 ] as const
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number]
+
+/**
+ * Pre-auth superadmin: publishing decisions belong to this directory user
+ * until corpora-auth lands. The session is treated as the superadmin when a
+ * directory row with this email exists (see users.getSuperadmin).
+ */
+export const SUPERADMIN_EMAIL =
+  import.meta.env?.VITE_SUPERADMIN_EMAIL ?? "manny.defreitas7@gmail.com"
 
 export const BOOK_TYPES = [
   "bible",
@@ -68,6 +76,19 @@ export type CategoryType = (typeof CATEGORY_TYPES)[number]
 export const SCRIPTURAL_TYPES = ["bible", "tanakh", "quran", "apocrypha"] as const
 export type ScripturalType = (typeof SCRIPTURAL_TYPES)[number]
 
+/**
+ * Scriptural types with a constrained source-language vocabulary. Types not
+ * listed here offer the full LANGUAGE_TYPES list.
+ */
+export const LANGUAGES_BY_TYPE: Partial<Record<ScripturalType, readonly LanguageType[]>> = {
+  quran: ["arabic", "english"],
+  bible: ["greek", "aramaic", "hebrew", "latin", "french", "english", "syriac"],
+}
+
+export function languageOptionsFor(type: string): readonly LanguageType[] {
+  return LANGUAGES_BY_TYPE[type as ScripturalType] ?? LANGUAGE_TYPES
+}
+
 /** Types that require a category (FR-007). */
 export const CATEGORIZED_TYPES = ["biography", "commentary", "review"] as const
 export type CategorizedType = (typeof CATEGORIZED_TYPES)[number]
@@ -113,16 +134,26 @@ export interface CorpusLink {
   } | null
 }
 
-export interface ProjectReference {
+export type CorpusSource = "upload" | "huggingface"
+
+/** The project's own corpus — an uploaded .corpus file or a Hugging Face URL. */
+export interface ProjectCorpus {
+  source: CorpusSource
+  /** Storage path for uploads, the full URL for Hugging Face. */
+  path: string
+  filename: string | null
+  uploadedAt: string | null
+}
+
+/** One commit from the corpus' nested .git, newest first. */
+export interface CorpusCommit {
   id: string
-  projectId: string
-  title: string
-  authors: string | null
-  year: number | null
-  publication: string | null
-  url: string | null
-  createdAt: string
-  updatedAt: string
+  sha: string
+  message: string
+  authorName: string | null
+  authorEmail: string | null
+  branch: string | null
+  committedAt: string | null
 }
 
 export interface ProjectCreator {
@@ -158,8 +189,10 @@ export interface ProjectDetail extends ProjectSummary {
   creator: ProjectCreator
   organization: ProjectOrganization | null
   licenses: AttachedLicense[]
+  /** Corpus references: library corpora loaded alongside this dataset. */
   corpora: CorpusLink[]
-  references: ProjectReference[]
+  corpus: ProjectCorpus | null
+  commits: CorpusCommit[]
 }
 
 export interface CorpusOption {
@@ -169,14 +202,6 @@ export interface CorpusOption {
   type: string | null
   available: boolean
   alreadyLinked: boolean
-}
-
-export interface ReferenceInput {
-  title: string
-  authors?: string
-  year?: number
-  publication?: string
-  url?: string
 }
 
 interface ProjectRow {
@@ -189,16 +214,14 @@ interface ProjectRow {
   updated_at: string
 }
 
-interface ReferenceRow {
+interface CommitRow {
   id: string
-  project_id: string
-  title: string
-  authors: string | null
-  year: number | null
-  publication: string | null
-  url: string | null
-  created_at: string
-  updated_at: string
+  sha: string
+  message: string
+  author_name: string | null
+  author_email: string | null
+  branch: string | null
+  committed_at: string | null
 }
 
 interface LicenseRow {
@@ -222,6 +245,10 @@ interface CreatorRow {
 interface ProjectDetailRow extends ProjectRow {
   language: LanguageType | null
   category: CategoryType | null
+  corpus_source: CorpusSource | null
+  corpus_path: string | null
+  corpus_filename: string | null
+  corpus_uploaded_at: string | null
   user_directory: CreatorRow | null
   organizations: { id: string; name: string; website: string | null } | null
   project_licences: {
@@ -242,12 +269,13 @@ interface ProjectDetailRow extends ProjectRow {
       available: boolean
     } | null
   }[]
-  project_references: ReferenceRow[]
+  corpus_commits: CommitRow[]
 }
 
 const PROJECT_COLUMNS = "id, name, description, status, type, created_at, updated_at"
 
 const PROJECT_DETAIL_COLUMNS = `${PROJECT_COLUMNS}, language, category,
+  corpus_source, corpus_path, corpus_filename, corpus_uploaded_at,
   user_directory ( id, name, username ),
   organizations ( id, name, website ),
   project_licences ( agreed_at,
@@ -255,7 +283,7 @@ const PROJECT_DETAIL_COLUMNS = `${PROJECT_COLUMNS}, language, category,
     user_directory ( id, name, username ) ),
   project_corpora ( corpus_id, linked_at,
     corpora ( uid, name, language, type, category, version, available ) ),
-  project_references ( id, project_id, title, authors, year, publication, url, created_at, updated_at )`
+  corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at )`
 
 const UNKNOWN_CREATOR: ProjectCreator = { id: "", name: null, username: "unknown" }
 
@@ -278,17 +306,15 @@ function toSummary(row: ProjectRow): ProjectSummary {
   }
 }
 
-function toReference(row: ReferenceRow): ProjectReference {
+function toCommit(row: CommitRow): CorpusCommit {
   return {
     id: row.id,
-    projectId: row.project_id,
-    title: row.title,
-    authors: row.authors,
-    year: row.year,
-    publication: row.publication,
-    url: row.url,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    sha: row.sha,
+    message: row.message,
+    authorName: row.author_name,
+    authorEmail: row.author_email,
+    branch: row.branch,
+    committedAt: row.committed_at,
   }
 }
 
@@ -370,9 +396,17 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
         corpus: link.corpora,
       }))
       .sort((a, b) => a.linkedAt.localeCompare(b.linkedAt)),
-    references: row.project_references
-      .map(toReference)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    corpus: row.corpus_source && row.corpus_path
+      ? {
+          source: row.corpus_source,
+          path: row.corpus_path,
+          filename: row.corpus_filename,
+          uploadedAt: row.corpus_uploaded_at,
+        }
+      : null,
+    commits: row.corpus_commits
+      .map(toCommit)
+      .sort((a, b) => (b.committedAt ?? "").localeCompare(a.committedAt ?? "")),
   }
 }
 
@@ -498,22 +532,121 @@ export async function setProjectOrganization(
   }
 }
 
+// ---- Status workflow (003) ------------------------------------------------
+
+/** While a project awaits review it is read-only except for status changes. */
+export function isProjectReadOnly(status: ProjectStatus): boolean {
+  return status === "ready-for-review"
+}
+
+/**
+ * What still blocks a submission for review. Empty means the creator may move
+ * the project to ready-for-review.
+ */
+export function reviewIssues(project: ProjectDetail): string[] {
+  const issues: string[] = []
+  if (project.licenses.length === 0) {
+    issues.push("Attach and agree to at least one licence.")
+  }
+  if (!project.type) {
+    issues.push("Classify the project (bible, book, …).")
+  }
+  if (!project.corpus) {
+    issues.push("Attach a corpus — upload a .corpus file or a Hugging Face URL.")
+  }
+  return issues
+}
+
+/**
+ * Legal next statuses from the project's current one. Publishing decisions
+ * (into published, out of ready-for-review or published) belong to the
+ * superadmin; the creator may submit for review once the requirements pass.
+ */
+export function allowedStatusChanges(
+  project: ProjectDetail,
+  isSuperadmin: boolean,
+): ProjectStatus[] {
+  switch (project.status) {
+    case "ready-for-review":
+      return isSuperadmin ? ["published", "draft"] : []
+    case "published":
+      return isSuperadmin ? ["draft"] : []
+    default: {
+      const drafting: ProjectStatus[] = ["draft", "started", "failed"]
+      const next = drafting.filter((status) => status !== project.status)
+      if (reviewIssues(project).length === 0) next.push("ready-for-review")
+      return next
+    }
+  }
+}
+
+/** Human-readable reason a transition is refused, or null when it is legal. */
+export function refuseStatusChange(
+  project: ProjectDetail,
+  next: ProjectStatus,
+  isSuperadmin: boolean,
+): string | null {
+  if (!PROJECT_STATUSES.includes(next)) {
+    return "That is not a valid project status."
+  }
+  if (next === project.status) return null
+  if (allowedStatusChanges(project, isSuperadmin).includes(next)) return null
+  if (next === "ready-for-review") {
+    const issues = reviewIssues(project)
+    if (issues.length > 0) {
+      return `Not ready for review yet. ${issues.join(" ")}`
+    }
+  }
+  if (
+    next === "published" ||
+    project.status === "ready-for-review" ||
+    project.status === "published"
+  ) {
+    return "Only the superadmin can approve or change a project in review or published."
+  }
+  return `A ${project.status} project cannot move to ${next}.`
+}
+
 export async function updateProjectStatus(
-  id: string,
+  project: ProjectDetail,
   status: ProjectStatus,
+  isSuperadmin: boolean,
 ): Promise<void> {
-  if (!PROJECT_STATUSES.includes(status)) {
-    throw new DataError("validation", "That is not a valid project status.")
+  const refusal = refuseStatusChange(project, status, isSuperadmin)
+  if (refusal) {
+    throw new DataError("validation", refusal)
   }
   const { data, error } = await getSupabase()
     .from("projects")
     .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", id)
+    .eq("id", project.id)
     .select("id")
     .maybeSingle()
   if (error) fail("Could not update the project status", error)
   if (!data) {
     throw new DataError("not-found", "This project no longer exists.")
+  }
+}
+
+/**
+ * Guard for every mutating action: a project in review is read-only. Throws
+ * not-found when the project is gone so callers surface the right message.
+ */
+export async function assertEditable(projectId: string): Promise<void> {
+  const { data, error } = await getSupabase()
+    .from("projects")
+    .select("status")
+    .eq("id", projectId)
+    .maybeSingle()
+  if (error) fail("Could not load the project", error)
+  if (!data) {
+    throw new DataError("not-found", "This project no longer exists.")
+  }
+  if (isProjectReadOnly((data as { status: ProjectStatus }).status)) {
+    throw new DataError(
+      "validation",
+      "This project is in review and read-only until the superadmin approves or returns it.",
+    )
   }
 }
 
@@ -575,72 +708,3 @@ export async function unlinkCorpus(projectId: string, corpusId: string): Promise
   await touchProject(projectId)
 }
 
-// ---- References (US3) -----------------------------------------------------
-
-const REFERENCE_COLUMNS =
-  "id, project_id, title, authors, year, publication, url, created_at, updated_at"
-
-function referencePatch(input: Partial<ReferenceInput>) {
-  const patch: Partial<{
-    title: string
-    authors: string | null
-    year: number | null
-    publication: string | null
-    url: string | null
-  }> = {}
-  if (input.title !== undefined) patch.title = requireNonEmpty(input.title, "title")
-  if (input.authors !== undefined) patch.authors = input.authors.trim() || null
-  if (input.year !== undefined) patch.year = input.year
-  if (input.publication !== undefined) {
-    patch.publication = input.publication.trim() || null
-  }
-  if (input.url !== undefined) patch.url = input.url.trim() || null
-  return patch
-}
-
-export async function createReference(
-  projectId: string,
-  input: ReferenceInput,
-): Promise<ProjectReference> {
-  const title = requireNonEmpty(input.title, "title")
-  const { data, error } = await getSupabase()
-    .from("project_references")
-    .insert({ ...referencePatch(input), title, project_id: projectId })
-    .select(REFERENCE_COLUMNS)
-    .single()
-  if (error || !data) fail("Could not add the reference", error ?? {})
-  await touchProject(projectId)
-  return toReference(data as ReferenceRow)
-}
-
-export async function updateReference(
-  id: string,
-  input: Partial<ReferenceInput>,
-): Promise<ProjectReference> {
-  const { data, error } = await getSupabase()
-    .from("project_references")
-    .update(referencePatch(input))
-    .eq("id", id)
-    .select(REFERENCE_COLUMNS)
-    .maybeSingle()
-  if (error) fail("Could not save the reference", error)
-  if (!data) {
-    throw new DataError("not-found", "This reference no longer exists.")
-  }
-  const reference = toReference(data as ReferenceRow)
-  await touchProject(reference.projectId)
-  return reference
-}
-
-export async function deleteReference(id: string): Promise<void> {
-  const { data, error } = await getSupabase()
-    .from("project_references")
-    .delete()
-    .eq("id", id)
-    .select("id, project_id")
-  if (error) fail("Could not delete the reference", error)
-  if (!data || data.length === 0) {
-    throw new DataError("not-found", "This reference no longer exists.")
-  }
-  await touchProject((data as { id: string; project_id: string }[])[0].project_id)
-}
