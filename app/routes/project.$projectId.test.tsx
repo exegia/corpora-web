@@ -295,47 +295,40 @@ describe("references — corpus links (003)", () => {
 })
 
 describe("details panel — status workflow (003)", () => {
-  it("offers only the legal transitions while requirements are unmet", async () => {
-    const user = userEvent.setup()
+  it("disables Ready for review and lists the checklist while requirements are unmet", async () => {
     renderRoute()
-    const trigger = await screen.findByLabelText("Status")
-    expect(trigger).toHaveTextContent("draft")
-
-    await user.click(trigger)
-    const options = await screen.findAllByRole("option")
-    expect(options.map((option) => option.textContent)).toEqual([
-      "draft",
-      "started",
-      "failed",
-    ])
+    const ready = await screen.findByRole("button", { name: "Ready for review" })
+    expect(ready).toBeDisabled()
+    // no other status action from a plain draft
+    expect(
+      screen.queryByRole("button", { name: "Change to draft" }),
+    ).not.toBeInTheDocument()
     // the unmet requirements are listed as a checklist
     expect(screen.getByText("Licence attached and agreed")).toBeInTheDocument()
     expect(screen.getByText("Corpus attached")).toBeInTheDocument()
   })
 
-  it("offers ready-for-review once licence, classification, and corpus pass", async () => {
-    const user = userEvent.setup()
+  it("enables Ready for review once licence, classification, and corpus pass", async () => {
     vi.mocked(getProject).mockResolvedValue(readyDetail)
     renderRoute()
-
-    await user.click(await screen.findByLabelText("Status"))
-    const options = await screen.findAllByRole("option")
-    expect(options.map((option) => option.textContent)).toContain(
-      "ready-for-review",
-    )
+    expect(
+      await screen.findByRole("button", { name: "Ready for review" }),
+    ).toBeEnabled()
   })
 
   it("submits set-status with the loaded project and superadmin flag", async () => {
     const user = userEvent.setup()
+    vi.mocked(getProject).mockResolvedValue(readyDetail)
     vi.mocked(updateProjectStatus).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByLabelText("Status"))
-    await user.click(await screen.findByRole("option", { name: "started" }))
+    await user.click(
+      await screen.findByRole("button", { name: "Ready for review" }),
+    )
     await waitFor(() =>
       expect(updateProjectStatus).toHaveBeenCalledWith(
         expect.objectContaining({ id: "p1" }),
-        "started",
+        "ready-for-review",
         true,
       ),
     )
@@ -350,14 +343,12 @@ describe("details panel — status workflow (003)", () => {
     vi.mocked(updateProjectStatus).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByLabelText("Status"))
-    const options = await screen.findAllByRole("option")
-    expect(options.map((option) => option.textContent)).toEqual([
-      "ready-for-review",
-      "published",
-      "draft",
-    ])
-    await user.click(screen.getByRole("option", { name: "published" }))
+    // the double group: publish, or send back to draft
+    const publish = await screen.findByRole("button", { name: "Publish" })
+    expect(
+      screen.getByRole("button", { name: "Change to draft" }),
+    ).toBeInTheDocument()
+    await user.click(publish)
     await waitFor(() =>
       expect(updateProjectStatus).toHaveBeenCalledWith(
         expect.objectContaining({ id: "p1" }),
@@ -369,13 +360,15 @@ describe("details panel — status workflow (003)", () => {
 
   it("surfaces a refused status change as a visible error", async () => {
     const user = userEvent.setup()
+    vi.mocked(getProject).mockResolvedValue(readyDetail)
     vi.mocked(updateProjectStatus).mockRejectedValue(
       new DataError("validation", "Only the superadmin can approve."),
     )
     renderRoute()
 
-    await user.click(await screen.findByLabelText("Status"))
-    await user.click(await screen.findByRole("option", { name: "failed" }))
+    await user.click(
+      await screen.findByRole("button", { name: "Ready for review" }),
+    )
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Only the superadmin can approve.",
     )

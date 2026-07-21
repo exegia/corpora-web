@@ -13,19 +13,11 @@ import {
   CardFrameTitle,
   CardPanel,
 } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { ButtonGroup } from "@/components/ui/group"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
 import {
-  allowedStatusChanges,
   type AttachedLicense,
   type ProjectDetail,
   type ProjectStatus,
@@ -49,6 +41,83 @@ function StatusLabel({ status }: { status: ProjectStatus }) {
       />
       <span className="truncate">{status}</span>
     </span>
+  )
+}
+
+/**
+ * The status workflow as contextual actions instead of a select: the
+ * creator submits for review; the superadmin publishes or returns to draft.
+ */
+function StatusActions({
+  project,
+  superadmin,
+  fetcher,
+}: {
+  project: ProjectDetail
+  superadmin: boolean
+  fetcher: ReturnType<typeof useFetcher<{ ok: boolean; error?: string }>>
+}) {
+  const busy = fetcher.state !== "idle"
+  const submit = (status: ProjectStatus) =>
+    fetcher.submit({ intent: "set-status", status }, { method: "post" })
+
+  if (project.status === "ready-for-review") {
+    if (!superadmin) return null
+    return (
+      <ButtonGroup>
+        <Button size="sm" disabled={busy} onClick={() => submit("published")}>
+          Publish
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => submit("draft")}
+        >
+          Change to draft
+        </Button>
+      </ButtonGroup>
+    )
+  }
+
+  if (project.status === "published") {
+    if (!superadmin) return null
+    return (
+      <ButtonGroup>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => submit("draft")}
+        >
+          Change to draft
+        </Button>
+      </ButtonGroup>
+    )
+  }
+
+  // Drafting (incl. legacy started/failed rows, which only return to draft).
+  return (
+    <ButtonGroup>
+      {project.status !== "draft" && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => submit("draft")}
+        >
+          Change to draft
+        </Button>
+      )}
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy || reviewIssues(project).length > 0}
+        onClick={() => submit("ready-for-review")}
+      >
+        Ready for review
+      </Button>
+    </ButtonGroup>
   )
 }
 
@@ -162,10 +231,6 @@ export function ProjectDetailPanel({
     .filter(Boolean)
     .join(" · ")
 
-  const statusOptions = [
-    project.status,
-    ...allowedStatusChanges(project, superadmin),
-  ]
   const issues = reviewIssues(project)
   const showChecklist =
     !["ready-for-review", "published"].includes(project.status) && issues.length > 0
@@ -189,35 +254,16 @@ export function ProjectDetailPanel({
           )}
           <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
             <div className="flex flex-col gap-1">
-              <dt>
-                <Label htmlFor="project-status">Status</Label>
-              </dt>
+              <dt className="font-medium">Status</dt>
               <dd>
-                <Select
-                  value={project.status}
-                  disabled={
-                    statusFetcher.state !== "idle" || statusOptions.length === 1
-                  }
-                  onValueChange={(status) =>
-                    statusFetcher.submit(
-                      { intent: "set-status", status: String(status) },
-                      { method: "post" },
-                    )
-                  }
-                >
-                  <SelectTrigger className="w-full" id="project-status">
-                    <SelectValue>
-                      {(status: ProjectStatus) => <StatusLabel status={status} />}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectPopup>
-                    {statusOptions.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        <StatusLabel status={status} />
-                      </SelectItem>
-                    ))}
-                  </SelectPopup>
-                </Select>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <StatusLabel status={project.status} />
+                  <StatusActions
+                    project={project}
+                    superadmin={superadmin}
+                    fetcher={statusFetcher}
+                  />
+                </div>
                 {showChecklist && <ReviewChecklist project={project} />}
                 {project.status === "ready-for-review" && !superadmin && (
                   <p className="mt-1 text-muted-foreground text-xs">

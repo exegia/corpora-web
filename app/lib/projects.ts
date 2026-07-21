@@ -580,9 +580,11 @@ export function reviewIssues(project: ProjectDetail): string[] {
 }
 
 /**
- * Legal next statuses from the project's current one. Publishing decisions
- * (into published, out of ready-for-review or published) belong to the
- * superadmin; the creator may submit for review once the requirements pass.
+ * Legal next statuses from the project's current one. The workflow is
+ * draft → ready-for-review → published: the creator submits for review once
+ * the requirements pass; publishing decisions (into published, out of
+ * ready-for-review or published) belong to the superadmin. The legacy
+ * "started"/"failed" statuses still display but only move back to draft.
  */
 export function allowedStatusChanges(
   project: ProjectDetail,
@@ -594,8 +596,8 @@ export function allowedStatusChanges(
     case "published":
       return isSuperadmin ? ["draft"] : []
     default: {
-      const drafting: ProjectStatus[] = ["draft", "started", "failed"]
-      const next = drafting.filter((status) => status !== project.status)
+      const next: ProjectStatus[] = []
+      if (project.status !== "draft") next.push("draft")
       if (reviewIssues(project).length === 0) next.push("ready-for-review")
       return next
     }
