@@ -163,7 +163,7 @@ function makeDetail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     description: null,
     status: "draft",
     type: null,
-    language: null,
+    languages: [],
     category: null,
     creator: { id: "u1", name: "Ada Researcher", username: "ada" },
     organization: null,
@@ -192,7 +192,7 @@ const attachedLicence = {
 const readyDetail = makeDetail({
   licenses: [attachedLicence],
   type: "bible",
-  language: "hebrew",
+  languages: ["hebrew"],
   corpus: {
     source: "upload",
     path: "p1/peshitta.corpus",
@@ -426,7 +426,7 @@ describe("getProject", () => {
         data: {
           ...detailRow,
           type: "bible",
-          language: "aramaic",
+          language: ["aramaic"],
           organizations: { id: "o1", name: "Peshitta Institute", website: null },
           project_licences: [
             {
@@ -452,7 +452,7 @@ describe("getProject", () => {
     const project = await getProject("p1")
     expect(project?.creator).toEqual(creatorRow)
     expect(project?.organization?.name).toBe("Peshitta Institute")
-    expect(project?.language).toBe("aramaic")
+    expect(project?.languages).toEqual(["aramaic"])
     expect(project?.licenses).toEqual([
       {
         id: "CC-BY-4.0",
@@ -471,7 +471,7 @@ describe("getProject", () => {
 
 describe("classifyProject", () => {
   it.each([
-    ["scriptural type + language", { type: "bible", language: "hebrew" }, { type: "bible", language: "hebrew", category: null }],
+    ["scriptural type + languages", { type: "bible", languages: ["hebrew", "greek"] }, { type: "bible", language: ["hebrew", "greek"], category: null }],
     ["categorized type + category", { type: "review", category: "literary" }, { type: "review", language: null, category: "literary" }],
     ["neutral type", { type: "regular" }, { type: "regular", language: null, category: null }],
     ["cleared classification", null, { type: null, language: null, category: null }],
@@ -488,7 +488,8 @@ describe("classifyProject", () => {
   )
 
   it.each([
-    ["scriptural type without a language", { type: "bible" }],
+    ["scriptural type without a language", { type: "bible", languages: [] }],
+    ["quran with a language outside its vocabulary", { type: "quran", languages: ["hebrew"] }],
     ["categorized type without a category", { type: "commentary" }],
     ["unknown type", { type: "novel" }],
   ] as const)("rejects %s before any network call", async (_label, input) => {
