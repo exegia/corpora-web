@@ -235,9 +235,9 @@ export type Database = {
           branch: string | null
           committed_at: string | null
           created_at: string
+          document_id: string
           id: string
           message: string
-          project_id: string
           sha: string
         }
         Insert: {
@@ -246,9 +246,9 @@ export type Database = {
           branch?: string | null
           committed_at?: string | null
           created_at?: string
+          document_id: string
           id?: string
           message: string
-          project_id: string
           sha: string
         }
         Update: {
@@ -257,20 +257,50 @@ export type Database = {
           branch?: string | null
           committed_at?: string | null
           created_at?: string
+          document_id?: string
           id?: string
           message?: string
-          project_id?: string
           sha?: string
         }
         Relationships: [
           {
-            foreignKeyName: "corpus_commits_project_id_fkey"
-            columns: ["project_id"]
+            foreignKeyName: "corpus_commits_document_id_fkey"
+            columns: ["document_id"]
             isOneToOne: false
-            referencedRelation: "projects"
+            referencedRelation: "corpus_documents"
             referencedColumns: ["id"]
           },
         ]
+      }
+      corpus_documents: {
+        Row: {
+          created_at: string
+          filename: string | null
+          id: string
+          name: string
+          path: string
+          source: string
+          uploaded_at: string
+        }
+        Insert: {
+          created_at?: string
+          filename?: string | null
+          id?: string
+          name: string
+          path: string
+          source: string
+          uploaded_at?: string
+        }
+        Update: {
+          created_at?: string
+          filename?: string | null
+          id?: string
+          name?: string
+          path?: string
+          source?: string
+          uploaded_at?: string
+        }
+        Relationships: []
       }
       devices: {
         Row: {
@@ -560,10 +590,7 @@ export type Database = {
       projects: {
         Row: {
           category: string | null
-          corpus_filename: string | null
-          corpus_path: string | null
-          corpus_source: string | null
-          corpus_uploaded_at: string | null
+          corpus_document_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -578,10 +605,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
-          corpus_filename?: string | null
-          corpus_path?: string | null
-          corpus_source?: string | null
-          corpus_uploaded_at?: string | null
+          corpus_document_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -596,10 +620,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
-          corpus_filename?: string | null
-          corpus_path?: string | null
-          corpus_source?: string | null
-          corpus_uploaded_at?: string | null
+          corpus_document_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -613,6 +634,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_corpus_document_id_fkey"
+            columns: ["corpus_document_id"]
+            isOneToOne: false
+            referencedRelation: "corpus_documents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_organization_id_fkey"
             columns: ["organization_id"]

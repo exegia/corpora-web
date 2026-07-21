@@ -21,7 +21,12 @@ const Stub = createRoutesStub([
         HydrateFallback: () => null,
         loader: () => ({ data: Promise.resolve({ projects: [], users: [] }) }),
       },
-      { path: "corpus", Component: Corpus },
+      {
+        path: "corpus",
+        Component: Corpus,
+        HydrateFallback: () => null,
+        loader: () => ({ documents: [] }),
+      },
     ],
   },
 ])
