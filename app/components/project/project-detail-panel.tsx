@@ -6,6 +6,13 @@ import { OrganizationDialog } from "@/components/project/organization-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
@@ -13,7 +20,28 @@ import {
   type AttachedLicense,
   PROJECT_STATUSES,
   type ProjectDetail,
+  type ProjectStatus,
 } from "@/lib/projects"
+
+const STATUS_DOT_COLORS: Record<ProjectStatus, string> = {
+  draft: "bg-gray-500",
+  started: "bg-blue-500",
+  progress: "bg-amber-500",
+  completed: "bg-emerald-500",
+  failed: "bg-red-500",
+}
+
+function StatusLabel({ status }: { status: ProjectStatus }) {
+  return (
+    <span className="flex items-center gap-2">
+      <span
+        aria-hidden="true"
+        className={`size-2 rounded-full ${STATUS_DOT_COLORS[status]}`}
+      />
+      <span className="truncate">{status}</span>
+    </span>
+  )
+}
 
 function AttachedLicenseRow({ license }: { license: AttachedLicense }) {
   const fetcher = useFetcher<{ ok: boolean; error?: string }>()
@@ -74,32 +102,36 @@ export function ProjectDetailPanel({
 
   return (
     <div className="rounded-lg border p-4">
-      <h2 className="font-heading font-semibold text-lg">Details</h2>
+      <h2 className="font-semibold text-lg">Details</h2>
       <dl className="mt-3 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <dt>
             <Label htmlFor="project-status">Status</Label>
           </dt>
           <dd>
-            <select
-              id="project-status"
-              name="status"
+            <Select
               value={project.status}
               disabled={statusFetcher.state !== "idle"}
-              onChange={(event) =>
+              onValueChange={(status) =>
                 statusFetcher.submit(
-                  { intent: "set-status", status: event.currentTarget.value },
+                  { intent: "set-status", status: String(status) },
                   { method: "post" },
                 )
               }
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
-              {PROJECT_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full" id="project-status">
+                <SelectValue>
+                  {(status: ProjectStatus) => <StatusLabel status={status} />}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup>
+                {PROJECT_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    <StatusLabel status={status} />
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
             {statusFetcher.data?.ok === false && statusFetcher.data.error && (
               <p role="alert" className="mt-1 text-destructive text-xs">
                 {statusFetcher.data.error}

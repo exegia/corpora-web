@@ -28,12 +28,12 @@ const items = [
   { title: "Corpus", url: "/corpus", icon: Database },
 ]
 
-export function AppSidebar() {
+const AppSidebar = () => {
   return (
     <Sidebar variant="inset">
       <SidebarHeader className="flex flex-row items-center justify-center">
         <Logo className="fill-amber-400 w-8 h-8 transform rotate-12" />
-        <span className="font-heading text-2xl font-medium text-black">
+        <span className="font-heading text-2xl font-medium text-foreground">
           Corpora
         </span>
       </SidebarHeader>
@@ -46,7 +46,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <NavLink to={item.url} end={item.url === "/"} >
                     {({ isActive }) => (
-                      <SidebarMenuButton isActive={isActive} className={cn("cursor-pointer bg-transparent transition-all ease-in-out duration-200", isActive && "bg-amber-400/70!")}>
+                      <SidebarMenuButton isActive={isActive} className={cn("cursor-pointer bg-transparent transition-all ease-in-out duration-200", isActive && "bg-accent!")}>
                         <item.icon />
                         <span>{item.title}</span>
                       </SidebarMenuButton>
@@ -61,3 +61,5 @@ export function AppSidebar() {
     </Sidebar>
   )
 }
+
+export default AppSidebar;

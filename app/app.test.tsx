@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import { createRoutesStub } from "react-router"
 import { describe, expect, it } from "vitest"
 import { AppLayout } from "@/components/app-layout"
@@ -19,7 +19,7 @@ const Stub = createRoutesStub([
         path: "project",
         Component: Project,
         HydrateFallback: () => null,
-        loader: () => ({ projects: [] }),
+        loader: () => ({ data: Promise.resolve({ projects: [], users: [] }) }),
       },
       { path: "corpus", Component: Corpus },
     ],
@@ -40,6 +40,20 @@ describe("routes", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: heading }),
     ).toBeInTheDocument()
+  })
+
+  it("breadcrumb shows the trail for the current route", async () => {
+    renderAt("/project")
+    const breadcrumb = await screen.findByRole("navigation", {
+      name: "breadcrumb",
+    })
+    expect(
+      within(breadcrumb).getByRole("link", { name: "Dashboard" }),
+    ).toHaveAttribute("href", "/")
+    expect(within(breadcrumb).getByText("Projects")).toBeInTheDocument()
+    expect(
+      within(breadcrumb).queryByRole("link", { name: "Projects" }),
+    ).not.toBeInTheDocument()
   })
 
   it("shows sidebar navigation links", () => {

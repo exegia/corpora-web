@@ -1,26 +1,29 @@
 import { Outlet } from "react-router"
-import { AppSidebar } from "@/components/app-sidebar"
-import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
+import { Provider, Drawer, Wrapper, Trigger } from "@/components/sidebar"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { COBreadcrumb } from "./breadcrumb"
+import { ThemeToggle } from "./theme-toggle"
+
 
 export function AppLayout() {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
+    <Provider className="p-2 h-screen">
+      <Drawer />
+      <Wrapper className="relative shadow-2xl">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="h-4" />
-          <span className="text-sm text-muted-foreground">Corpora</span>
+          <Trigger />
+          <COBreadcrumb />
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </header>
-        <main className="flex-1 p-6">
-          <Outlet />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+
+        <ScrollArea className="flex-1 min-h-0" fill>
+          <main className="p-6">
+            <Outlet />
+          </main>
+          </ScrollArea>
+      </Wrapper>
+    </Provider>
   )
 }
