@@ -214,14 +214,16 @@ describe("status workflow (003)", () => {
   })
 
   it("offers ready-for-review only when the requirements pass", () => {
-    expect(allowedStatusChanges(makeDetail(), false)).toEqual([
-      "started",
-      "failed",
+    expect(allowedStatusChanges(makeDetail(), false)).toEqual([])
+    expect(allowedStatusChanges(readyDetail, false)).toEqual(["ready-for-review"])
+  })
+
+  it("only returns legacy started/failed projects to draft", () => {
+    expect(allowedStatusChanges(makeDetail({ status: "started" }), false)).toEqual([
+      "draft",
     ])
-    expect(allowedStatusChanges(readyDetail, false)).toEqual([
-      "started",
-      "failed",
-      "ready-for-review",
+    expect(allowedStatusChanges(makeDetail({ status: "failed" }), false)).toEqual([
+      "draft",
     ])
   })
 
@@ -272,10 +274,13 @@ describe("status workflow (003)", () => {
 describe("updateProjectStatus", () => {
   it("updates the status and touches updated_at", async () => {
     const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
-    await updateProjectStatus(makeDetail(), "started", false)
+    await updateProjectStatus(readyDetail, "ready-for-review", false)
     expect(builders[0].table).toBe("projects")
     expect(builders[0].update).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "started", updated_at: expect.any(String) }),
+      expect.objectContaining({
+        status: "ready-for-review",
+        updated_at: expect.any(String),
+      }),
     )
     expect(builders[0].eq).toHaveBeenCalledWith("id", "p1")
   })
@@ -315,7 +320,7 @@ describe("updateProjectStatus", () => {
   it("maps a missing row to not-found", async () => {
     mockSupabase([{ data: null, error: null }])
     await expect(
-      updateProjectStatus(makeDetail({ id: "gone" }), "failed", false),
+      updateProjectStatus(makeDetail({ id: "gone", status: "started" }), "draft", false),
     ).rejects.toMatchObject({ code: "not-found" })
   })
 })
