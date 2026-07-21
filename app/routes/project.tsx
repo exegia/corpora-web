@@ -25,6 +25,7 @@ import {
   updateProject,
 } from "@/lib/projects"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import { listUsers } from "@/lib/users"
 
 export async function clientLoader() {
@@ -125,6 +126,8 @@ function ProjectHeader({ children }: { children?: ReactNode }) {
 }
 
 function ProjectListSkeleton() {
+  useLoadingSound()
+
   return (
     <div aria-busy="true" aria-label="Loading projects" role="status">
       <ProjectHeader>
@@ -155,6 +158,7 @@ function ProjectList({
   projects: ProjectSummary[]
   users: Awaited<ReturnType<typeof listUsers>>
 }) {
+  useReadySound()
   const [creating, setCreating] = useState(false)
 
   return (

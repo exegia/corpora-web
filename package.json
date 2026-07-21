@@ -21,6 +21,7 @@
     "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cuelume": "^0.1.2",
     "fflate": "^0.8.3",
     "isbot": "^5",
     "isomorphic-git": "^1.38.9",

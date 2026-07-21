@@ -29,6 +29,7 @@ import {
   createLicence,
   listLicences,
 } from "@/lib/licenses"
+import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import { DataError, type LicenseStatus } from "@/lib/projects"
 import { getSuperadmin } from "@/lib/users"
 
@@ -128,6 +129,8 @@ function LicenceRow({ licence }: { licence: CatalogLicence }) {
 
 /** Header + skeleton rows shown while the catalog loads. */
 function CatalogSkeleton() {
+  useLoadingSound()
+
   return (
     <>
       <Skeleton className="h-9 w-full max-w-sm rounded-lg" />
@@ -160,6 +163,7 @@ function Catalog({
   licences: CatalogLicence[]
   superadmin: boolean
 }) {
+  useReadySound()
   const [query, setQuery] = useState("")
 
   const needle = query.trim().toLowerCase()

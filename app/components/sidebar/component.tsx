@@ -48,7 +48,11 @@ const AppSidebar = () => {
                 <SidebarMenuItem key={item.title}>
                   <NavLink to={item.url} end={item.url === "/"} >
                     {({ isActive }) => (
-                      <SidebarMenuButton isActive={isActive} className={cn("cursor-pointer bg-transparent transition-all ease-in-out duration-200", isActive && "bg-accent!")}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        data-cuelume-hover="tick"
+                        className={cn("cursor-pointer bg-transparent transition-all ease-in-out duration-200", isActive && "bg-accent!")}
+                      >
                         <item.icon />
                         <span>{item.title}</span>
                       </SidebarMenuButton>
