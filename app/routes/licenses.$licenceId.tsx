@@ -1,18 +1,7 @@
-import {
-  BlockTypeSelect,
-  BoldItalicUnderlineToggles,
-  headingsPlugin,
-  listsPlugin,
-  MDXEditor,
-  type MDXEditorMethods,
-  quotePlugin,
-  thematicBreakPlugin,
-  toolbarPlugin,
-} from "@mdxeditor/editor"
+import MarkdownEditor from "@uiw/react-markdown-editor"
 import { FileQuestion } from "lucide-react"
 import { Suspense, useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import "@mdxeditor/editor/style.css"
 import { Await, Link, useFetcher, useLoaderData } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Badge } from "@/components/ui/badge"
@@ -141,8 +130,9 @@ function domainList(licence: LicenceDetail): string[] {
 }
 
 /**
- * The stored licence text in MDXEditor: read-only for everyone, with a
- * simple Edit → Save flow for the superadmin persisting back to the db.
+ * The stored licence text in the uiw markdown editor: a rendered read-only
+ * preview for everyone, with a simple source-editor Edit → Save flow for the
+ * superadmin persisting back to the db.
  */
 function LicenceTextSection({
   licence,
@@ -155,9 +145,9 @@ function LicenceTextSection({
 }) {
   useReadySound()
   const fetcher = useFetcher<{ ok: boolean; error?: string }>()
-  const editorRef = useRef<MDXEditorMethods>(null)
   const submittedRef = useRef(false)
   const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(text ?? "")
   const busy = fetcher.state !== "idle"
 
   // Leave edit mode only once the save lands; a failed save keeps the
@@ -168,6 +158,12 @@ function LicenceTextSection({
       setEditing(false)
     }
   }, [fetcher.state, fetcher.data])
+
+  // Re-seed the draft from the (revalidated) stored text whenever we are not
+  // actively editing — so a saved edit and Cancel both reset cleanly.
+  useEffect(() => {
+    if (!editing) setDraft(text ?? "")
+  }, [text, editing])
 
   const hasText = text !== null
 
@@ -193,10 +189,7 @@ function LicenceTextSection({
                   onClick={() => {
                     submittedRef.current = true
                     fetcher.submit(
-                      {
-                        intent: "save-licence-text",
-                        text: editorRef.current?.getMarkdown() ?? "",
-                      },
+                      { intent: "save-licence-text", text: draft },
                       { method: "post" },
                     )
                   }}
@@ -236,41 +229,21 @@ function LicenceTextSection({
               )}
               {superadmin && " Use Edit to write it by hand."}
             </p>
+          ) : editing ? (
+            // Source editor with a live preview and the default toolbar
+            // (bold, italic, header, …). Controlled so Save reads `draft`.
+            <MarkdownEditor
+              value={draft}
+              height="420px"
+              autoFocus
+              enableScroll
+              onChange={(value) => setDraft(value)}
+            />
           ) : (
-            // Remount on mode change so Cancel discards the draft and a
-            // saved text re-renders from the revalidated loader data.
-            <MDXEditor
-              key={editing ? "edit" : `view:${licence.updatedAt ?? ""}`}
-              ref={editorRef}
-              markdown={text ?? ""}
-              readOnly={!editing}
-              autoFocus={editing ? { defaultSelection: "rootStart" } : false}
-              plugins={[
-                headingsPlugin(),
-                quotePlugin(),
-                listsPlugin(),
-                thematicBreakPlugin(),
-                ...(editing
-                  ? [
-                      toolbarPlugin({
-                        toolbarContents: () => (
-                          <>
-                            <BlockTypeSelect />
-                            <BoldItalicUnderlineToggles />
-                          </>
-                        ),
-                      }),
-                    ]
-                  : []),
-              ]}
-              className={
-                editing
-                  ? "rounded-lg border bg-white dark:bg-neutral-950"
-                  : ""
-              }
-              contentEditableClassName={`font-sans ${
-                editing ? "min-h-40 p-4" : "!p-0"
-              }`}
+            // Rendered read-only preview of the stored markdown.
+            <MarkdownEditor.Markdown
+              source={text ?? ""}
+              style={{ backgroundColor: "transparent" }}
             />
           )}
           {fetcher.data?.ok === false && fetcher.data.error && (
