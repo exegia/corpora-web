@@ -22,7 +22,10 @@ import {
   uploadCorpusFile,
 } from "@/lib/corpus"
 import type { CorpusCommitInput, CorpusDocument } from "@/lib/corpus"
-import { extractCorpusHistory } from "@/lib/corpus-history"
+import {
+  extractCorpusHistory,
+  fetchHuggingFaceHistory,
+} from "@/lib/corpus-history"
 import { type CorpusSource, DataError } from "@/lib/projects"
 
 export async function clientLoader() {
@@ -165,6 +168,30 @@ export default function Corpus() {
     }
   }
 
+  async function handleHuggingFace(url: string) {
+    setUploading(true)
+    setUploadError(null)
+    try {
+      // Best effort — a private or unreachable repo still registers, just
+      // without a version history.
+      const history = await fetchHuggingFaceHistory(url)
+      attachFetcher.submit(
+        {
+          intent: "create-document",
+          name: url.split("/").filter(Boolean).slice(-2).join("/"),
+          source: "huggingface",
+          path: url,
+          filename: "",
+          commits: JSON.stringify(history ?? []),
+        },
+        { method: "post" },
+      )
+      setHfUrl("")
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const actionError =
     attachFetcher.data?.ok === false ? attachFetcher.data.error : null
 
@@ -204,18 +231,7 @@ export default function Corpus() {
           className="flex flex-1 items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault()
-            attachFetcher.submit(
-              {
-                intent: "create-document",
-                name: hfUrl.split("/").filter(Boolean).slice(-2).join("/"),
-                source: "huggingface",
-                path: hfUrl,
-                filename: "",
-                commits: "[]",
-              },
-              { method: "post" },
-            )
-            setHfUrl("")
+            void handleHuggingFace(hfUrl)
           }}
         >
           <Input

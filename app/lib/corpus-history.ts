@@ -1,8 +1,9 @@
 // Version history extraction (003): a .corpus file is a zip archive that may
 // carry its repository's nested .git directory. This module unzips the
 // archive in the browser, mounts the .git tree on a minimal in-memory fs, and
-// reads the commit log with isomorphic-git. No network, no persistence — the
-// caller stores the resulting commits via lib/corpus.
+// reads the commit log with isomorphic-git. Hugging Face corpora get their
+// history from the Hub's commits API instead. No persistence — the caller
+// stores the resulting commits via lib/corpus.
 
 import { Buffer } from "buffer"
 import { unzipSync } from "fflate"
@@ -183,5 +184,69 @@ export async function extractCorpusHistory(
       "validation",
       "The corpus carries a .git directory but its history could not be read.",
     )
+  }
+}
+
+interface HubCommit {
+  id: string
+  title: string
+  message: string
+  authors?: { user: string }[]
+  date: string
+}
+
+/**
+ * Resolve a huggingface.co URL to its Hub API commits endpoint. Datasets and
+ * spaces keep their prefix; a bare owner/name path is a model repo. Returns
+ * null when the URL points nowhere useful (e.g. the site root).
+ */
+export function huggingFaceCommitsEndpoint(url: string): string | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  if (
+    parsed.hostname !== "huggingface.co" &&
+    parsed.hostname !== "www.huggingface.co"
+  ) {
+    return null
+  }
+  const segments = parsed.pathname.split("/").filter(Boolean)
+  const prefixed = segments[0] === "datasets" || segments[0] === "spaces"
+  const repo = prefixed ? segments.slice(1, 3) : segments.slice(0, 2)
+  if (repo.length < 2) return null
+  const kind = prefixed ? segments[0] : "models"
+  return `https://huggingface.co/api/${kind}/${repo.join("/")}/commits/main`
+}
+
+/**
+ * Read a Hugging Face repo's commit log from the Hub API. Best effort by
+ * design: unreachable, private, or unrecognised repos yield null so
+ * registering the corpus never blocks on its history.
+ */
+export async function fetchHuggingFaceHistory(
+  url: string,
+): Promise<CorpusCommitInput[] | null> {
+  const endpoint = huggingFaceCommitsEndpoint(url)
+  if (!endpoint) return null
+  try {
+    const response = await fetch(`${endpoint}?limit=${MAX_COMMITS}`)
+    if (!response.ok) return null
+    const entries = (await response.json()) as HubCommit[]
+    if (!Array.isArray(entries)) return null
+    return entries.map((entry) => ({
+      sha: entry.id,
+      message: [entry.title, entry.message?.trim()]
+        .filter(Boolean)
+        .join("\n\n"),
+      authorName: entry.authors?.[0]?.user ?? null,
+      authorEmail: null,
+      branch: "main",
+      committedAt: entry.date ?? null,
+    }))
+  } catch {
+    return null
   }
 }

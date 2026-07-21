@@ -9,7 +9,10 @@ import {
   uploadCorpusFile,
 } from "@/lib/corpus"
 import type { CorpusDocument } from "@/lib/corpus"
-import { extractCorpusHistory } from "@/lib/corpus-history"
+import {
+  extractCorpusHistory,
+  fetchHuggingFaceHistory,
+} from "@/lib/corpus-history"
 import CorpusRoute, { clientAction, clientLoader } from "@/routes/corpus"
 
 vi.mock("@/lib/corpus", () => ({
@@ -21,6 +24,7 @@ vi.mock("@/lib/corpus", () => ({
 
 vi.mock("@/lib/corpus-history", () => ({
   extractCorpusHistory: vi.fn(),
+  fetchHuggingFaceHistory: vi.fn(),
 }))
 
 const peshitta: CorpusDocument = {
@@ -115,8 +119,19 @@ describe("/corpus library", () => {
     )
   })
 
-  it("registers a Hugging Face corpus", async () => {
+  it("registers a Hugging Face corpus with its Hub commit history", async () => {
     const user = userEvent.setup()
+    const commits = [
+      {
+        sha: "e628166",
+        message: "Convert dataset to Parquet",
+        authorName: "albertvillanova",
+        authorEmail: null,
+        branch: "main",
+        committedAt: "2024-01-04T12:09:45.000Z",
+      },
+    ]
+    vi.mocked(fetchHuggingFaceHistory).mockResolvedValue(commits)
     vi.mocked(createCorpusDocument).mockResolvedValue(peshitta)
     renderRoute()
 
@@ -125,13 +140,35 @@ describe("/corpus library", () => {
     await user.click(screen.getByRole("button", { name: "Add" }))
 
     await waitFor(() =>
+      expect(fetchHuggingFaceHistory).toHaveBeenCalledWith(
+        "https://huggingface.co/datasets/x/onkelos",
+      ),
+    )
+    await waitFor(() =>
       expect(createCorpusDocument).toHaveBeenCalledWith({
         name: "x/onkelos",
         source: "huggingface",
         path: "https://huggingface.co/datasets/x/onkelos",
         filename: null,
-        commits: [],
+        commits,
       }),
+    )
+  })
+
+  it("still registers when the Hub history is unavailable", async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetchHuggingFaceHistory).mockResolvedValue(null)
+    vi.mocked(createCorpusDocument).mockResolvedValue(peshitta)
+    renderRoute()
+
+    const input = await screen.findByLabelText("Hugging Face URL")
+    await user.type(input, "https://huggingface.co/datasets/x/private")
+    await user.click(screen.getByRole("button", { name: "Add" }))
+
+    await waitFor(() =>
+      expect(createCorpusDocument).toHaveBeenCalledWith(
+        expect.objectContaining({ commits: [] }),
+      ),
     )
   })
 
