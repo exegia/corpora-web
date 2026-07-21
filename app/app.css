@@ -3,6 +3,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Cal Sans 2.0 variable — the coss main font (see coss.com/ui/docs/styling). */
+@font-face {
+  font-family: "Cal Sans";
+  src: url("./fonts/CalSansVF.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
     user-select: none;
     -webkit-user-drag: none;
@@ -61,7 +70,7 @@
 @theme inline {
   --font-heading: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: var(--font-mono, ui-monospace, monospace);
-  --font-sans: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  --font-sans: "Cal Sans", ui-sans-serif, system-ui, sans-serif;
   ----animate-toast-success-odd: toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
   ----animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
   ----animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
