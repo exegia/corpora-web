@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   attachLicence,
+  createLicence,
   detachLicence,
+  fetchLicenceText,
   getLicence,
   listLicences,
+  saveLicenceText,
   updateLicence,
 } from "@/lib/licenses"
 import { getSupabase } from "@/lib/supabase"
@@ -114,6 +117,7 @@ const detailRow = {
   osd_conformance: null,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: null,
+  full_text: null,
 }
 
 describe("getLicence", () => {
@@ -191,6 +195,113 @@ describe("updateLicence", () => {
     await expect(updateLicence("nope", input)).rejects.toMatchObject({
       code: "not-found",
     })
+  })
+})
+
+describe("saveLicenceText", () => {
+  it("stores the text and stamps updated_at", async () => {
+    const { builders } = mockSupabase([
+      { data: { id: "CC-BY-4.0" }, error: null },
+    ])
+    await saveLicenceText("CC-BY-4.0", "# Licence body")
+    expect(builders[0].table).toBe("licences")
+    expect(builders[0].update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        full_text: "# Licence body",
+        updated_at: expect.any(String),
+      }),
+    )
+    expect(builders[0].eq).toHaveBeenCalledWith("id", "CC-BY-4.0")
+  })
+
+  it("maps a missing licence to not-found", async () => {
+    mockSupabase([{ data: null, error: null }])
+    await expect(saveLicenceText("nope", "text")).rejects.toMatchObject({
+      code: "not-found",
+    })
+  })
+})
+
+describe("createLicence", () => {
+  const input = {
+    id: "MIT",
+    title: "MIT License",
+    url: null,
+    family: null,
+    maintainer: null,
+    status: "active" as const,
+    domains: { content: false, data: false, software: true },
+  }
+
+  it("inserts the catalog row and returns the id", async () => {
+    const { builders } = mockSupabase([{ data: null, error: null }])
+    await expect(createLicence(input)).resolves.toBe("MIT")
+    expect(builders[0].table).toBe("licences")
+    expect(builders[0].insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "MIT",
+        title: "MIT License",
+        status: "active",
+        domain_software: true,
+      }),
+    )
+  })
+
+  it("requires an identifier before any network call", async () => {
+    const { from } = mockSupabase([])
+    await expect(createLicence({ ...input, id: " " })).rejects.toMatchObject({
+      code: "validation",
+    })
+    expect(from).not.toHaveBeenCalled()
+  })
+
+  it("maps a duplicate identifier to a validation error", async () => {
+    mockSupabase([{ data: null, error: { code: "23505" } }])
+    await expect(createLicence(input)).rejects.toMatchObject({
+      code: "validation",
+    })
+  })
+})
+
+describe("fetchLicenceText", () => {
+  function response(body: string, contentType = "text/plain", ok = true) {
+    return {
+      ok,
+      headers: new Headers({ "content-type": contentType }),
+      text: async () => body,
+    }
+  }
+
+  it("returns the SPDX text with MDX syntax characters escaped", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response("Copyright <year> {holder}"))
+    vi.stubGlobal("fetch", fetchMock)
+    await expect(
+      fetchLicenceText({ id: "MIT", url: null }),
+    ).resolves.toBe("Copyright \\<year> \\{holder}")
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://raw.githubusercontent.com/spdx/license-list-data/main/text/MIT.txt",
+    )
+    vi.unstubAllGlobals()
+  })
+
+  it("skips HTML responses and falls through to the next source", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response("<html>", "text/html"))
+      .mockResolvedValueOnce(response("plain licence"))
+    vi.stubGlobal("fetch", fetchMock)
+    await expect(
+      fetchLicenceText({ id: "X", url: "https://example.org/x.txt" }),
+    ).resolves.toBe("plain licence")
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.unstubAllGlobals()
+  })
+
+  it("returns null when every source fails", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("offline"))
+    vi.stubGlobal("fetch", fetchMock)
+    await expect(fetchLicenceText({ id: "X", url: null })).resolves.toBeNull()
+    vi.unstubAllGlobals()
   })
 })
 

@@ -1,8 +1,19 @@
+import {
+  BlockTypeSelect,
+  BoldItalicUnderlineToggles,
+  headingsPlugin,
+  listsPlugin,
+  MDXEditor,
+  type MDXEditorMethods,
+  quotePlugin,
+  thematicBreakPlugin,
+  toolbarPlugin,
+} from "@mdxeditor/editor"
 import { FileQuestion } from "lucide-react"
-import { marked } from "marked"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
-import { Link, useFetcher, useLoaderData } from "react-router"
+import "@mdxeditor/editor/style.css"
+import { Await, Link, useFetcher, useLoaderData } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,6 +36,8 @@ import {
 } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Select,
   SelectItem,
@@ -33,7 +46,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatDate } from "@/lib/format"
-import { getLicence, type LicenceDetail, updateLicence } from "@/lib/licenses"
+import {
+  fetchLicenceText,
+  getLicence,
+  type LicenceDetail,
+  saveLicenceText,
+  updateLicence,
+} from "@/lib/licenses"
 import { DataError, type LicenseStatus } from "@/lib/projects"
 import { getSuperadmin } from "@/lib/users"
 
@@ -43,8 +62,24 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
     getLicence(licenceId),
     getSuperadmin(),
   ])
+  // Deliberately not awaited (see routes/project.tsx): the text section
+  // suspends on this promise, showing a skeleton while the first visit
+  // downloads and stores the licence text. Later visits resolve instantly
+  // from the stored text. Best effort — null when every source fails.
+  const text: Promise<string | null> =
+    licence === null
+      ? Promise.resolve(null)
+      : licence.fullText !== null
+        ? Promise.resolve(licence.fullText)
+        : fetchLicenceText(licence)
+            .then(async (fetched) => {
+              if (fetched) await saveLicenceText(licence.id, fetched)
+              return fetched
+            })
+            .catch(() => null)
   return {
     licence,
+    text,
     // Pre-auth: the session acts as the superadmin when the directory has one.
     superadmin: superadmin !== null,
   }
@@ -75,6 +110,14 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
         })
         return { ok: true, intent }
       }
+      case "save-licence-text": {
+        // Pre-auth guard (research R4): only the superadmin edits the catalog.
+        if ((await getSuperadmin()) === null) {
+          return { ok: false, error: "Only the superadmin can edit licences." }
+        }
+        await saveLicenceText(licenceId, String(form.get("text") ?? ""))
+        return { ok: true, intent }
+      }
       default:
         return { ok: false, error: "Unknown action." }
     }
@@ -96,39 +139,146 @@ function domainList(licence: LicenceDetail): string[] {
   return domains
 }
 
-/** The licence rendered as markdown — the document view of the record. */
-function licenceMarkdown(licence: LicenceDetail): string {
-  const lines = [
-    `# ${licence.title}`,
-    "",
-    `**Identifier:** \`${licence.id}\``,
-    `**Status:** ${licence.status}`,
-    `**Domains:** ${domainList(licence).join(", ") || "—"}`,
-  ]
-  if (licence.family) lines.push(`**Family:** ${licence.family}`)
-  if (licence.maintainer) lines.push(`**Maintainer:** ${licence.maintainer}`)
-  if (licence.odConformance)
-    lines.push(`**Open Definition conformance:** ${licence.odConformance}`)
-  if (licence.osdConformance)
-    lines.push(`**Open Source Definition conformance:** ${licence.osdConformance}`)
-  if (licence.isGeneric) lines.push(`**Generic licence** (not version-specific)`)
-  if (licence.legacyIds.length > 0)
-    lines.push(`**Legacy identifiers:** ${licence.legacyIds.join(", ")}`)
-  if (licence.url) lines.push("", `[Read the full licence text](${licence.url})`)
-  return lines.join("\n")
-}
+/**
+ * The stored licence text in MDXEditor: read-only for everyone, with a
+ * simple Edit → Save flow for the superadmin persisting back to the db.
+ */
+function LicenceTextSection({
+  licence,
+  text,
+  superadmin,
+}: {
+  licence: LicenceDetail
+  text: string | null
+  superadmin: boolean
+}) {
+  const fetcher = useFetcher<{ ok: boolean; error?: string }>()
+  const editorRef = useRef<MDXEditorMethods>(null)
+  const submittedRef = useRef(false)
+  const [editing, setEditing] = useState(false)
+  const busy = fetcher.state !== "idle"
 
-function LicenceMarkdownView({ licence }: { licence: LicenceDetail }) {
-  const html = useMemo(
-    () => marked.parse(licenceMarkdown(licence), { async: false }),
-    [licence],
-  )
+  // Leave edit mode only once the save lands; a failed save keeps the
+  // editor open with its error visible.
+  useEffect(() => {
+    if (submittedRef.current && fetcher.state === "idle" && fetcher.data?.ok) {
+      submittedRef.current = false
+      setEditing(false)
+    }
+  }, [fetcher.state, fetcher.data])
+
+  const hasText = text !== null
+
   return (
-    <div
-      className="text-sm [&_a]:underline [&_a]:underline-offset-2 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_h1]:font-heading [&_h1]:font-semibold [&_h1]:text-xl [&_p]:mt-2 first:[&_p]:mt-0"
-      // Our own generated markdown — no user-provided HTML flows through here.
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <CardFrame>
+      <CardFrameHeader>
+        <CardFrameTitle render={<h2 />}>License</CardFrameTitle>
+        {superadmin && (
+          <CardFrameAction>
+            {editing ? (
+              <span className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => setEditing(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => {
+                    submittedRef.current = true
+                    fetcher.submit(
+                      {
+                        intent: "save-licence-text",
+                        text: editorRef.current?.getMarkdown() ?? "",
+                      },
+                      { method: "post" },
+                    )
+                  }}
+                >
+                  {busy && <Spinner />}
+                  {busy ? "Saving…" : "Save"}
+                </Button>
+              </span>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+            )}
+          </CardFrameAction>
+        )}
+      </CardFrameHeader>
+      <Card>
+        <CardPanel>
+          {!hasText && !editing ? (
+            <p className="py-2 text-muted-foreground text-sm">
+              No licence text could be downloaded for this licence
+              {licence.url ? (
+                <>
+                  {" — read it at "}
+                  <a
+                    href={licence.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all underline-offset-2 hover:underline"
+                  >
+                    {licence.url}
+                  </a>
+                  .
+                </>
+              ) : (
+                "."
+              )}
+              {superadmin && " Use Edit to write it by hand."}
+            </p>
+          ) : (
+            // Remount on mode change so Cancel discards the draft and a
+            // saved text re-renders from the revalidated loader data.
+            <MDXEditor
+              key={editing ? "edit" : `view:${licence.updatedAt ?? ""}`}
+              ref={editorRef}
+              markdown={text ?? ""}
+              readOnly={!editing}
+              autoFocus={editing ? { defaultSelection: "rootStart" } : false}
+              plugins={[
+                headingsPlugin(),
+                quotePlugin(),
+                listsPlugin(),
+                thematicBreakPlugin(),
+                ...(editing
+                  ? [
+                      toolbarPlugin({
+                        toolbarContents: () => (
+                          <>
+                            <BlockTypeSelect />
+                            <BoldItalicUnderlineToggles />
+                          </>
+                        ),
+                      }),
+                    ]
+                  : []),
+              ]}
+              className={
+                editing
+                  ? "rounded-lg border bg-white dark:bg-neutral-950"
+                  : ""
+              }
+              contentEditableClassName={`font-sans ${
+                editing ? "min-h-40 p-4" : "!p-0"
+              }`}
+            />
+          )}
+          {fetcher.data?.ok === false && fetcher.data.error && (
+            <p role="alert" className="mt-2 text-destructive text-sm">
+              {fetcher.data.error}
+            </p>
+          )}
+        </CardPanel>
+      </Card>
+    </CardFrame>
   )
 }
 
@@ -322,10 +472,31 @@ function LicenceEditForm({
           Cancel
         </Button>
         <Button type="submit" disabled={busy}>
-          Save changes
+          {busy && <Spinner />}
+          {busy ? "Saving…" : "Save changes"}
         </Button>
       </div>
     </fetcher.Form>
+  )
+}
+
+/** CardFrame placeholder while the licence text downloads on first visit. */
+function LicenceTextSkeleton() {
+  return (
+    <CardFrame>
+      <CardFrameHeader>
+        <CardFrameTitle render={<h2 />}>License</CardFrameTitle>
+      </CardFrameHeader>
+      <Card>
+        <CardPanel className="flex flex-col gap-3" aria-busy="true">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="h-4 w-4/5" />
+        </CardPanel>
+      </Card>
+    </CardFrame>
   )
 }
 
@@ -353,7 +524,7 @@ function LicenceNotFound() {
  * and the licence rendered as markdown.
  */
 export default function LicenceDetailPage() {
-  const { licence, superadmin } = useLoaderData<typeof clientLoader>()
+  const { licence, text, superadmin } = useLoaderData<typeof clientLoader>()
   const [editing, setEditing] = useState(false)
 
   if (!licence) return <LicenceNotFound />
@@ -391,16 +562,17 @@ export default function LicenceDetailPage() {
         </Card>
       </CardFrame>
 
-      <CardFrame>
-        <CardFrameHeader>
-          <CardFrameTitle render={<h2 />}>License</CardFrameTitle>
-        </CardFrameHeader>
-        <Card>
-          <CardPanel>
-            <LicenceMarkdownView licence={licence} />
-          </CardPanel>
-        </Card>
-      </CardFrame>
+      <Suspense fallback={<LicenceTextSkeleton />}>
+        <Await resolve={text}>
+          {(resolved) => (
+            <LicenceTextSection
+              licence={licence}
+              text={resolved}
+              superadmin={superadmin}
+            />
+          )}
+        </Await>
+      </Suspense>
     </section>
   )
 }

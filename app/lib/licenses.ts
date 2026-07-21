@@ -32,6 +32,8 @@ export interface LicenceDetail extends CatalogLicence {
   osdConformance: LicenceConformance | null
   createdAt: string
   updatedAt: string | null
+  /** The downloaded/edited licence text, null until first fetched. */
+  fullText: string | null
 }
 
 interface CatalogRow {
@@ -53,12 +55,13 @@ interface DetailRow extends CatalogRow {
   osd_conformance: LicenceConformance | null
   created_at: string
   updated_at: string | null
+  full_text: string | null
 }
 
 const CATALOG_COLUMNS =
   "id, title, url, domain_content, domain_data, domain_software, family, maintainer, status"
 
-const DETAIL_COLUMNS = `${CATALOG_COLUMNS}, is_generic, legacy_ids, od_conformance, osd_conformance, created_at, updated_at`
+const DETAIL_COLUMNS = `${CATALOG_COLUMNS}, is_generic, legacy_ids, od_conformance, osd_conformance, created_at, updated_at, full_text`
 
 function toCatalogLicence(row: CatalogRow): CatalogLicence {
   return {
@@ -114,7 +117,105 @@ export async function getLicence(id: string): Promise<LicenceDetail | null> {
     osdConformance: row.osd_conformance,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    fullText: row.full_text,
   }
+}
+
+/**
+ * Escape the characters MDX treats as syntax (JSX/expressions) so downloaded
+ * plain-text licences — "<year>", "{}" placeholders — survive the editor's
+ * parser without altering what the reader sees.
+ */
+function toEditorSafeMarkdown(text: string): string {
+  return text.replace(/[<{]/g, (char) => `\\${char}`)
+}
+
+/**
+ * Download the licence text: the SPDX license-list serves plain text by the
+ * catalog id (CORS-open), the stored URL is the fallback. HTML responses are
+ * skipped — a licence web page is not the licence text. Returns null when no
+ * source yields text.
+ */
+export async function fetchLicenceText(licence: {
+  id: string
+  url: string | null
+}): Promise<string | null> {
+  const sources = [
+    `https://raw.githubusercontent.com/spdx/license-list-data/main/text/${encodeURIComponent(licence.id)}.txt`,
+    ...(licence.url ? [licence.url] : []),
+  ]
+  for (const source of sources) {
+    try {
+      const response = await fetch(source)
+      if (!response.ok) continue
+      const type = response.headers.get("content-type") ?? ""
+      if (type.includes("html")) continue
+      const text = (await response.text()).trim()
+      if (text) return toEditorSafeMarkdown(text)
+    } catch {
+      // Unreachable or CORS-blocked source — try the next one.
+    }
+  }
+  return null
+}
+
+/** Store the licence text (first download or a superadmin edit). */
+export async function saveLicenceText(id: string, text: string): Promise<void> {
+  const { data, error } = await getSupabase()
+    .from("licences")
+    .update({ full_text: text, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle()
+  if (error) {
+    throw new DataError(
+      "unknown",
+      `Could not save the licence text: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  if (!data) {
+    throw new DataError("not-found", "This licence no longer exists.")
+  }
+}
+
+export interface LicenceCreate extends LicenceUpdate {
+  id: string
+}
+
+/** Superadmin-only creation of a catalog entry (guarded at the route action). */
+export async function createLicence(input: LicenceCreate): Promise<string> {
+  const id = input.id.trim()
+  const title = input.title.trim()
+  if (!id) {
+    throw new DataError("validation", "A licence identifier is required.")
+  }
+  if (!title) {
+    throw new DataError("validation", "A licence title is required.")
+  }
+  const { error } = await getSupabase().from("licences").insert({
+    id,
+    title,
+    url: input.url?.trim() || null,
+    family: input.family?.trim() || null,
+    maintainer: input.maintainer?.trim() || null,
+    status: input.status,
+    domain_content: input.domains.content,
+    domain_data: input.domains.data,
+    domain_software: input.domains.software,
+  })
+  if (error) {
+    if (error.code === "23505") {
+      throw new DataError(
+        "validation",
+        "A licence with this identifier already exists.",
+      )
+    }
+    throw new DataError(
+      "unknown",
+      `Could not create the licence: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  return id
 }
 
 export interface LicenceUpdate {

@@ -215,3 +215,32 @@
     opacity: 0;
   }
 }
+
+/* MDXEditor (licence text): its stylesheet resolves the light radix scale
+   even under `.dark`, leaving dark-on-dark text. Map its base tokens to the
+   app's theme so both schemes follow app.css. */
+.mdxeditor.mdxeditor {
+  --basePageBg: transparent;
+  --baseBg: var(--muted);
+  --baseBgHover: var(--accent);
+  --baseBgActive: var(--accent);
+  --baseLine: var(--border);
+  --baseBorder: var(--border);
+  --baseBorderHover: var(--input);
+  --baseText: var(--muted-foreground);
+  --baseTextContrast: var(--foreground);
+  color: var(--foreground);
+}
+
+.mdxeditor.mdxeditor [contenteditable] {
+  width: 100%;
+  max-width: none;
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.mdxeditor.mdxeditor [role="toolbar"] {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
