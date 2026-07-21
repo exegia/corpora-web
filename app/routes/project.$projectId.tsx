@@ -75,7 +75,9 @@ function parseClassification(form: FormData): Classification {
   if ((SCRIPTURAL_TYPES as readonly string[]).includes(type)) {
     return {
       type: type as (typeof SCRIPTURAL_TYPES)[number],
-      language: String(form.get("language") ?? "") as LanguageType,
+      languages: String(form.get("languages") ?? "")
+        .split(",")
+        .filter(Boolean) as LanguageType[],
     }
   }
   if ((CATEGORIZED_TYPES as readonly string[]).includes(type)) {
