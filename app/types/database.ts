@@ -345,6 +345,7 @@ export type Database = {
           domain_data: boolean
           domain_software: boolean
           family: string | null
+          full_text: string | null
           id: string
           is_generic: boolean
           legacy_ids: string[] | null
@@ -366,6 +367,7 @@ export type Database = {
           domain_data?: boolean
           domain_software?: boolean
           family?: string | null
+          full_text?: string | null
           id: string
           is_generic?: boolean
           legacy_ids?: string[] | null
@@ -387,6 +389,7 @@ export type Database = {
           domain_data?: boolean
           domain_software?: boolean
           family?: string | null
+          full_text?: string | null
           id?: string
           is_generic?: boolean
           legacy_ids?: string[] | null
