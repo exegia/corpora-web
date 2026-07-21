@@ -1,7 +1,7 @@
-import MarkdownEditor from "@uiw/react-markdown-editor"
 import { FileQuestion } from "lucide-react"
 import { Suspense, useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
+import { useRemarkSync } from "react-remark"
 import { Await, Link, useFetcher, useLoaderData } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectItem,
@@ -130,9 +131,10 @@ function domainList(licence: LicenceDetail): string[] {
 }
 
 /**
- * The stored licence text in the uiw markdown editor: a rendered read-only
- * preview for everyone, with a simple source-editor Edit → Save flow for the
- * superadmin persisting back to the db.
+ * The stored licence text rendered as markdown with react-remark: a read-only
+ * view for everyone, with a simple raw-markdown Edit → Save flow for the
+ * superadmin persisting back to the db. react-remark only renders — the edit
+ * surface is a plain textarea over the markdown source.
  */
 function LicenceTextSection({
   licence,
@@ -149,6 +151,8 @@ function LicenceTextSection({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(text ?? "")
   const busy = fetcher.state !== "idle"
+  // Synchronous render — the stored text carries no async remark plugins.
+  const rendered = useRemarkSync(text ?? "")
 
   // Leave edit mode only once the save lands; a failed save keeps the
   // editor open with its error visible.
@@ -230,21 +234,19 @@ function LicenceTextSection({
               {superadmin && " Use Edit to write it by hand."}
             </p>
           ) : editing ? (
-            // Source editor with a live preview and the default toolbar
-            // (bold, italic, header, …). Controlled so Save reads `draft`.
-            <MarkdownEditor
-              value={draft}
-              height="420px"
+            // react-remark has no editor, so the source is edited as raw
+            // markdown in a textarea. Controlled so Save reads `draft`; focus
+            // the textarea on open to match the previous editor's behaviour.
+            <Textarea
               autoFocus
-              enableScroll
-              onChange={(value) => setDraft(value)}
+              aria-label="Licence markdown source"
+              value={draft}
+              onChange={(event) => setDraft(event.currentTarget.value)}
+              className="min-h-96 font-mono text-sm leading-relaxed"
             />
           ) : (
-            // Rendered read-only preview of the stored markdown.
-            <MarkdownEditor.Markdown
-              source={text ?? ""}
-              style={{ backgroundColor: "transparent" }}
-            />
+            // Read-only markdown rendered to React elements by react-remark.
+            <div className="licence-prose">{rendered}</div>
           )}
           {fetcher.data?.ok === false && fetcher.data.error && (
             <p role="alert" className="mt-2 text-destructive text-sm">

@@ -216,10 +216,99 @@
   }
 }
 
-/* uiw markdown editor/preview (licence text): the read-only preview sits
-   inside a Card, so drop its own canvas fill and let the Card show through.
-   The theme (data-color-mode) is driven from lib/theme.ts. */
-.wmde-markdown {
-  --color-canvas-default: transparent;
+/* Licence text rendered by react-remark: a lightweight prose style over the
+   semantic HTML it emits, using app tokens so both schemes follow the theme. */
+.licence-prose {
   font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--foreground);
+}
+
+.licence-prose > :first-child {
+  margin-top: 0;
+}
+
+.licence-prose > :last-child {
+  margin-bottom: 0;
+}
+
+.licence-prose p,
+.licence-prose ul,
+.licence-prose ol,
+.licence-prose blockquote,
+.licence-prose pre {
+  margin: 0.75em 0;
+}
+
+.licence-prose h1,
+.licence-prose h2,
+.licence-prose h3,
+.licence-prose h4 {
+  margin: 1.25em 0 0.5em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.licence-prose h1 {
+  font-size: 1.35em;
+}
+
+.licence-prose h2 {
+  font-size: 1.2em;
+}
+
+.licence-prose h3 {
+  font-size: 1.05em;
+}
+
+.licence-prose ul,
+.licence-prose ol {
+  padding-inline-start: 1.5em;
+}
+
+.licence-prose ul {
+  list-style: disc;
+}
+
+.licence-prose ol {
+  list-style: decimal;
+}
+
+.licence-prose li {
+  margin: 0.25em 0;
+}
+
+.licence-prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.licence-prose blockquote {
+  border-inline-start: 3px solid var(--border);
+  padding-inline-start: 1em;
+  color: var(--muted-foreground);
+}
+
+.licence-prose code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.9em;
+}
+
+.licence-prose pre {
+  padding: 0.75em 1em;
+  border-radius: var(--radius, 0.5rem);
+  background: var(--muted);
+  overflow-x: auto;
+}
+
+.licence-prose pre code {
+  background: none;
+  padding: 0;
+}
+
+.licence-prose hr {
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid var(--border);
 }
