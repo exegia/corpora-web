@@ -68,7 +68,7 @@
 }
 
 @theme inline {
-  --font-heading: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-heading: var(--font-sans);
   --font-mono: var(--font-mono, ui-monospace, monospace);
   --font-sans: "Cal Sans", ui-sans-serif, system-ui, sans-serif;
   ----animate-toast-success-odd: toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
