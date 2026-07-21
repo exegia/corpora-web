@@ -19,6 +19,11 @@ export const THEME_INIT_SCRIPT = `(function () {
       (stored !== "light" &&
         window.matchMedia("(prefers-color-scheme: dark)").matches)
     document.documentElement.classList.toggle("dark", dark)
+    // Keep the markdown editor/preview (data-color-mode) in sync pre-paint.
+    document.documentElement.setAttribute(
+      "data-color-mode",
+      dark ? "dark" : "light",
+    )
   } catch (e) {}
 })()`
 
@@ -38,6 +43,8 @@ export function resolveTheme(preference: ThemePreference): ResolvedTheme {
 
 export function applyTheme(resolved: ResolvedTheme): void {
   document.documentElement.classList.toggle("dark", resolved === "dark")
+  // The uiw markdown editor/preview theme keys off this attribute, not `.dark`.
+  document.documentElement.setAttribute("data-color-mode", resolved)
 }
 
 export function setThemePreference(preference: ThemePreference): void {
