@@ -225,7 +225,7 @@ interface ProjectDetailRow extends ProjectRow {
   user_directory: CreatorRow | null
   organizations: { id: string; name: string; website: string | null } | null
   project_licences: {
-    agreed_at: string
+    agreed_at: string | null
     licences: LicenseRow | null
     user_directory: CreatorRow | null
   }[]
@@ -355,7 +355,10 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
           status: license.status,
           family: license.family,
           maintainer: license.maintainer,
-          agreedAt: attachment.agreed_at,
+          // agreed_at is nullable in the DB but paired with agreed_by_user_id;
+          // the app always attaches with agreement, so "" only appears for
+          // rows written by other clients without one.
+          agreedAt: attachment.agreed_at ?? "",
           agreedBy: attachment.user_directory ?? UNKNOWN_CREATOR,
         }
       })
