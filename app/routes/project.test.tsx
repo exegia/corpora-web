@@ -62,6 +62,28 @@ beforeEach(() => {
 })
 
 describe("/project list", () => {
+  it("shows a skeleton while projects load, then the list", async () => {
+    let resolveProjects!: (value: ProjectSummary[]) => void
+    vi.mocked(listProjects).mockReturnValue(
+      new Promise((resolve) => {
+        resolveProjects = resolve
+      }),
+    )
+    renderRoute()
+
+    expect(
+      await screen.findByRole("status", { name: "Loading projects" }),
+    ).toBeInTheDocument()
+
+    resolveProjects([summary])
+    expect(
+      await screen.findByRole("link", { name: /Peshitta Study/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("status", { name: "Loading projects" }),
+    ).not.toBeInTheDocument()
+  })
+
   it("shows an inviting empty state when there are no projects", async () => {
     renderRoute()
     expect(await screen.findByText("No projects yet")).toBeInTheDocument()
@@ -74,7 +96,7 @@ describe("/project list", () => {
     vi.mocked(listProjects).mockResolvedValue([summary])
     renderRoute()
     expect(
-      await screen.findByRole("link", { name: "Peshitta Study" }),
+      await screen.findByRole("link", { name: /Peshitta Study/ }),
     ).toBeInTheDocument()
     expect(screen.getByText("draft")).toBeInTheDocument()
     expect(screen.getByText(/updated/)).toBeInTheDocument()

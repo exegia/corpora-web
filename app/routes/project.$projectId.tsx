@@ -201,7 +201,7 @@ export default function ProjectWorkspace() {
     <section className="flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="break-words font-heading font-bold text-2xl">
+          <h1 className="break-words font-bold text-2xl capitalize font-sans">
             {project.name}
           </h1>
           {project.description && (
@@ -234,7 +234,7 @@ export default function ProjectWorkspace() {
 
       <div>
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-heading font-semibold text-lg">Corpora</h2>
+          <h2 className="font-semibold text-lg">Corpora</h2>
           <LinkCorpusDialog options={corpusOptions} />
         </div>
         <CorpusLinkList corpora={project.corpora} />
@@ -244,7 +244,7 @@ export default function ProjectWorkspace() {
 
       <div>
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-heading font-semibold text-lg">References</h2>
+          <h2 className="font-semibold text-lg">References</h2>
           <Button
             size="sm"
             variant="outline"

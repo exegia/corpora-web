@@ -330,14 +330,20 @@ describe("/project/:projectId workspace", () => {
 
 describe("details panel — status (US1)", () => {
   it("shows metadata with the current status and only the five statuses offered", async () => {
+    const user = userEvent.setup()
     renderRoute()
-    const select = await screen.findByLabelText("Status")
-    expect(select).toHaveValue("draft")
-    expect(
-      within(select as HTMLElement)
-        .getAllByRole("option")
-        .map((option) => (option as HTMLOptionElement).value),
-    ).toEqual(["draft", "started", "progress", "completed", "failed"])
+    const trigger = await screen.findByLabelText("Status")
+    expect(trigger).toHaveTextContent("draft")
+
+    await user.click(trigger)
+    const options = await screen.findAllByRole("option")
+    expect(options.map((option) => option.textContent)).toEqual([
+      "draft",
+      "started",
+      "progress",
+      "completed",
+      "failed",
+    ])
     // dates appear in the panel's Dates row (in addition to the header)
     expect(screen.getAllByText(/created/i).length).toBeGreaterThanOrEqual(2)
   })
@@ -347,7 +353,8 @@ describe("details panel — status (US1)", () => {
     vi.mocked(updateProjectStatus).mockResolvedValue()
     renderRoute()
 
-    await user.selectOptions(await screen.findByLabelText("Status"), "started")
+    await user.click(await screen.findByLabelText("Status"))
+    await user.click(await screen.findByRole("option", { name: "started" }))
     await waitFor(() =>
       expect(updateProjectStatus).toHaveBeenCalledWith("p1", "started"),
     )
@@ -360,7 +367,8 @@ describe("details panel — status (US1)", () => {
     )
     renderRoute()
 
-    await user.selectOptions(await screen.findByLabelText("Status"), "failed")
+    await user.click(await screen.findByLabelText("Status"))
+    await user.click(await screen.findByRole("option", { name: "failed" }))
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Could not update the project status.",
     )
