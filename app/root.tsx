@@ -7,16 +7,19 @@ import {
 } from "react-router"
 import type { Route } from "./+types/root"
 import { AppLayout } from "@/components/app-layout"
+import { THEME_INIT_SCRIPT } from "@/lib/theme"
 import "./app.css"
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
         <title>Corpora</title>
+        {/* Applies the theme before first paint to avoid a light flash. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <Meta />
         <Links />
       </head>

@@ -2,6 +2,7 @@ import { Outlet } from "react-router"
 import { Provider, Drawer, Wrapper, Trigger } from "@/components/sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { COBreadcrumb } from "./breadcrumb"
+import { ThemeToggle } from "./theme-toggle"
 
 
 export function AppLayout() {
@@ -12,6 +13,9 @@ export function AppLayout() {
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <Trigger />
           <COBreadcrumb />
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </header>
 
         <ScrollArea className="flex-1 min-h-0" fill>
