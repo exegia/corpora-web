@@ -2,8 +2,11 @@ import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { detachProjectCorpus, setProjectCorpus, uploadCorpusFile } from "@/lib/corpus"
-import { extractCorpusHistory } from "@/lib/corpus-history"
+import {
+  attachCorpusToProject,
+  detachCorpusFromProject,
+  listCorpusDocuments,
+} from "@/lib/corpus"
 import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organizations"
 import {
@@ -59,13 +62,9 @@ vi.mock("@/lib/users", () => ({
 }))
 
 vi.mock("@/lib/corpus", () => ({
-  setProjectCorpus: vi.fn(),
-  detachProjectCorpus: vi.fn(),
-  uploadCorpusFile: vi.fn(),
-}))
-
-vi.mock("@/lib/corpus-history", () => ({
-  extractCorpusHistory: vi.fn(),
+  attachCorpusToProject: vi.fn(),
+  detachCorpusFromProject: vi.fn(),
+  listCorpusDocuments: vi.fn(),
 }))
 
 const detail: ProjectDetail = {
@@ -130,8 +129,10 @@ const readyDetail: ProjectDetail = {
   type: "bible",
   languages: ["hebrew"],
   corpus: {
+    id: "d1",
+    name: "peshitta",
     source: "upload",
-    path: "p1/peshitta.corpus",
+    path: "d1/peshitta.corpus",
     filename: "peshitta.corpus",
     uploadedAt: "2026-07-10T00:00:00Z",
   },
@@ -163,6 +164,26 @@ beforeEach(() => {
     email: "manny.defreitas7@gmail.com",
   })
   vi.mocked(listLicences).mockResolvedValue([catalogLicense, softwareLicense])
+  vi.mocked(listCorpusDocuments).mockResolvedValue([
+    {
+      id: "d1",
+      name: "peshitta",
+      source: "upload",
+      path: "d1/peshitta.corpus",
+      filename: "peshitta.corpus",
+      uploadedAt: "2026-07-10T00:00:00Z",
+      commits: [],
+    },
+    {
+      id: "d2",
+      name: "onkelos",
+      source: "huggingface",
+      path: "https://huggingface.co/datasets/x/onkelos",
+      filename: null,
+      uploadedAt: "2026-07-11T00:00:00Z",
+      commits: [],
+    },
+  ])
   vi.mocked(listOrganizations).mockResolvedValue([
     { id: "o1", name: "Peshitta Institute", website: null },
   ])
@@ -571,61 +592,43 @@ describe("details panel — licences (US3)", () => {
 })
 
 describe("corpus section (003)", () => {
-  it("attaches a Hugging Face URL", async () => {
+  it("imports a corpus from the library and marks the imported one", async () => {
     const user = userEvent.setup()
-    vi.mocked(setProjectCorpus).mockResolvedValue()
+    vi.mocked(attachCorpusToProject).mockResolvedValue()
     renderRoute()
 
-    const input = await screen.findByLabelText("Hugging Face URL")
-    await user.type(input, "https://huggingface.co/datasets/x/peshitta")
-    await user.click(screen.getByRole("button", { name: "Attach" }))
+    await user.click(
+      await screen.findByRole("button", { name: "Import corpus" }),
+    )
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByText("onkelos")).toBeInTheDocument()
 
+    await user.click(within(dialog).getAllByRole("button", { name: "Import" })[0])
     await waitFor(() =>
-      expect(setProjectCorpus).toHaveBeenCalledWith("p1", {
-        source: "huggingface",
-        path: "https://huggingface.co/datasets/x/peshitta",
-        filename: null,
-        commits: [],
-      }),
+      expect(attachCorpusToProject).toHaveBeenCalledWith("p1", "d1"),
     )
   })
 
-  it("uploads a .corpus file and records its extracted git history", async () => {
+  it("points at the Corpus page when the library is empty", async () => {
     const user = userEvent.setup()
-    const commits = [
-      {
-        sha: "a1b2c3d",
-        message: "Initial import",
-        authorName: "Ada",
-        authorEmail: "ada@example.org",
-        branch: "main",
-        committedAt: "2026-07-01T00:00:00.000Z",
-      },
-    ]
-    vi.mocked(extractCorpusHistory).mockResolvedValue(commits)
-    vi.mocked(uploadCorpusFile).mockResolvedValue("p1/peshitta.corpus")
-    vi.mocked(setProjectCorpus).mockResolvedValue()
+    vi.mocked(listCorpusDocuments).mockResolvedValue([])
     renderRoute()
 
-    const input = await screen.findByLabelText("Upload .corpus file")
-    const file = new File(["zip-bytes"], "peshitta.corpus", {
-      type: "application/zip",
-    })
-    await user.upload(input, file)
-
-    await waitFor(() =>
-      expect(setProjectCorpus).toHaveBeenCalledWith("p1", {
-        source: "upload",
-        path: "p1/peshitta.corpus",
-        filename: "peshitta.corpus",
-        commits,
-      }),
+    await user.click(
+      await screen.findByRole("button", { name: "Import corpus" }),
+    )
+    expect(
+      await screen.findByText(/corpus library is empty/i),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Corpus" })).toHaveAttribute(
+      "href",
+      "/corpus",
     )
   })
 
-  it("shows the version history and detaches the corpus", async () => {
+  it("shows the version history and detaches without deleting the document", async () => {
     const user = userEvent.setup()
-    vi.mocked(detachProjectCorpus).mockResolvedValue()
+    vi.mocked(detachCorpusFromProject).mockResolvedValue()
     vi.mocked(getProject).mockResolvedValue({
       ...readyDetail,
       commits: [
@@ -642,17 +645,19 @@ describe("corpus section (003)", () => {
     })
     renderRoute()
 
-    expect(await screen.findByText("peshitta.corpus")).toBeInTheDocument()
+    expect(await screen.findByText("peshitta")).toBeInTheDocument()
     expect(screen.getByText("Fix verse numbering")).toBeInTheDocument()
     expect(screen.getByText(/ada · .* · main @ a1b2c3d/i)).toBeInTheDocument()
 
-    const card = screen.getByText("peshitta.corpus").closest("div.flex")
+    const card = screen.getByText("peshitta").closest("div.flex")
     const remove = screen
       .getAllByRole("button", { name: "Remove" })
-      .find((button) => card?.parentElement?.parentElement?.contains(button))
+      .find((button) => card?.parentElement?.contains(button))
     if (!remove) throw new Error("corpus remove button not found")
     await user.click(remove)
-    await waitFor(() => expect(detachProjectCorpus).toHaveBeenCalledWith("p1"))
+    await waitFor(() =>
+      expect(detachCorpusFromProject).toHaveBeenCalledWith("p1"),
+    )
   })
 })
 

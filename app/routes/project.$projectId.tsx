@@ -18,8 +18,11 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
-import { detachProjectCorpus, setProjectCorpus } from "@/lib/corpus"
-import type { CorpusCommitInput } from "@/lib/corpus"
+import {
+  attachCorpusToProject,
+  detachCorpusFromProject,
+  listCorpusDocuments,
+} from "@/lib/corpus"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organizations"
@@ -30,7 +33,6 @@ import {
   type CategoryType,
   type Classification,
   classifyProject,
-  type CorpusSource,
   DataError,
   deleteProject,
   getProject,
@@ -50,17 +52,20 @@ import { getSuperadmin } from "@/lib/users"
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const projectId = params.projectId ?? ""
   const project = await getProject(projectId)
-  const [corpusOptions, licenseCatalog, organizations, superadmin] = project
-    ? await Promise.all([
-        listCorpusOptions(projectId),
-        listLicences(),
-        listOrganizations(),
-        getSuperadmin(),
-      ])
-    : [[], [], [], null]
+  const [corpusOptions, licenseCatalog, organizations, superadmin, documents] =
+    project
+      ? await Promise.all([
+          listCorpusOptions(projectId),
+          listLicences(),
+          listOrganizations(),
+          getSuperadmin(),
+          listCorpusDocuments(),
+        ])
+      : [[], [], [], null, []]
   return {
     project,
     corpusOptions,
+    documents,
     licenseCatalog,
     organizations,
     // Pre-auth: the session acts as the superadmin when the directory has one.
@@ -87,19 +92,6 @@ function parseClassification(form: FormData): Classification {
     }
   }
   return { type: type as BookType } as Classification
-}
-
-function parseCommits(raw: string): CorpusCommitInput[] {
-  try {
-    const parsed = JSON.parse(raw || "[]")
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(
-      (commit): commit is CorpusCommitInput =>
-        typeof commit?.sha === "string" && typeof commit?.message === "string",
-    )
-  } catch {
-    return []
-  }
 }
 
 export async function clientAction({ request, params }: ActionFunctionArgs) {
@@ -169,15 +161,13 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
         await unlinkCorpus(projectId, String(form.get("corpusId") ?? ""))
         return { ok: true, intent }
       case "attach-corpus":
-        await setProjectCorpus(projectId, {
-          source: String(form.get("source") ?? "upload") as CorpusSource,
-          path: String(form.get("path") ?? ""),
-          filename: String(form.get("filename") ?? "") || null,
-          commits: parseCommits(String(form.get("commits") ?? "[]")),
-        })
+        await attachCorpusToProject(
+          projectId,
+          String(form.get("documentId") ?? ""),
+        )
         return { ok: true, intent }
       case "detach-corpus":
-        await detachProjectCorpus(projectId)
+        await detachCorpusFromProject(projectId)
         return { ok: true, intent }
       default:
         return { ok: false, error: "Unknown action." }
@@ -210,8 +200,14 @@ function ProjectNotFound() {
 }
 
 export default function ProjectWorkspace() {
-  const { project, corpusOptions, licenseCatalog, organizations, superadmin } =
-    useLoaderData<typeof clientLoader>()
+  const {
+    project,
+    corpusOptions,
+    documents,
+    licenseCatalog,
+    organizations,
+    superadmin,
+  } = useLoaderData<typeof clientLoader>()
   const [editing, setEditing] = useState(false)
 
   if (!project) return <ProjectNotFound />
@@ -260,14 +256,14 @@ export default function ProjectWorkspace() {
       <div>
         <h2 className="font-semibold text-lg">Corpus</h2>
         <p className="mt-1 text-muted-foreground text-sm">
-          The document this project publishes — a .corpus upload or a Hugging
-          Face corpus.
+          The document this project publishes, imported from the corpus
+          library.
         </p>
         <div className="mt-3">
           <CorpusSection
-            projectId={project.id}
             corpus={project.corpus}
             commits={project.commits}
+            documents={documents}
             readOnly={readOnly}
           />
         </div>
