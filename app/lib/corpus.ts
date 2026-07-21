@@ -1,9 +1,10 @@
-// Data-access layer for the project's own corpus (003): the uploaded .corpus
-// file (private storage bucket) or a Hugging Face URL, plus the version
-// history extracted from the archive's nested .git. Route modules import ONLY
+// Data-access layer for corpus documents (003): the Corpus route owns the
+// uploaded .corpus files / Hugging Face URLs and their version history;
+// projects import a document from this library. Route modules import ONLY
 // from this module — never supabase-js directly.
 
 import {
+  type CorpusCommit,
   type CorpusSource,
   DataError,
   touchProject,
@@ -22,6 +23,66 @@ export interface CorpusCommitInput {
   committedAt: string | null
 }
 
+export interface CorpusDocument {
+  id: string
+  name: string
+  source: CorpusSource
+  /** Storage path for uploads, the full URL for Hugging Face. */
+  path: string
+  filename: string | null
+  uploadedAt: string
+  commits: CorpusCommit[]
+}
+
+interface CommitRow {
+  id: string
+  sha: string
+  message: string
+  author_name: string | null
+  author_email: string | null
+  branch: string | null
+  committed_at: string | null
+}
+
+interface DocumentRow {
+  id: string
+  name: string
+  source: CorpusSource
+  path: string
+  filename: string | null
+  uploaded_at: string
+  corpus_commits: CommitRow[]
+}
+
+const DOCUMENT_COLUMNS = `id, name, source, path, filename, uploaded_at,
+  corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at )`
+
+function toCommit(row: CommitRow): CorpusCommit {
+  return {
+    id: row.id,
+    sha: row.sha,
+    message: row.message,
+    authorName: row.author_name,
+    authorEmail: row.author_email,
+    branch: row.branch,
+    committedAt: row.committed_at,
+  }
+}
+
+function toDocument(row: DocumentRow): CorpusDocument {
+  return {
+    id: row.id,
+    name: row.name,
+    source: row.source,
+    path: row.path,
+    filename: row.filename,
+    uploadedAt: row.uploaded_at,
+    commits: (row.corpus_commits ?? [])
+      .map(toCommit)
+      .sort((a, b) => (b.committedAt ?? "").localeCompare(a.committedAt ?? "")),
+  }
+}
+
 export function isHuggingFaceUrl(value: string): boolean {
   try {
     const url = new URL(value)
@@ -34,15 +95,27 @@ export function isHuggingFaceUrl(value: string): boolean {
   }
 }
 
+/** Every corpus document, newest first. */
+export async function listCorpusDocuments(): Promise<CorpusDocument[]> {
+  const { data, error } = await getSupabase()
+    .from("corpus_documents")
+    .select(DOCUMENT_COLUMNS)
+    .order("uploaded_at", { ascending: false })
+  if (error) {
+    throw new DataError(
+      "unknown",
+      `Could not load the corpus library: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  return ((data ?? []) as unknown as DocumentRow[]).map(toDocument)
+}
+
 /** Upload the .corpus file to the private bucket; returns its storage path. */
-export async function uploadCorpusFile(
-  projectId: string,
-  file: File,
-): Promise<string> {
+export async function uploadCorpusFile(file: File): Promise<string> {
   if (!file.name.endsWith(".corpus")) {
     throw new DataError("validation", "Pick a .corpus file.")
   }
-  const path = `${projectId}/${file.name}`
+  const path = `${crypto.randomUUID()}/${file.name}`
   const { error } = await getSupabase()
     .storage.from(CORPUS_BUCKET)
     .upload(path, file, { upsert: true })
@@ -55,60 +128,44 @@ export async function uploadCorpusFile(
   return path
 }
 
-/**
- * Record the project's corpus and replace its version history in one go.
- * The history is wholesale-replaced because it belongs to the uploaded
- * archive, not to individual edits.
- */
-export async function setProjectCorpus(
-  projectId: string,
-  input: {
-    source: CorpusSource
-    path: string
-    filename: string | null
-    commits: CorpusCommitInput[]
-  },
-): Promise<void> {
+/** Record a corpus document with the history extracted from its archive. */
+export async function createCorpusDocument(input: {
+  name: string
+  source: CorpusSource
+  path: string
+  filename: string | null
+  commits: CorpusCommitInput[]
+}): Promise<CorpusDocument> {
+  const name = input.name.trim()
+  if (!name) {
+    throw new DataError("validation", "A corpus name is required.")
+  }
   if (input.source === "huggingface" && !isHuggingFaceUrl(input.path)) {
     throw new DataError("validation", "Enter a valid Hugging Face URL.")
   }
   const supabase = getSupabase()
   const { data, error } = await supabase
-    .from("projects")
-    .update({
-      corpus_source: input.source,
-      corpus_path: input.path,
-      corpus_filename: input.filename,
-      corpus_uploaded_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+    .from("corpus_documents")
+    .insert({
+      name,
+      source: input.source,
+      path: input.path,
+      filename: input.filename,
     })
-    .eq("id", projectId)
-    .select("id")
-    .maybeSingle()
-  if (error) {
+    .select("id, name, source, path, filename, uploaded_at")
+    .single()
+  if (error || !data) {
     throw new DataError(
       "unknown",
-      `Could not attach the corpus: ${error.message ?? "unexpected error"}`,
+      `Could not add the corpus: ${error?.message ?? "unexpected error"}`,
     )
   }
-  if (!data) {
-    throw new DataError("not-found", "This project no longer exists.")
-  }
+  const row = data as Omit<DocumentRow, "corpus_commits">
 
-  const cleared = await supabase
-    .from("corpus_commits")
-    .delete()
-    .eq("project_id", projectId)
-  if (cleared.error) {
-    throw new DataError(
-      "unknown",
-      `Could not reset the version history: ${cleared.error.message ?? "unexpected error"}`,
-    )
-  }
   if (input.commits.length > 0) {
     const inserted = await supabase.from("corpus_commits").insert(
       input.commits.map((commit) => ({
-        project_id: projectId,
+        document_id: row.id,
         sha: commit.sha,
         message: commit.message,
         author_name: commit.authorName,
@@ -124,56 +181,87 @@ export async function setProjectCorpus(
       )
     }
   }
+  return toDocument({ ...row, corpus_commits: [] })
 }
 
-/** Detach the corpus: clear the project fields, history, and stored file. */
-export async function detachProjectCorpus(projectId: string): Promise<void> {
+/**
+ * Delete a document, its stored file, and (via cascade) its history.
+ * Projects referencing it fall back to "no corpus" (FK on delete set null).
+ */
+export async function deleteCorpusDocument(id: string): Promise<void> {
   const supabase = getSupabase()
   const { data, error } = await supabase
-    .from("projects")
-    .select("corpus_source, corpus_path")
-    .eq("id", projectId)
+    .from("corpus_documents")
+    .select("source, path")
+    .eq("id", id)
     .maybeSingle()
   if (error) {
     throw new DataError(
       "unknown",
-      `Could not load the project: ${error.message ?? "unexpected error"}`,
+      `Could not load the corpus: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  if (!data) {
+    throw new DataError("not-found", "This corpus no longer exists.")
+  }
+  const row = data as { source: CorpusSource; path: string }
+  if (row.source === "upload") {
+    // Best effort — a stale storage object must not block the delete.
+    await supabase.storage.from(CORPUS_BUCKET).remove([row.path])
+  }
+  const deleted = await supabase.from("corpus_documents").delete().eq("id", id)
+  if (deleted.error) {
+    throw new DataError(
+      "unknown",
+      `Could not delete the corpus: ${deleted.error.message ?? "unexpected error"}`,
+    )
+  }
+}
+
+/** Import a library document as the project's corpus (FK enforces existence). */
+export async function attachCorpusToProject(
+  projectId: string,
+  documentId: string,
+): Promise<void> {
+  if (!documentId.trim()) {
+    throw new DataError("validation", "Pick a corpus to import.")
+  }
+  const { data, error } = await getSupabase()
+    .from("projects")
+    .update({
+      corpus_document_id: documentId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", projectId)
+    .select("id")
+    .maybeSingle()
+  if (error) {
+    throw new DataError(
+      "unknown",
+      `Could not import the corpus: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data) {
     throw new DataError("not-found", "This project no longer exists.")
   }
+}
 
-  const row = data as { corpus_source: CorpusSource | null; corpus_path: string | null }
-  if (row.corpus_source === "upload" && row.corpus_path) {
-    // Best effort — a stale storage object must not block the detach.
-    await supabase.storage.from(CORPUS_BUCKET).remove([row.corpus_path])
-  }
-
-  const updated = await supabase
+/** Detach the project's corpus; the document stays in the library. */
+export async function detachCorpusFromProject(projectId: string): Promise<void> {
+  const { data, error } = await getSupabase()
     .from("projects")
-    .update({
-      corpus_source: null,
-      corpus_path: null,
-      corpus_filename: null,
-      corpus_uploaded_at: null,
-    })
+    .update({ corpus_document_id: null })
     .eq("id", projectId)
-  if (updated.error) {
+    .select("id")
+    .maybeSingle()
+  if (error) {
     throw new DataError(
       "unknown",
-      `Could not detach the corpus: ${updated.error.message ?? "unexpected error"}`,
+      `Could not detach the corpus: ${error.message ?? "unexpected error"}`,
     )
   }
-  const cleared = await supabase
-    .from("corpus_commits")
-    .delete()
-    .eq("project_id", projectId)
-  if (cleared.error) {
-    throw new DataError(
-      "unknown",
-      `Could not clear the version history: ${cleared.error.message ?? "unexpected error"}`,
-    )
+  if (!data) {
+    throw new DataError("not-found", "This project no longer exists.")
   }
   await touchProject(projectId)
 }

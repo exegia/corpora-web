@@ -136,8 +136,10 @@ export interface CorpusLink {
 
 export type CorpusSource = "upload" | "huggingface"
 
-/** The project's own corpus — an uploaded .corpus file or a Hugging Face URL. */
+/** The corpus document imported from the Corpus library (lib/corpus). */
 export interface ProjectCorpus {
+  id: string
+  name: string
   source: CorpusSource
   /** Storage path for uploads, the full URL for Hugging Face. */
   path: string
@@ -243,13 +245,20 @@ interface CreatorRow {
   username: string
 }
 
+interface DocumentRow {
+  id: string
+  name: string
+  source: CorpusSource
+  path: string
+  filename: string | null
+  uploaded_at: string
+  corpus_commits: CommitRow[]
+}
+
 interface ProjectDetailRow extends ProjectRow {
   language: LanguageType[] | null
   category: CategoryType | null
-  corpus_source: CorpusSource | null
-  corpus_path: string | null
-  corpus_filename: string | null
-  corpus_uploaded_at: string | null
+  corpus_documents: DocumentRow | null
   user_directory: CreatorRow | null
   organizations: { id: string; name: string; website: string | null } | null
   project_licences: {
@@ -270,21 +279,20 @@ interface ProjectDetailRow extends ProjectRow {
       available: boolean
     } | null
   }[]
-  corpus_commits: CommitRow[]
 }
 
 const PROJECT_COLUMNS = "id, name, description, status, type, created_at, updated_at"
 
 const PROJECT_DETAIL_COLUMNS = `${PROJECT_COLUMNS}, language, category,
-  corpus_source, corpus_path, corpus_filename, corpus_uploaded_at,
+  corpus_documents ( id, name, source, path, filename, uploaded_at,
+    corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at ) ),
   user_directory ( id, name, username ),
   organizations ( id, name, website ),
   project_licences ( agreed_at,
     licences ( id, title, url, domain_content, domain_data, domain_software, family, maintainer, status ),
     user_directory ( id, name, username ) ),
   project_corpora ( corpus_id, linked_at,
-    corpora ( uid, name, language, type, category, version, available ) ),
-  corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at )`
+    corpora ( uid, name, language, type, category, version, available ) )`
 
 const UNKNOWN_CREATOR: ProjectCreator = { id: "", name: null, username: "unknown" }
 
@@ -397,15 +405,17 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
         corpus: link.corpora,
       }))
       .sort((a, b) => a.linkedAt.localeCompare(b.linkedAt)),
-    corpus: row.corpus_source && row.corpus_path
+    corpus: row.corpus_documents
       ? {
-          source: row.corpus_source,
-          path: row.corpus_path,
-          filename: row.corpus_filename,
-          uploadedAt: row.corpus_uploaded_at,
+          id: row.corpus_documents.id,
+          name: row.corpus_documents.name,
+          source: row.corpus_documents.source,
+          path: row.corpus_documents.path,
+          filename: row.corpus_documents.filename,
+          uploadedAt: row.corpus_documents.uploaded_at,
         }
       : null,
-    commits: row.corpus_commits
+    commits: (row.corpus_documents?.corpus_commits ?? [])
       .map(toCommit)
       .sort((a, b) => (b.committedAt ?? "").localeCompare(a.committedAt ?? "")),
   }

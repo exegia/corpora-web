@@ -194,8 +194,10 @@ const readyDetail = makeDetail({
   type: "bible",
   languages: ["hebrew"],
   corpus: {
+    id: "d1",
+    name: "peshitta",
     source: "upload",
-    path: "p1/peshitta.corpus",
+    path: "d1/peshitta.corpus",
     filename: "peshitta.corpus",
     uploadedAt: "2026-07-10T00:00:00Z",
   },
@@ -372,10 +374,7 @@ const detailRow = {
   ...projectRow,
   language: null,
   category: null,
-  corpus_source: null,
-  corpus_path: null,
-  corpus_filename: null,
-  corpus_uploaded_at: null,
+  corpus_documents: null,
   user_directory: creatorRow,
   organizations: null,
   project_licences: [],
@@ -595,43 +594,49 @@ describe("unlinkCorpus", () => {
 })
 
 describe("getProject corpus mapping (003)", () => {
-  it("maps the uploaded corpus and its version history newest-first", async () => {
+  it("maps the imported corpus document and its history newest-first", async () => {
     mockSupabase([
       {
         data: {
           ...detailRow,
-          corpus_source: "upload",
-          corpus_path: "p1/peshitta.corpus",
-          corpus_filename: "peshitta.corpus",
-          corpus_uploaded_at: "2026-07-10T00:00:00Z",
-          corpus_commits: [
-            {
-              id: "cm1",
-              sha: "a1b2c3d",
-              message: "Initial import",
-              author_name: "Ada",
-              author_email: "ada@example.org",
-              branch: "main",
-              committed_at: "2026-07-01T00:00:00Z",
-            },
-            {
-              id: "cm2",
-              sha: "e4f5a6b",
-              message: "Fix verse numbering",
-              author_name: "Ada",
-              author_email: "ada@example.org",
-              branch: "main",
-              committed_at: "2026-07-05T00:00:00Z",
-            },
-          ],
+          corpus_documents: {
+            id: "d1",
+            name: "peshitta",
+            source: "upload",
+            path: "d1/peshitta.corpus",
+            filename: "peshitta.corpus",
+            uploaded_at: "2026-07-10T00:00:00Z",
+            corpus_commits: [
+              {
+                id: "cm1",
+                sha: "a1b2c3d",
+                message: "Initial import",
+                author_name: "Ada",
+                author_email: "ada@example.org",
+                branch: "main",
+                committed_at: "2026-07-01T00:00:00Z",
+              },
+              {
+                id: "cm2",
+                sha: "e4f5a6b",
+                message: "Fix verse numbering",
+                author_name: "Ada",
+                author_email: "ada@example.org",
+                branch: "main",
+                committed_at: "2026-07-05T00:00:00Z",
+              },
+            ],
+          },
         },
         error: null,
       },
     ])
     const project = await getProject("p1")
     expect(project?.corpus).toEqual({
+      id: "d1",
+      name: "peshitta",
       source: "upload",
-      path: "p1/peshitta.corpus",
+      path: "d1/peshitta.corpus",
       filename: "peshitta.corpus",
       uploadedAt: "2026-07-10T00:00:00Z",
     })
