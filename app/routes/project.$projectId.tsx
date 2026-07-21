@@ -1,14 +1,13 @@
-import { FolderX, Plus } from "lucide-react"
+import { FolderX } from "lucide-react"
 import { useState } from "react"
 import { Link, redirect, useLoaderData } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { CorpusLinkList } from "@/components/project/corpus-link-list"
+import { CorpusSection } from "@/components/project/corpus-section"
 import { DeleteProjectDialog } from "@/components/project/delete-project-dialog"
 import { LinkCorpusDialog } from "@/components/project/link-corpus-dialog"
 import { ProjectDetailPanel } from "@/components/project/project-detail-panel"
 import { ProjectFormDialog } from "@/components/project/project-form-dialog"
-import { ReferenceFormDialog } from "@/components/project/reference-form"
-import { ReferenceList } from "@/components/project/reference-list"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -19,44 +18,54 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
+import { detachProjectCorpus, setProjectCorpus } from "@/lib/corpus"
+import type { CorpusCommitInput } from "@/lib/corpus"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organizations"
 import {
+  assertEditable,
   type BookType,
   CATEGORIZED_TYPES,
   type CategoryType,
   type Classification,
   classifyProject,
-  createReference,
+  type CorpusSource,
   DataError,
   deleteProject,
-  deleteReference,
   getProject,
+  isProjectReadOnly,
   type LanguageType,
   linkCorpus,
   listCorpusOptions,
   type ProjectStatus,
-  type ReferenceInput,
   SCRIPTURAL_TYPES,
   setProjectOrganization,
   unlinkCorpus,
   updateProject,
   updateProjectStatus,
-  updateReference,
 } from "@/lib/projects"
+import { getSuperadmin } from "@/lib/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const projectId = params.projectId ?? ""
   const project = await getProject(projectId)
-  const [corpusOptions, licenseCatalog, organizations] = project
+  const [corpusOptions, licenseCatalog, organizations, superadmin] = project
     ? await Promise.all([
         listCorpusOptions(projectId),
         listLicences(),
         listOrganizations(),
+        getSuperadmin(),
       ])
-    : [[], [], []]
-  return { project, corpusOptions, licenseCatalog, organizations }
+    : [[], [], [], null]
+  return {
+    project,
+    corpusOptions,
+    licenseCatalog,
+    organizations,
+    // Pre-auth: the session acts as the superadmin when the directory has one.
+    superadmin: superadmin !== null,
+  }
 }
 
 /** Build the discriminated Classification from form fields (FR-006..FR-009). */
@@ -78,18 +87,16 @@ function parseClassification(form: FormData): Classification {
   return { type: type as BookType } as Classification
 }
 
-function parseReferenceInput(form: FormData): ReferenceInput {
-  const yearRaw = String(form.get("year") ?? "").trim()
-  const year = yearRaw ? Number(yearRaw) : undefined
-  if (year !== undefined && !Number.isInteger(year)) {
-    throw new DataError("validation", "Year must be a whole number.")
-  }
-  return {
-    title: String(form.get("title") ?? ""),
-    authors: String(form.get("authors") ?? ""),
-    year,
-    publication: String(form.get("publication") ?? ""),
-    url: String(form.get("url") ?? ""),
+function parseCommits(raw: string): CorpusCommitInput[] {
+  try {
+    const parsed = JSON.parse(raw || "[]")
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (commit): commit is CorpusCommitInput =>
+        typeof commit?.sha === "string" && typeof commit?.message === "string",
+    )
+  } catch {
+    return []
   }
 }
 
@@ -98,6 +105,11 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
   const form = await request.formData()
   const intent = String(form.get("intent") ?? "")
   try {
+    // A project in review is read-only for everything except the status
+    // decision itself (superadmin approve / return).
+    if (intent !== "set-status") {
+      await assertEditable(projectId)
+    }
     switch (intent) {
       case "update-project":
         await updateProject(projectId, {
@@ -108,12 +120,19 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
       case "delete-project":
         await deleteProject(projectId)
         return redirect("/project")
-      case "set-status":
+      case "set-status": {
+        const project = await getProject(projectId)
+        if (!project) {
+          throw new DataError("not-found", "This project no longer exists.")
+        }
+        const superadmin = (await getSuperadmin()) !== null
         await updateProjectStatus(
-          projectId,
+          project,
           String(form.get("status") ?? "") as ProjectStatus,
+          superadmin,
         )
         return { ok: true, intent }
+      }
       case "classify":
         await classifyProject(projectId, parseClassification(form))
         return { ok: true, intent }
@@ -147,17 +166,16 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
       case "unlink-corpus":
         await unlinkCorpus(projectId, String(form.get("corpusId") ?? ""))
         return { ok: true, intent }
-      case "create-reference":
-        await createReference(projectId, parseReferenceInput(form))
+      case "attach-corpus":
+        await setProjectCorpus(projectId, {
+          source: String(form.get("source") ?? "upload") as CorpusSource,
+          path: String(form.get("path") ?? ""),
+          filename: String(form.get("filename") ?? "") || null,
+          commits: parseCommits(String(form.get("commits") ?? "[]")),
+        })
         return { ok: true, intent }
-      case "update-reference":
-        await updateReference(
-          String(form.get("referenceId") ?? ""),
-          parseReferenceInput(form),
-        )
-        return { ok: true, intent }
-      case "delete-reference":
-        await deleteReference(String(form.get("referenceId") ?? ""))
+      case "detach-corpus":
+        await detachProjectCorpus(projectId)
         return { ok: true, intent }
       default:
         return { ok: false, error: "Unknown action." }
@@ -190,12 +208,13 @@ function ProjectNotFound() {
 }
 
 export default function ProjectWorkspace() {
-  const { project, corpusOptions, licenseCatalog, organizations } =
+  const { project, corpusOptions, licenseCatalog, organizations, superadmin } =
     useLoaderData<typeof clientLoader>()
   const [editing, setEditing] = useState(false)
-  const [addingReference, setAddingReference] = useState(false)
 
   if (!project) return <ProjectNotFound />
+
+  const readOnly = isProjectReadOnly(project.status)
 
   return (
     <section className="flex flex-col gap-6">
@@ -214,46 +233,57 @@ export default function ProjectWorkspace() {
             {formatRelativeTime(project.updatedAt)}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            Edit
-          </Button>
-          <DeleteProjectDialog
-            project={{ id: project.id, name: project.name }}
-          />
-        </div>
+        {!readOnly && (
+          <div className="flex shrink-0 items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              Edit
+            </Button>
+            <DeleteProjectDialog
+              project={{ id: project.id, name: project.name }}
+            />
+          </div>
+        )}
       </header>
 
       <ProjectDetailPanel
         project={project}
         licenseCatalog={licenseCatalog}
         organizations={organizations}
+        superadmin={superadmin}
+        readOnly={readOnly}
       />
 
       <Separator />
 
       <div>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-lg">Corpora</h2>
-          <LinkCorpusDialog options={corpusOptions} />
+        <h2 className="font-semibold text-lg">Corpus</h2>
+        <p className="mt-1 text-muted-foreground text-sm">
+          The document this project publishes — a .corpus upload or a Hugging
+          Face corpus.
+        </p>
+        <div className="mt-3">
+          <CorpusSection
+            projectId={project.id}
+            corpus={project.corpus}
+            commits={project.commits}
+            readOnly={readOnly}
+          />
         </div>
-        <CorpusLinkList corpora={project.corpora} />
       </div>
 
       <Separator />
 
       <div>
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-lg">References</h2>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setAddingReference(true)}
-          >
-            <Plus /> Add reference
-          </Button>
+          <div>
+            <h2 className="font-semibold text-lg">References</h2>
+            <p className="mt-1 text-muted-foreground text-sm">
+              Library corpora loaded alongside this dataset.
+            </p>
+          </div>
+          <LinkCorpusDialog options={corpusOptions} disabled={readOnly} />
         </div>
-        <ReferenceList references={project.references} />
+        <CorpusLinkList corpora={project.corpora} readOnly={readOnly} />
       </div>
 
       <ProjectFormDialog
@@ -264,10 +294,6 @@ export default function ProjectWorkspace() {
           name: project.name,
           description: project.description,
         }}
-      />
-      <ReferenceFormDialog
-        open={addingReference}
-        onOpenChange={setAddingReference}
       />
     </section>
   )

@@ -2,14 +2,15 @@ import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { detachProjectCorpus, setProjectCorpus, uploadCorpusFile } from "@/lib/corpus"
+import { extractCorpusHistory } from "@/lib/corpus-history"
 import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organizations"
 import {
+  assertEditable,
   classifyProject,
-  createReference,
   DataError,
   deleteProject,
-  deleteReference,
   getProject,
   linkCorpus,
   listCorpusOptions,
@@ -18,8 +19,8 @@ import {
   unlinkCorpus,
   updateProject,
   updateProjectStatus,
-  updateReference,
 } from "@/lib/projects"
+import { getSuperadmin } from "@/lib/users"
 import WorkspaceRoute, {
   clientAction,
   clientLoader,
@@ -38,9 +39,7 @@ vi.mock("@/lib/projects", async (importOriginal) => {
     deleteProject: vi.fn(),
     linkCorpus: vi.fn(),
     unlinkCorpus: vi.fn(),
-    createReference: vi.fn(),
-    updateReference: vi.fn(),
-    deleteReference: vi.fn(),
+    assertEditable: vi.fn(),
   }
 })
 
@@ -55,6 +54,20 @@ vi.mock("@/lib/organizations", () => ({
   createOrganization: vi.fn(),
 }))
 
+vi.mock("@/lib/users", () => ({
+  getSuperadmin: vi.fn(),
+}))
+
+vi.mock("@/lib/corpus", () => ({
+  setProjectCorpus: vi.fn(),
+  detachProjectCorpus: vi.fn(),
+  uploadCorpusFile: vi.fn(),
+}))
+
+vi.mock("@/lib/corpus-history", () => ({
+  extractCorpusHistory: vi.fn(),
+}))
+
 const detail: ProjectDetail = {
   id: "p1",
   name: "Peshitta Study",
@@ -66,6 +79,8 @@ const detail: ProjectDetail = {
   creator: { id: "u1", name: "Ada Researcher", username: "ada" },
   organization: null,
   licenses: [],
+  corpus: null,
+  commits: [],
   createdAt: "2026-07-01T00:00:00Z",
   updatedAt: "2026-07-02T00:00:00Z",
   corpora: [
@@ -82,33 +97,44 @@ const detail: ProjectDetail = {
         available: true,
       },
     },
-    {
-      corpusId: "c2",
-      linkedAt: "2026-07-04T00:00:00Z",
-      corpus: {
-        uid: "u2",
-        name: "Targum Onkelos",
-        language: "Aramaic",
-        type: "bible",
-        category: "religious",
-        version: "0.9.0",
-        available: false,
-      },
-    },
   ],
-  references: [
-    {
-      id: "r1",
-      projectId: "p1",
-      title: "Aramaic Grammar",
-      authors: "Muraoka, T.",
-      year: 2011,
-      publication: null,
-      url: null,
-      createdAt: "2026-07-05T00:00:00Z",
-      updatedAt: "2026-07-05T00:00:00Z",
-    },
-  ],
+}
+
+const catalogLicense = {
+  id: "CC-BY-4.0",
+  title: "Creative Commons Attribution 4.0",
+  url: null,
+  domains: { content: true, data: true, software: false },
+  status: "active" as const,
+  family: null,
+  maintainer: null,
+}
+
+const softwareLicense = {
+  ...catalogLicense,
+  id: "GPL-3.0",
+  title: "GNU GPL v3",
+  domains: { content: false, data: false, software: true },
+}
+
+const attachedLicence = {
+  ...catalogLicense,
+  agreedAt: "2026-07-06T00:00:00Z",
+  agreedBy: detail.creator,
+}
+
+/** A project passing every ready-for-review requirement. */
+const readyDetail: ProjectDetail = {
+  ...detail,
+  licenses: [attachedLicence],
+  type: "bible",
+  language: "hebrew",
+  corpus: {
+    source: "upload",
+    path: "p1/peshitta.corpus",
+    filename: "peshitta.corpus",
+    uploadedAt: "2026-07-10T00:00:00Z",
+  },
 }
 
 function renderRoute() {
@@ -126,20 +152,17 @@ function renderRoute() {
   return render(<Stub initialEntries={["/project/p1"]} />)
 }
 
-const catalogLicense = {
-  id: "CC-BY-4.0",
-  title: "Creative Commons Attribution 4.0",
-  url: null,
-  domains: { content: true, data: true, software: false },
-  status: "active" as const,
-  family: null,
-  maintainer: null,
-}
-
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getProject).mockResolvedValue(detail)
-  vi.mocked(listLicences).mockResolvedValue([catalogLicense])
+  vi.mocked(assertEditable).mockResolvedValue()
+  vi.mocked(getSuperadmin).mockResolvedValue({
+    id: "u9",
+    name: "Emmanuel",
+    username: "manny",
+    email: "manny.defreitas7@gmail.com",
+  })
+  vi.mocked(listLicences).mockResolvedValue([catalogLicense, softwareLicense])
   vi.mocked(listOrganizations).mockResolvedValue([
     { id: "o1", name: "Peshitta Institute", website: null },
   ])
@@ -164,13 +187,13 @@ beforeEach(() => {
 })
 
 describe("/project/:projectId workspace", () => {
-  it("renders the project header, corpora, and references", async () => {
+  it("renders the project header, corpus section, and references", async () => {
     renderRoute()
     expect(
       await screen.findByRole("heading", { level: 1, name: "Peshitta Study" }),
     ).toBeInTheDocument()
+    expect(screen.getByText("No corpus attached")).toBeInTheDocument()
     expect(screen.getByText("Peshitta OT")).toBeInTheDocument()
-    expect(screen.getByText("Aramaic Grammar")).toBeInTheDocument()
   })
 
   it("shows the no-longer-exists state when the project is gone", async () => {
@@ -186,9 +209,8 @@ describe("/project/:projectId workspace", () => {
     vi.mocked(updateProject).mockResolvedValue({ ...detail, name: "Renamed" })
     renderRoute()
 
-    // the header's Edit comes first in the DOM; reference rows have their own
     await screen.findByRole("heading", { level: 1, name: "Peshitta Study" })
-    await user.click(screen.getAllByRole("button", { name: "Edit" })[0])
+    await user.click(screen.getByRole("button", { name: "Edit" }))
     const nameInput = await screen.findByLabelText("Name")
     await user.clear(nameInput)
     await user.type(nameInput, "Renamed")
@@ -207,9 +229,8 @@ describe("/project/:projectId workspace", () => {
     vi.mocked(deleteProject).mockResolvedValue()
     renderRoute()
 
-    // the header's Delete comes first in the DOM; reference rows have their own
     await screen.findByRole("heading", { level: 1, name: "Peshitta Study" })
-    await user.click(screen.getAllByRole("button", { name: "Delete" })[0])
+    await user.click(screen.getByRole("button", { name: "Delete" }))
     await user.click(
       await screen.findByRole("button", { name: "Delete project" }),
     )
@@ -219,117 +240,41 @@ describe("/project/:projectId workspace", () => {
       await screen.findByRole("heading", { name: "Projects list" }),
     ).toBeInTheDocument()
   })
+})
 
-  it("links a corpus from the dialog and blocks re-linking", async () => {
+describe("references — corpus links (003)", () => {
+  it("references a library corpus from the dialog and blocks duplicates", async () => {
     const user = userEvent.setup()
     vi.mocked(linkCorpus).mockResolvedValue()
     renderRoute()
 
     await user.click(
-      await screen.findByRole("button", { name: "Link corpus" }),
+      await screen.findByRole("button", { name: "Add reference" }),
     )
     const dialog = await screen.findByRole("dialog")
-    // the already-linked corpus offers no Link button, only a "Linked" badge
-    expect(within(dialog).getByText("Linked")).toBeInTheDocument()
-    expect(within(dialog).getAllByRole("button", { name: "Link" })).toHaveLength(1)
+    expect(within(dialog).getByText("Referenced")).toBeInTheDocument()
+    expect(
+      within(dialog).getAllByRole("button", { name: "Reference" }),
+    ).toHaveLength(1)
 
-    await user.click(within(dialog).getByRole("button", { name: "Link" }))
+    await user.click(within(dialog).getByRole("button", { name: "Reference" }))
     await waitFor(() => expect(linkCorpus).toHaveBeenCalledWith("p1", "c3"))
   })
 
-  it("renders a stale link as unavailable with a remove affordance", async () => {
-    renderRoute()
-    expect(await screen.findByText("Targum Onkelos")).toBeInTheDocument()
-    expect(screen.getByText("Unavailable")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument()
-  })
-
-  it("unlinks a corpus without touching the library", async () => {
+  it("removes a reference without touching the library", async () => {
     const user = userEvent.setup()
     vi.mocked(unlinkCorpus).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Unlink" }))
+    const row = (await screen.findByText("Peshitta OT")).closest("li")
+    if (!row) throw new Error("reference row not found")
+    await user.click(within(row).getByRole("button", { name: "Remove" }))
     await waitFor(() => expect(unlinkCorpus).toHaveBeenCalledWith("p1", "c1"))
-  })
-
-  it("adds a reference with a title", async () => {
-    const user = userEvent.setup()
-    vi.mocked(createReference).mockResolvedValue(detail.references[0])
-    renderRoute()
-
-    await user.click(
-      await screen.findByRole("button", { name: /add reference/i }),
-    )
-    await user.type(await screen.findByLabelText("Title"), "New Article")
-    await user.click(screen.getByRole("button", { name: "Add reference" }))
-
-    await waitFor(() =>
-      expect(createReference).toHaveBeenCalledWith(
-        "p1",
-        expect.objectContaining({ title: "New Article" }),
-      ),
-    )
-  })
-
-  it("shows the validation message when the reference title is missing", async () => {
-    const user = userEvent.setup()
-    vi.mocked(createReference).mockRejectedValue(
-      new DataError("validation", "A title is required."),
-    )
-    renderRoute()
-
-    await user.click(
-      await screen.findByRole("button", { name: /add reference/i }),
-    )
-    await user.click(screen.getByRole("button", { name: "Add reference" }))
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "A title is required.",
-    )
-  })
-
-  it("edits an existing reference", async () => {
-    const user = userEvent.setup()
-    vi.mocked(updateReference).mockResolvedValue(detail.references[0])
-    renderRoute()
-
-    const row = (await screen.findByText("Aramaic Grammar")).closest("li")
-    if (!row) throw new Error("reference row not found")
-    await user.click(within(row).getByRole("button", { name: "Edit" }))
-
-    const titleInput = await screen.findByLabelText("Title")
-    expect(titleInput).toHaveValue("Aramaic Grammar")
-    await user.clear(titleInput)
-    await user.type(titleInput, "Aramaic Grammar, 2nd ed.")
-    await user.click(screen.getByRole("button", { name: "Save changes" }))
-
-    await waitFor(() =>
-      expect(updateReference).toHaveBeenCalledWith(
-        "r1",
-        expect.objectContaining({ title: "Aramaic Grammar, 2nd ed." }),
-      ),
-    )
-  })
-
-  it("deletes a reference after a confirmation", async () => {
-    const user = userEvent.setup()
-    vi.mocked(deleteReference).mockResolvedValue()
-    renderRoute()
-
-    const row = (await screen.findByText("Aramaic Grammar")).closest("li")
-    if (!row) throw new Error("reference row not found")
-    await user.click(within(row).getByRole("button", { name: "Delete" }))
-    await user.click(
-      await screen.findByRole("button", { name: "Delete reference" }),
-    )
-
-    await waitFor(() => expect(deleteReference).toHaveBeenCalledWith("r1"))
   })
 })
 
-describe("details panel — status (US1)", () => {
-  it("shows metadata with the current status and only the five statuses offered", async () => {
+describe("details panel — status workflow (003)", () => {
+  it("offers only the legal transitions while requirements are unmet", async () => {
     const user = userEvent.setup()
     renderRoute()
     const trigger = await screen.findByLabelText("Status")
@@ -340,15 +285,26 @@ describe("details panel — status (US1)", () => {
     expect(options.map((option) => option.textContent)).toEqual([
       "draft",
       "started",
-      "progress",
-      "completed",
       "failed",
     ])
-    // dates appear in the panel's Dates row (in addition to the header)
-    expect(screen.getAllByText(/created/i).length).toBeGreaterThanOrEqual(2)
+    // the unmet requirements are listed as a checklist
+    expect(screen.getByText("Licence attached and agreed")).toBeInTheDocument()
+    expect(screen.getByText("Corpus attached")).toBeInTheDocument()
   })
 
-  it("submits set-status when the status changes", async () => {
+  it("offers ready-for-review once licence, classification, and corpus pass", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getProject).mockResolvedValue(readyDetail)
+    renderRoute()
+
+    await user.click(await screen.findByLabelText("Status"))
+    const options = await screen.findAllByRole("option")
+    expect(options.map((option) => option.textContent)).toContain(
+      "ready-for-review",
+    )
+  })
+
+  it("submits set-status with the loaded project and superadmin flag", async () => {
     const user = userEvent.setup()
     vi.mocked(updateProjectStatus).mockResolvedValue()
     renderRoute()
@@ -356,22 +312,91 @@ describe("details panel — status (US1)", () => {
     await user.click(await screen.findByLabelText("Status"))
     await user.click(await screen.findByRole("option", { name: "started" }))
     await waitFor(() =>
-      expect(updateProjectStatus).toHaveBeenCalledWith("p1", "started"),
+      expect(updateProjectStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "p1" }),
+        "started",
+        true,
+      ),
     )
   })
 
-  it("surfaces a failed status update as a visible error", async () => {
+  it("lets the superadmin publish or return a project in review", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getProject).mockResolvedValue({
+      ...readyDetail,
+      status: "ready-for-review",
+    })
+    vi.mocked(updateProjectStatus).mockResolvedValue()
+    renderRoute()
+
+    await user.click(await screen.findByLabelText("Status"))
+    const options = await screen.findAllByRole("option")
+    expect(options.map((option) => option.textContent)).toEqual([
+      "ready-for-review",
+      "published",
+      "draft",
+    ])
+    await user.click(screen.getByRole("option", { name: "published" }))
+    await waitFor(() =>
+      expect(updateProjectStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "p1" }),
+        "published",
+        true,
+      ),
+    )
+  })
+
+  it("surfaces a refused status change as a visible error", async () => {
     const user = userEvent.setup()
     vi.mocked(updateProjectStatus).mockRejectedValue(
-      new DataError("unknown", "Could not update the project status."),
+      new DataError("validation", "Only the superadmin can approve."),
     )
     renderRoute()
 
     await user.click(await screen.findByLabelText("Status"))
     await user.click(await screen.findByRole("option", { name: "failed" }))
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Could not update the project status.",
+      "Only the superadmin can approve.",
     )
+  })
+})
+
+describe("read-only while in review (003)", () => {
+  beforeEach(() => {
+    vi.mocked(getProject).mockResolvedValue({
+      ...readyDetail,
+      status: "ready-for-review",
+    })
+  })
+
+  it("hides every editing affordance and shows the review banner", async () => {
+    renderRoute()
+    expect(await screen.findByRole("status")).toHaveTextContent(/in review/i)
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Classify" })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Add licence" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Add reference" })).toBeDisabled()
+  })
+
+  it("rejects mutating actions server-side via assertEditable", async () => {
+    vi.mocked(assertEditable).mockRejectedValue(
+      new DataError("validation", "This project is in review and read-only."),
+    )
+    const request = new Request("http://localhost/project/p1", {
+      method: "POST",
+      body: new URLSearchParams({ intent: "classify", type: "regular" }),
+    })
+    const result = await clientAction({
+      request,
+      params: { projectId: "p1" },
+      context: {},
+    } as never)
+    expect(result).toEqual({
+      ok: false,
+      error: "This project is in review and read-only.",
+    })
+    expect(classifyProject).not.toHaveBeenCalled()
   })
 })
 
@@ -383,18 +408,36 @@ describe("details panel — classification (US2)", () => {
     expect(await screen.findByText("Unclassified")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Classify" }))
 
-    const typeSelect = await screen.findByLabelText("Type")
-    await user.selectOptions(typeSelect, "bible")
+    await user.click(await screen.findByLabelText("Type"))
+    await user.click(await screen.findByRole("option", { name: "bible" }))
     expect(screen.getByLabelText("Source language")).toBeInTheDocument()
     expect(screen.queryByLabelText("Category")).not.toBeInTheDocument()
 
-    await user.selectOptions(typeSelect, "commentary")
+    await user.click(screen.getByLabelText("Type"))
+    await user.click(await screen.findByRole("option", { name: "commentary" }))
     expect(screen.getByLabelText("Category")).toBeInTheDocument()
     expect(screen.queryByLabelText("Source language")).not.toBeInTheDocument()
 
-    await user.selectOptions(typeSelect, "regular")
+    await user.click(screen.getByLabelText("Type"))
+    await user.click(await screen.findByRole("option", { name: "regular" }))
     expect(screen.queryByLabelText("Source language")).not.toBeInTheDocument()
     expect(screen.queryByLabelText("Category")).not.toBeInTheDocument()
+  })
+
+  it("narrows the language options for quran to arabic and english", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Classify" }))
+    await user.click(await screen.findByLabelText("Type"))
+    await user.click(await screen.findByRole("option", { name: "quran" }))
+
+    await user.click(screen.getByLabelText("Source language"))
+    const options = await screen.findAllByRole("option")
+    expect(options.map((option) => option.textContent)).toEqual([
+      "arabic",
+      "english",
+    ])
   })
 
   it("blocks saving until the required conditional value is chosen", async () => {
@@ -402,12 +445,14 @@ describe("details panel — classification (US2)", () => {
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Classify" }))
-    await user.selectOptions(await screen.findByLabelText("Type"), "bible")
+    await user.click(await screen.findByLabelText("Type"))
+    await user.click(await screen.findByRole("option", { name: "bible" }))
     expect(
       screen.getByRole("button", { name: "Save classification" }),
     ).toBeDisabled()
 
-    await user.selectOptions(screen.getByLabelText("Source language"), "hebrew")
+    await user.click(screen.getByLabelText("Source language"))
+    await user.click(await screen.findByRole("option", { name: "hebrew" }))
     expect(
       screen.getByRole("button", { name: "Save classification" }),
     ).toBeEnabled()
@@ -424,8 +469,10 @@ describe("details panel — classification (US2)", () => {
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Classify" }))
-    await user.selectOptions(await screen.findByLabelText("Type"), "review")
-    await user.selectOptions(screen.getByLabelText("Category"), "literary")
+    await user.click(await screen.findByLabelText("Type"))
+    await user.click(await screen.findByRole("option", { name: "review" }))
+    await user.click(screen.getByLabelText("Category"))
+    await user.click(await screen.findByRole("option", { name: "literary" }))
     await user.click(
       screen.getByRole("button", { name: "Save classification" }),
     )
@@ -439,15 +486,22 @@ describe("details panel — classification (US2)", () => {
   })
 })
 
-describe("details panel — licenses (US3)", () => {
-  it("shows the empty state and attaches after an agreement confirmation", async () => {
+describe("details panel — licences (US3)", () => {
+  it("filters out non-content licences and attaches after an agreement step", async () => {
     const user = userEvent.setup()
     vi.mocked(attachLicence).mockResolvedValue()
     renderRoute()
 
-    expect(await screen.findByText(/no licenses attached/i)).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Add license" }))
-    await user.click(await screen.findByRole("button", { name: "Attach" }))
+    expect(await screen.findByText(/no licences attached/i)).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Add licence" }))
+
+    // GPL is software-only — it has no business in a content catalog
+    expect(
+      await screen.findByText("Creative Commons Attribution 4.0"),
+    ).toBeInTheDocument()
+    expect(screen.queryByText("GNU GPL v3")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Attach" }))
     expect(attachLicence).not.toHaveBeenCalled() // agreement step first
     await user.click(screen.getByRole("button", { name: "Agree & attach" }))
 
@@ -456,23 +510,34 @@ describe("details panel — licenses (US3)", () => {
     )
   })
 
-  it("lists attached licenses with agreement info and detaches one row only", async () => {
+  it("searches the catalog by title", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Add licence" }))
+    const search = await screen.findByLabelText("Search licences")
+    await user.type(search, "creative")
+    expect(
+      screen.getByText("Creative Commons Attribution 4.0"),
+    ).toBeInTheDocument()
+
+    await user.clear(search)
+    await user.type(search, "does-not-exist")
+    expect(await screen.findByText(/no licence matches/i)).toBeInTheDocument()
+  })
+
+  it("lists attached licences with agreement info and detaches one row only", async () => {
     const user = userEvent.setup()
     vi.mocked(detachLicence).mockResolvedValue()
     vi.mocked(getProject).mockResolvedValue({
       ...detail,
       licenses: [
+        attachedLicence,
         {
-          ...catalogLicense,
-          agreedAt: "2026-07-06T00:00:00Z",
-          agreedBy: detail.creator,
-        },
-        {
-          ...catalogLicense,
-          id: "GPL-3.0",
-          title: "GNU GPL v3",
+          ...attachedLicence,
+          id: "CC0-1.0",
+          title: "CC0 Public Domain",
           agreedAt: "2026-07-07T00:00:00Z",
-          agreedBy: detail.creator,
         },
       ],
     })
@@ -483,25 +548,109 @@ describe("details panel — licenses (US3)", () => {
     ).toBeInTheDocument()
     expect(screen.getAllByText(/agreed .* by ada researcher/i)).toHaveLength(2)
 
-    const row = screen
-      .getByText("GNU GPL v3")
-      .closest("li") as HTMLElement
+    const row = screen.getByText("CC0 Public Domain").closest("li") as HTMLElement
     await user.click(within(row).getByRole("button", { name: "Remove" }))
     await waitFor(() =>
-      expect(detachLicence).toHaveBeenCalledWith("p1", "GPL-3.0"),
+      expect(detachLicence).toHaveBeenCalledWith("p1", "CC0-1.0"),
     )
     expect(detachLicence).toHaveBeenCalledTimes(1)
   })
 
-  it("marks already-attached catalog entries and explains an empty catalog", async () => {
+  it("explains an empty content catalog", async () => {
     const user = userEvent.setup()
-    vi.mocked(listLicences).mockResolvedValue([])
+    vi.mocked(listLicences).mockResolvedValue([softwareLicense])
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Add license" }))
+    await user.click(await screen.findByRole("button", { name: "Add licence" }))
     expect(
       await screen.findByText(/catalog has not been seeded/i),
     ).toBeInTheDocument()
+  })
+})
+
+describe("corpus section (003)", () => {
+  it("attaches a Hugging Face URL", async () => {
+    const user = userEvent.setup()
+    vi.mocked(setProjectCorpus).mockResolvedValue()
+    renderRoute()
+
+    const input = await screen.findByLabelText("Hugging Face URL")
+    await user.type(input, "https://huggingface.co/datasets/x/peshitta")
+    await user.click(screen.getByRole("button", { name: "Attach" }))
+
+    await waitFor(() =>
+      expect(setProjectCorpus).toHaveBeenCalledWith("p1", {
+        source: "huggingface",
+        path: "https://huggingface.co/datasets/x/peshitta",
+        filename: null,
+        commits: [],
+      }),
+    )
+  })
+
+  it("uploads a .corpus file and records its extracted git history", async () => {
+    const user = userEvent.setup()
+    const commits = [
+      {
+        sha: "a1b2c3d",
+        message: "Initial import",
+        authorName: "Ada",
+        authorEmail: "ada@example.org",
+        branch: "main",
+        committedAt: "2026-07-01T00:00:00.000Z",
+      },
+    ]
+    vi.mocked(extractCorpusHistory).mockResolvedValue(commits)
+    vi.mocked(uploadCorpusFile).mockResolvedValue("p1/peshitta.corpus")
+    vi.mocked(setProjectCorpus).mockResolvedValue()
+    renderRoute()
+
+    const input = await screen.findByLabelText("Upload .corpus file")
+    const file = new File(["zip-bytes"], "peshitta.corpus", {
+      type: "application/zip",
+    })
+    await user.upload(input, file)
+
+    await waitFor(() =>
+      expect(setProjectCorpus).toHaveBeenCalledWith("p1", {
+        source: "upload",
+        path: "p1/peshitta.corpus",
+        filename: "peshitta.corpus",
+        commits,
+      }),
+    )
+  })
+
+  it("shows the version history and detaches the corpus", async () => {
+    const user = userEvent.setup()
+    vi.mocked(detachProjectCorpus).mockResolvedValue()
+    vi.mocked(getProject).mockResolvedValue({
+      ...readyDetail,
+      commits: [
+        {
+          id: "cm1",
+          sha: "a1b2c3d4e5f",
+          message: "Fix verse numbering\n\nDetails…",
+          authorName: "Ada",
+          authorEmail: "ada@example.org",
+          branch: "main",
+          committedAt: "2026-07-05T00:00:00Z",
+        },
+      ],
+    })
+    renderRoute()
+
+    expect(await screen.findByText("peshitta.corpus")).toBeInTheDocument()
+    expect(screen.getByText("Fix verse numbering")).toBeInTheDocument()
+    expect(screen.getByText(/ada · .* · main @ a1b2c3d/i)).toBeInTheDocument()
+
+    const card = screen.getByText("peshitta.corpus").closest("div.flex")
+    const remove = screen
+      .getAllByRole("button", { name: "Remove" })
+      .find((button) => card?.parentElement?.parentElement?.contains(button))
+    if (!remove) throw new Error("corpus remove button not found")
+    await user.click(remove)
+    await waitFor(() => expect(detachProjectCorpus).toHaveBeenCalledWith("p1"))
   })
 })
 
@@ -509,15 +658,6 @@ describe("details panel — organization & creator (US4)", () => {
   it("displays the creator (FR-015)", async () => {
     renderRoute()
     expect(await screen.findByText("Ada Researcher")).toBeInTheDocument()
-  })
-
-  it("displays the backfilled default user for pre-002 projects (FR-017)", async () => {
-    vi.mocked(getProject).mockResolvedValue({
-      ...detail,
-      creator: { id: "u0", name: "Default User", username: "default" },
-    })
-    renderRoute()
-    expect(await screen.findByText("Default User")).toBeInTheDocument()
   })
 
   it("assigns an existing organization from the picker", async () => {

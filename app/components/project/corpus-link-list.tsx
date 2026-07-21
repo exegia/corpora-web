@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/empty"
 import type { CorpusLink } from "@/lib/projects"
 
-function CorpusLinkRow({ link }: { link: CorpusLink }) {
+function CorpusLinkRow({ link, readOnly }: { link: CorpusLink; readOnly: boolean }) {
   const fetcher = useFetcher<{ ok: boolean; error?: string }>()
   const busy = fetcher.state !== "idle"
   const stale = link.corpus === null || !link.corpus.available
@@ -36,18 +36,30 @@ function CorpusLinkRow({ link }: { link: CorpusLink }) {
           </p>
         )}
       </div>
-      <fetcher.Form method="post">
-        <input type="hidden" name="intent" value="unlink-corpus" />
-        <input type="hidden" name="corpusId" value={link.corpusId} />
-        <Button type="submit" size="sm" variant="ghost" disabled={busy}>
-          {stale ? "Remove" : "Unlink"}
-        </Button>
-      </fetcher.Form>
+      {!readOnly && (
+        <fetcher.Form method="post">
+          <input type="hidden" name="intent" value="unlink-corpus" />
+          <input type="hidden" name="corpusId" value={link.corpusId} />
+          <Button type="submit" size="sm" variant="ghost" disabled={busy}>
+            Remove
+          </Button>
+        </fetcher.Form>
+      )}
     </li>
   )
 }
 
-export function CorpusLinkList({ corpora }: { corpora: CorpusLink[] }) {
+/**
+ * The project's corpus references: library corpora loaded alongside the
+ * dataset (e.g. a commentary referencing the bible version it comments on).
+ */
+export function CorpusLinkList({
+  corpora,
+  readOnly,
+}: {
+  corpora: CorpusLink[]
+  readOnly: boolean
+}) {
   if (corpora.length === 0) {
     return (
       <Empty className="py-8 md:py-10">
@@ -55,16 +67,21 @@ export function CorpusLinkList({ corpora }: { corpora: CorpusLink[] }) {
           <EmptyMedia variant="icon">
             <LibraryBig />
           </EmptyMedia>
-          <EmptyTitle>No linked corpora</EmptyTitle>
+          <EmptyTitle>No references</EmptyTitle>
           <EmptyDescription>
-            Use “Link corpus” to attach source texts from your library.
+            Use “Add reference” to point at library corpora that should load
+            with this dataset.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
     )
   }
 
-  return <ul className="divide-y">{corpora.map((link) => (
-    <CorpusLinkRow key={link.corpusId} link={link} />
-  ))}</ul>
+  return (
+    <ul className="divide-y">
+      {corpora.map((link) => (
+        <CorpusLinkRow key={link.corpusId} link={link} readOnly={readOnly} />
+      ))}
+    </ul>
+  )
 }

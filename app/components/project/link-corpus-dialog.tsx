@@ -15,6 +15,7 @@ import type { CorpusOption } from "@/lib/projects"
 
 export interface LinkCorpusDialogProps {
   options: CorpusOption[]
+  disabled?: boolean
 }
 
 function LinkOptionRow({ option }: { option: CorpusOption }) {
@@ -35,7 +36,7 @@ function LinkOptionRow({ option }: { option: CorpusOption }) {
         )}
       </div>
       {option.alreadyLinked ? (
-        <Badge variant="secondary">Linked</Badge>
+        <Badge variant="secondary">Referenced</Badge>
       ) : !option.available ? (
         <Badge variant="secondary">Unavailable</Badge>
       ) : (
@@ -43,7 +44,7 @@ function LinkOptionRow({ option }: { option: CorpusOption }) {
           <input type="hidden" name="intent" value="link-corpus" />
           <input type="hidden" name="corpusId" value={option.id} />
           <Button type="submit" size="sm" variant="outline" disabled={busy}>
-            Link
+            Reference
           </Button>
         </fetcher.Form>
       )}
@@ -51,26 +52,30 @@ function LinkOptionRow({ option }: { option: CorpusOption }) {
   )
 }
 
-export function LinkCorpusDialog({ options }: LinkCorpusDialogProps) {
+/** Pick an existing library corpus to reference from this project. */
+export function LinkCorpusDialog({ options, disabled }: LinkCorpusDialogProps) {
   const [open, setOpen] = useState(false)
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
-        Link corpus
+      <DialogTrigger
+        render={<Button size="sm" variant="outline" disabled={disabled} />}
+      >
+        Add reference
       </DialogTrigger>
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>Link a corpus</DialogTitle>
+          <DialogTitle>Add a corpus reference</DialogTitle>
           <DialogDescription>
-            Pick a corpus from your library to link to this project.
+            References tell the loader which library corpora belong with this
+            dataset — a commentary references the bible version it comments on.
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           {options.length === 0 ? (
             <p className="py-4 text-muted-foreground text-sm">
               Your library has no corpora yet. Add corpora in the Library area,
-              then link them here.
+              then reference them here.
             </p>
           ) : (
             <ul className="divide-y">
