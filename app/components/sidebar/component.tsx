@@ -35,7 +35,7 @@ const AppSidebar = () => {
     <Sidebar variant="inset">
       <SidebarHeader className="flex flex-row items-center justify-center">
         <Logo className="fill-amber-400 w-8 h-8 transform rotate-12" />
-        <span className="font-heading text-2xl font-medium text-foreground">
+        <span className="text-2xl font-medium text-foreground font-serif">
           Corpora
         </span>
       </SidebarHeader>

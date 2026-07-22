@@ -2,11 +2,12 @@
 import path from "node:path"
 import { reactRouter } from "@react-router/dev/vite"
 import tailwindcss from "@tailwindcss/vite"
+import { vercelPreset } from '@vercel/react-router/vite';
 import { defineConfig } from "vite"
 import devtoolsJson from 'vite-plugin-devtools-json';
 
 export default defineConfig({
-  plugins: [!process.env.VITEST && reactRouter(), tailwindcss(),  devtoolsJson()],
+  plugins: [!process.env.VITEST && reactRouter(), tailwindcss(), vercelPreset(), devtoolsJson()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./app"),

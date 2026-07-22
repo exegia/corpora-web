@@ -222,7 +222,7 @@ function Catalog({
                   No licence matches “{query}”.
                 </p>
               ) : (
-                <ul className="divide-y">
+                <ul>
                   {results.map((licence) => (
                     <LicenceRow key={licence.id} licence={licence} />
                   ))}
