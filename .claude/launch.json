@@ -6,6 +6,12 @@
       "runtimeExecutable": "bun",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "corpora-web-prod",
+      "runtimeExecutable": "bunx",
+      "runtimeArgs": ["--bun", "serve", "-s", "build/client", "-l", "4173"],
+      "port": 4173
     }
   ]
 }

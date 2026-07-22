@@ -6,7 +6,7 @@ import { defineConfig } from "vite"
 import devtoolsJson from 'vite-plugin-devtools-json';
 
 export default defineConfig({
-  plugins: [!process.env.VITEST && reactRouter(), tailwindcss(),  devtoolsJson()],
+  plugins: [!process.env.VITEST && reactRouter(), tailwindcss(), devtoolsJson()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./app"),
