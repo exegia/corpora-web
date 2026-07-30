@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Generate utilities for @exegia/corpora-ui component class strings. */
+@source "../node_modules/@exegia/corpora-ui/dist-lib";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Cal Sans 2.0 variable — the coss main font (see coss.com/ui/docs/styling). */
@@ -19,6 +22,9 @@
 
 :root {
   color-scheme: light;
+  /* Let width/height tween between auto and fixed values (corpora-ui buttons
+     morph size when loading). No-op in browsers without support. */
+  interpolate-size: allow-keywords;
   --accent: light-dark(--alpha(var(--color-black) / 6%), --alpha(var(--color-white) / 6%));
   --accent-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
   --background: light-dark(var(--color-white), color-mix(in srgb, var(--color-neutral-950) 95%, var(--color-white)));
@@ -68,6 +74,9 @@
 }
 
 @theme inline {
+  /* motion tokens (transitions.dev scale) — required by corpora-ui components */
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-input-shake: input-shake 0.4s ease-in-out;
   --font-heading: var(--font-sans);
   --font-mono: var(--font-mono, ui-monospace, monospace);
   --font-sans: "Cal Sans", ui-sans-serif, system-ui, sans-serif;
@@ -205,6 +214,14 @@
   to {
     background-position: -200% 0;
   }
+}
+
+@keyframes input-shake {
+  0%, 100% { translate: 0; }
+  20% { translate: -6px 0; }
+  40% { translate: 6px 0; }
+  60% { translate: -4px 0; }
+  80% { translate: 4px 0; }
 }
 
 @keyframes caret-blink {
