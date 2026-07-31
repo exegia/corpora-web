@@ -1,6 +1,6 @@
 import { FolderX } from "lucide-react"
-import { useState } from "react"
-import { Link, redirect, useLoaderData } from "react-router"
+import { Suspense, useState } from "react"
+import { Await, Link, redirect, useLoaderData } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { CorpusLinkList } from "@/components/project/corpus-link-list"
 import { CorpusSection } from "@/components/project/corpus-section"
@@ -9,6 +9,7 @@ import { LinkCorpusDialog } from "@/components/project/link-corpus-dialog"
 import { ProjectDetailPanel } from "@/components/project/project-detail-panel"
 import { ProjectFormDialog } from "@/components/project/project-form-dialog"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import {
   Empty,
   EmptyContent,
@@ -18,6 +19,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   attachCorpusToProject,
   detachCorpusFromProject,
@@ -47,30 +49,36 @@ import {
   updateProject,
   updateProjectStatus,
 } from "@/lib/projects"
+import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import { getSuperadmin } from "@/lib/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const projectId = params.projectId ?? ""
-  const project = await getProject(projectId)
-  const [corpusOptions, licenseCatalog, organizations, superadmin, documents] =
-    project
-      ? await Promise.all([
-          listCorpusOptions(projectId),
-          listLicences(),
-          listOrganizations(),
-          getSuperadmin(),
-          listCorpusDocuments(),
-        ])
-      : [[], [], [], null, []]
-  return {
-    project,
-    corpusOptions,
-    documents,
-    licenseCatalog,
-    organizations,
-    // Pre-auth: the session acts as the superadmin when the directory has one.
-    superadmin: superadmin !== null,
-  }
+  // Deliberately not awaited (see routes/project.tsx): navigation completes
+  // immediately and the workspace suspends on this promise, showing the
+  // skeleton meanwhile.
+  const data = getProject(projectId).then(async (project) => {
+    const [corpusOptions, licenseCatalog, organizations, superadmin, documents] =
+      project
+        ? await Promise.all([
+            listCorpusOptions(projectId),
+            listLicences(),
+            listOrganizations(),
+            getSuperadmin(),
+            listCorpusDocuments(),
+          ])
+        : [[], [], [], null, []]
+    return {
+      project,
+      corpusOptions,
+      documents,
+      licenseCatalog,
+      organizations,
+      // Pre-auth: the session acts as the superadmin when the directory has one.
+      superadmin: superadmin !== null,
+    }
+  })
+  return { data }
 }
 
 /** Build the discriminated Classification from form fields (FR-006..FR-009). */
@@ -199,15 +207,60 @@ function ProjectNotFound() {
   )
 }
 
-export default function ProjectWorkspace() {
-  const {
-    project,
-    corpusOptions,
-    documents,
-    licenseCatalog,
-    organizations,
-    superadmin,
-  } = useLoaderData<typeof clientLoader>()
+function WorkspaceSkeleton() {
+  useLoadingSound()
+
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading project"
+      className="flex flex-col gap-6"
+      role="status"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-2">
+          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-4 w-72" />
+          <Skeleton className="h-3 w-48" />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Skeleton className="h-8 w-14" />
+          <Skeleton className="h-8 w-16" />
+        </div>
+      </div>
+      <Card className="gap-4 p-6">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div className="flex items-center justify-between gap-4" key={i}>
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        ))}
+      </Card>
+      <Separator />
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-32" />
+        <Card className="gap-3 p-6">
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-3 w-2/3" />
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+type WorkspaceData = Awaited<
+  Awaited<ReturnType<typeof clientLoader>>["data"]
+>
+
+function Workspace({
+  project,
+  corpusOptions,
+  documents,
+  licenseCatalog,
+  organizations,
+  superadmin,
+}: WorkspaceData) {
+  useReadySound()
   const [editing, setEditing] = useState(false)
 
   if (!project) return <ProjectNotFound />
@@ -285,5 +338,15 @@ export default function ProjectWorkspace() {
         }}
       />
     </section>
+  )
+}
+
+export default function ProjectWorkspace() {
+  const { data } = useLoaderData<typeof clientLoader>()
+
+  return (
+    <Suspense fallback={<WorkspaceSkeleton />}>
+      <Await resolve={data}>{(resolved) => <Workspace {...resolved} />}</Await>
+    </Suspense>
   )
 }

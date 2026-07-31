@@ -18,6 +18,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { Spinner } from "@/components/ui/spinner"
 import { default as Logo } from "@/components/logo";
 import { cn } from "@/lib/utils"
 
@@ -46,14 +47,17 @@ const AppSidebar = () => {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
+                  {/* isPending: react-router's local pending navigation. Route
+                      modules are code-split, so this covers the chunk fetch on
+                      a first visit; loaders themselves no longer block. */}
                   <NavLink to={item.url} end={item.url === "/"} >
-                    {({ isActive }) => (
+                    {({ isActive, isPending }) => (
                       <SidebarMenuButton
                         isActive={isActive}
                         data-cuelume-hover="tick"
                         className={cn("cursor-pointer bg-transparent transition-all ease-in-out duration-200", isActive && "bg-accent!")}
                       >
-                        <item.icon />
+                        {isPending ? <Spinner /> : <item.icon />}
                         <span>{item.title}</span>
                       </SidebarMenuButton>
                     )}

@@ -49,31 +49,35 @@ import { getSuperadmin } from "@/lib/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const licenceId = params.licenceId ?? ""
-  const [licence, superadmin] = await Promise.all([
-    getLicence(licenceId),
-    getSuperadmin(),
-  ])
-  // Deliberately not awaited (see routes/project.tsx): the text section
-  // suspends on this promise, showing a skeleton while the first visit
-  // downloads and stores the licence text. Later visits resolve instantly
-  // from the stored text. Best effort — null when every source fails.
-  const text: Promise<string | null> =
-    licence === null
-      ? Promise.resolve(null)
-      : licence.fullText !== null
-        ? Promise.resolve(licence.fullText)
-        : fetchLicenceText(licence)
-            .then(async (fetched) => {
-              if (fetched) await saveLicenceText(licence.id, fetched)
-              return fetched
-            })
-            .catch(() => null)
-  return {
-    licence,
-    text,
-    // Pre-auth: the session acts as the superadmin when the directory has one.
-    superadmin: superadmin !== null,
-  }
+  // Deliberately not awaited (see routes/project.tsx): navigation completes
+  // immediately and the page suspends on this promise, showing the skeleton
+  // meanwhile. The licence text below has its own, longer-lived boundary.
+  const detail = Promise.all([getLicence(licenceId), getSuperadmin()]).then(
+    ([licence, superadmin]) => ({
+      licence,
+      // Pre-auth: the session acts as the superadmin when the directory has one.
+      superadmin: superadmin !== null,
+      text: licenceText(licence),
+    }),
+  )
+  return { detail }
+}
+
+/**
+ * The licence body: stored text resolves instantly, a first visit downloads
+ * and stores it. Best effort — null when every source fails.
+ */
+function licenceText(
+  licence: Awaited<ReturnType<typeof getLicence>>,
+): Promise<string | null> {
+  if (licence === null) return Promise.resolve(null)
+  if (licence.fullText !== null) return Promise.resolve(licence.fullText)
+  return fetchLicenceText(licence)
+    .then(async (fetched) => {
+      if (fetched) await saveLicenceText(licence.id, fetched)
+      return fetched
+    })
+    .catch(() => null)
 }
 
 export async function clientAction({ request, params }: ActionFunctionArgs) {
@@ -498,12 +502,50 @@ function LicenceNotFound() {
   )
 }
 
+/** Placeholder for the header and details card while the licence loads. */
+function LicenceDetailSkeleton() {
+  useLoadingSound()
+
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading licence"
+      className="flex flex-col gap-6"
+      role="status"
+    >
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-7 w-72" />
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <CardFrame>
+        <CardFrameHeader>
+          <Skeleton className="h-4 w-16" />
+        </CardFrameHeader>
+        <Card>
+          <CardPanel className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div className="flex flex-col gap-1.5" key={i}>
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            ))}
+          </CardPanel>
+        </Card>
+      </CardFrame>
+      <LicenceTextSkeleton />
+    </div>
+  )
+}
+
+type LicenceDetailData = Awaited<
+  Awaited<ReturnType<typeof clientLoader>>["detail"]
+>
+
 /**
  * One catalog licence: the stored detail (editable by the superadmin only)
  * and the licence rendered as markdown.
  */
-export default function LicenceDetailPage() {
-  const { licence, text, superadmin } = useLoaderData<typeof clientLoader>()
+function LicenceDetail({ licence, text, superadmin }: LicenceDetailData) {
   const [editing, setEditing] = useState(false)
 
   if (!licence) return <LicenceNotFound />
@@ -553,5 +595,17 @@ export default function LicenceDetailPage() {
         </Await>
       </Suspense>
     </section>
+  )
+}
+
+export default function LicenceDetailPage() {
+  const { detail } = useLoaderData<typeof clientLoader>()
+
+  return (
+    <Suspense fallback={<LicenceDetailSkeleton />}>
+      <Await resolve={detail}>
+        {(resolved) => <LicenceDetail {...resolved} />}
+      </Await>
+    </Suspense>
   )
 }

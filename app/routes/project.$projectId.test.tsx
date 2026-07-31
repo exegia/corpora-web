@@ -252,9 +252,10 @@ describe("/project/:projectId workspace", () => {
 
     await screen.findByRole("heading", { level: 1, name: "Peshitta Study" })
     await user.click(screen.getByRole("button", { name: "Delete" }))
-    await user.click(
-      await screen.findByRole("button", { name: "Delete project" }),
-    )
+    const confirm = await screen.findByRole("button", { name: "Delete project" })
+    expect(confirm).toBeDisabled()
+    await user.type(screen.getByRole("textbox"), "DELETE")
+    await user.click(confirm)
 
     await waitFor(() => expect(deleteProject).toHaveBeenCalledWith("p1"))
     expect(
@@ -385,7 +386,12 @@ describe("read-only while in review (003)", () => {
 
   it("hides every editing affordance and shows the review banner", async () => {
     renderRoute()
-    expect(await screen.findByRole("status")).toHaveTextContent(/in review/i)
+    // Queried by text, not a bare role="status": the loading skeleton is also
+    // a status live region, and it resolves first.
+    expect(await screen.findByText(/in review/i)).toHaveAttribute(
+      "role",
+      "status",
+    )
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Classify" })).not.toBeInTheDocument()
