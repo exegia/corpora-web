@@ -28,6 +28,10 @@ export default defineConfig({
       "isomorphic-git",
       "lucide-react",
       "marked",
+      // Pulled in by the corpora-ui auth blocks: `motion/react` powers the
+      // step morphs, `@remixicon/react` the provider glyphs.
+      "motion/react",
+      "@remixicon/react",
       "react-remark",
       "tailwind-merge",
       ...[

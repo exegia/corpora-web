@@ -38,6 +38,7 @@ and the `extract-component` skill.
 | View transitions and reduced motion | [docs/motion.md](docs/motion.md) |
 | Test gotchas specific to this app | [docs/testing.md](docs/testing.md) |
 | Working with the upstream component library | [docs/corpora-ui.md](docs/corpora-ui.md) |
+| Auth screens, route guards, and the not-yet-wired Supabase seam | [docs/auth.md](docs/auth.md) |
 
 ## Two invariants that will bite
 

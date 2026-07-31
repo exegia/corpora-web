@@ -1,13 +1,15 @@
 import { Outlet } from "react-router"
+import { UserMenu } from "@/components/auth/user-menu"
 import { Provider, Drawer, Wrapper, Trigger } from "@/components/sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import type { SessionUser } from "@/lib/auth"
 import { useUISounds } from "@/lib/sounds"
 import { COBreadcrumb } from "./breadcrumb"
 import { SoundToggle } from "./sound-toggle"
 import { ThemeToggle } from "./theme-toggle"
 
 
-export function AppLayout() {
+export function AppLayout({ user }: { user?: SessionUser }) {
   useUISounds()
 
   return (
@@ -20,6 +22,7 @@ export function AppLayout() {
           <div className="ml-auto flex items-center gap-1">
             <SoundToggle />
             <ThemeToggle />
+            {user && <UserMenu user={user} />}
           </div>
         </header>
 

@@ -2,11 +2,11 @@ import {
   isRouteErrorResponse,
   Links,
   Meta,
+  Outlet,
   Scripts,
   ScrollRestoration,
 } from "react-router"
 import type { Route } from "./+types/root"
-import { AppLayout } from "@/components/app-layout"
 import { THEME_INIT_SCRIPT } from "@/lib/theme"
 import "./app.css"
 
@@ -34,8 +34,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   )
 }
 
+// The chrome moved down a level: `routes/protected-layout` renders the sidebar
+// shell, `routes/auth-layout` renders the signed-out one. Root just hosts them.
 export default function App() {
-  return <AppLayout />
+  return <Outlet />
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
