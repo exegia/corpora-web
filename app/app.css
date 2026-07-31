@@ -233,6 +233,52 @@
   }
 }
 
+/* View transitions (react-router `viewTransition` on links).
+   Only the routed content is named, so it animates on its own while the
+   persistent chrome — sidebar, header, breadcrumb — is left to the root group
+   and stays put. The outgoing half is deliberately much shorter than the
+   incoming one: a slow fade-out reads as lag, a slow fade-in reads as arrival. */
+@keyframes route-enter {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+@keyframes route-exit {
+  to {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
+/* The scroll viewport, not <main>: naming the content itself would snapshot its
+   full scroll height (~47000px on /licenses), well past the GPU's max texture
+   size. The viewport's box is viewport-sized and stable, so the snapshot stays
+   bounded. Scoped to .route-scroll because several ScrollAreas — the sidebar's
+   included — are mounted at once, and a duplicate name aborts the transition. */
+.route-scroll [data-slot="scroll-area-viewport"] {
+  view-transition-name: route-content;
+}
+
+::view-transition-old(route-content) {
+  animation: route-exit 110ms var(--ease-smooth-out) both;
+}
+
+::view-transition-new(route-content) {
+  animation: route-enter 260ms var(--ease-smooth-out) both;
+}
+
+/* Element-level `motion-reduce:` utilities cannot reach the transition
+   pseudo-elements, so the UA cross-fade needs switching off explicitly. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
 /* Licence text rendered by react-remark: a lightweight prose style over the
    semantic HTML it emits, using app tokens so both schemes follow the theme. */
 .licence-prose {

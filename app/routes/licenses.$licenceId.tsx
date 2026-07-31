@@ -497,7 +497,7 @@ function LicenceNotFound() {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button render={<Link to="/licenses" />}>Back to licenses</Button>
+        <Button render={<Link to="/licenses" viewTransition />}>Back to licenses</Button>
       </EmptyContent>
     </Empty>
   )

@@ -50,7 +50,7 @@ const AppSidebar = () => {
                   {/* isPending: react-router's local pending navigation. Route
                       modules are code-split, so this covers the chunk fetch on
                       a first visit; loaders themselves no longer block. */}
-                  <NavLink to={item.url} end={item.url === "/"} >
+                  <NavLink to={item.url} end={item.url === "/"} viewTransition>
                     {({ isActive, isPending }) => (
                       <SidebarMenuButton
                         isActive={isActive}

@@ -23,7 +23,9 @@ export function AppLayout() {
           </div>
         </header>
 
-        <ScrollArea className="flex-1 min-h-0" fill>
+        {/* route-scroll: scopes the view-transition-name to this viewport so the
+            snapshot is bounded by the visible region (see app.css). */}
+        <ScrollArea className="flex-1 min-h-0 route-scroll" fill>
           <main className="p-6">
             <Outlet />
           </main>

@@ -205,7 +205,7 @@ function ProjectNotFound() {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button render={<Link to="/project" />}>Back to projects</Button>
+        <Button render={<Link to="/project" viewTransition />}>Back to projects</Button>
       </EmptyContent>
     </Empty>
   )

@@ -142,7 +142,7 @@ function ImportCorpusSheet({
           {documents.length === 0 ? (
             <p className="py-4 text-muted-foreground text-sm">
               The corpus library is empty. Upload a .corpus document on the{" "}
-              <Link to="/corpus" className="underline underline-offset-2">
+              <Link to="/corpus" className="underline underline-offset-2" viewTransition>
                 Corpus
               </Link>{" "}
               page first.

@@ -102,6 +102,7 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                         <Link
                             className="outline-none after:absolute after:inset-0 after:rounded-2xl"
                             to={`/project/${project.id}`}
+                            viewTransition
                         >
                             {project.name}
                         </Link>
