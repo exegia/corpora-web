@@ -1,12 +1,14 @@
 import { FileArchive, Upload } from "lucide-react"
-import { useRef, useState } from "react"
-import { useFetcher, useLoaderData } from "react-router"
+import { Suspense, useRef, useState } from "react"
+import { Await, useFetcher, useLoaderData } from "react-router"
 import type { ActionFunctionArgs } from "react-router"
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import {
   CommitHistory,
   CorpusDocumentCard,
 } from "@/components/corpus/corpus-document-card"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import {
   Empty,
   EmptyDescription,
@@ -15,6 +17,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   createCorpusDocument,
   deleteCorpusDocument,
@@ -27,9 +30,14 @@ import {
   fetchHuggingFaceHistory,
 } from "@/lib/corpus-history"
 import { type CorpusSource, DataError } from "@/lib/projects"
+import { useLoadingSound, useReadySound } from "@/lib/sounds"
 
 export async function clientLoader() {
-  return { documents: await listCorpusDocuments() }
+  // Deliberately not awaited (see routes/project.tsx): navigation completes
+  // immediately, the upload controls stay interactive, and the list suspends
+  // on this promise, showing the skeleton meanwhile.
+  const documents = listCorpusDocuments()
+  return { documents }
 }
 
 function parseCommits(raw: string): CorpusCommitInput[] {
@@ -73,49 +81,77 @@ export async function clientAction({ request }: ActionFunctionArgs) {
   }
 }
 
-function DocumentEntry({ document }: { document: CorpusDocument }) {
-  const fetcher = useFetcher<{ ok: boolean; error?: string }>()
-  const [confirming, setConfirming] = useState(false)
-  const busy = fetcher.state !== "idle"
+function DocumentListSkeleton() {
+  useLoadingSound()
 
+  return (
+    <div aria-busy="true" aria-label="Loading corpus documents" role="status">
+      <ul className="flex flex-col gap-6">
+        {Array.from({ length: 3 }, (_, i) => (
+          <Card className="gap-4 p-6" key={i} render={<li />}>
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-9 shrink-0 rounded-lg" />
+              <div className="flex flex-1 flex-col gap-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+              <Skeleton className="h-8 w-16 shrink-0" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </Card>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function DocumentList({ documents }: { documents: CorpusDocument[] }) {
+  useReadySound()
+
+  if (documents.length === 0) {
+    return (
+      <Empty className="py-10 md:py-14">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <FileArchive />
+          </EmptyMedia>
+          <EmptyTitle>The corpus library is empty</EmptyTitle>
+          <EmptyDescription>
+            Upload your first .corpus document or add a Hugging Face corpus.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+
+  return (
+    <ul className="flex flex-col gap-6">
+      {documents.map((document) => (
+        <DocumentEntry key={document.id} document={document} />
+      ))}
+    </ul>
+  )
+}
+
+function DocumentEntry({ document }: { document: CorpusDocument }) {
   return (
     <li className="flex flex-col gap-3">
       <CorpusDocumentCard
         document={document}
         actions={
-          confirming ? (
-            <fetcher.Form method="post" onSubmit={() => setConfirming(false)}>
-              <input type="hidden" name="intent" value="delete-document" />
-              <input type="hidden" name="documentId" value={document.id} />
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirming(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" variant="destructive" disabled={busy}>
-                Delete corpus
-              </Button>
-            </fetcher.Form>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setConfirming(true)}
-            >
-              Delete
-            </Button>
-          )
+          <ConfirmDeleteDialog
+            confirmLabel="Delete corpus"
+            description={`This permanently deletes “${document.name}” and its version history from your library. Projects that reference it will show it as unavailable. This cannot be undone.`}
+            fields={{ documentId: document.id }}
+            intent="delete-document"
+            title={`Delete “${document.name}”?`}
+            trigger={<Button size="sm" type="button" variant="ghost" />}
+          />
         }
       />
-      {fetcher.data?.ok === false && fetcher.data.error && (
-        <p role="alert" className="text-destructive text-sm">
-          {fetcher.data.error}
-        </p>
-      )}
       <div className="ps-1">
         <CommitHistory commits={document.commits} />
       </div>
@@ -251,25 +287,11 @@ export default function Corpus() {
         </p>
       )}
 
-      {documents.length === 0 ? (
-        <Empty className="py-10 md:py-14">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <FileArchive />
-            </EmptyMedia>
-            <EmptyTitle>The corpus library is empty</EmptyTitle>
-            <EmptyDescription>
-              Upload your first .corpus document or add a Hugging Face corpus.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <ul className="flex flex-col gap-6">
-          {documents.map((document) => (
-            <DocumentEntry key={document.id} document={document} />
-          ))}
-        </ul>
-      )}
+      <Suspense fallback={<DocumentListSkeleton />}>
+        <Await resolve={documents}>
+          {(resolved) => <DocumentList documents={resolved} />}
+        </Await>
+      </Suspense>
     </section>
   )
 }

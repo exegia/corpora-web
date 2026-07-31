@@ -1,8 +1,9 @@
-/// <reference types="vitest/config" />
 import path from "node:path"
 import { reactRouter } from "@react-router/dev/vite"
 import tailwindcss from "@tailwindcss/vite"
-import { defineConfig } from "vite"
+// vitest/config, not vite: as of vite 8.2 the `test` key below is not part of
+// vite's own UserConfig, and the triple-slash reference no longer widens it.
+import { defineConfig } from "vitest/config"
 import devtoolsJson from 'vite-plugin-devtools-json';
 
 export default defineConfig({
@@ -11,6 +12,63 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./app"),
     },
+  },
+  // Pre-bundle every bare import up front. Without this, Vite discovers deps
+  // lazily as routes are visited, re-optimizes, and the browser's in-flight
+  // requests for the previous hash fail with "504 Outdated Optimize Dep".
+  optimizeDeps: {
+    include: [
+      "@exegia/corpora-ui",
+      "@supabase/supabase-js",
+      "buffer",
+      "class-variance-authority",
+      "clsx",
+      "cuelume",
+      "fflate",
+      "isomorphic-git",
+      "lucide-react",
+      "marked",
+      "react-remark",
+      "tailwind-merge",
+      ...[
+        "accordion",
+        "alert-dialog",
+        "autocomplete",
+        "avatar",
+        "checkbox",
+        "checkbox-group",
+        "collapsible",
+        "combobox",
+        "context-menu",
+        "dialog",
+        "drawer",
+        "field",
+        "fieldset",
+        "form",
+        "menu",
+        "merge-props",
+        "meter",
+        "number-field",
+        "otp-field",
+        "popover",
+        "preview-card",
+        "progress",
+        "radio",
+        "radio-group",
+        "scroll-area",
+        "select",
+        "separator",
+        "slider",
+        "switch",
+        "tabs",
+        "toast",
+        "toggle",
+        "toggle-group",
+        "toolbar",
+        "tooltip",
+        "use-render",
+      ].map((m) => `@base-ui/react/${m}`),
+    ],
   },
   server: {
     open: true,

@@ -162,6 +162,48 @@ describe("/project list", () => {
     expect(createProject).toHaveBeenCalledTimes(1)
   })
 
+  // The deferred-loader pattern (here, /corpus and both detail routes) is only
+  // safe because a revalidation keeps the resolved UI mounted. If <Await> ever
+  // re-suspends, every action would blank its page back to a skeleton.
+  it("does not flash the skeleton back in when an action revalidates", async () => {
+    const user = userEvent.setup()
+    vi.mocked(listProjects).mockResolvedValue([summary])
+    vi.mocked(createProject).mockResolvedValue(summary)
+    renderRoute()
+    await screen.findByRole("link", { name: /Peshitta Study/ })
+
+    let skeletonReturned = false
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('[aria-label="Loading projects"]')) {
+        skeletonReturned = true
+      }
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+
+    // A slow revalidation widens the window a re-suspend would show in.
+    let resolveSecond!: (value: ProjectSummary[]) => void
+    vi.mocked(listProjects).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSecond = resolve
+      }),
+    )
+
+    await user.click(await screen.findByRole("button", { name: /new project/i }))
+    await user.type(await screen.findByLabelText("Name"), "Another")
+    await user.selectOptions(screen.getByLabelText("Creator"), "Ada Researcher")
+    await user.click(screen.getByRole("button", { name: "Create project" }))
+    await waitFor(() => expect(listProjects).toHaveBeenCalledTimes(2))
+
+    // Mid-revalidation the stale row is still mounted. Asserted via
+    // textContent: the open dialog marks the rest of the app aria-hidden,
+    // which hides the row from role queries without unmounting it.
+    expect(document.body.textContent).toContain("Peshitta Study")
+
+    resolveSecond([summary])
+    observer.disconnect()
+    expect(skeletonReturned).toBe(false)
+  })
+
   it("deletes a project only after confirmation", async () => {
     const user = userEvent.setup()
     vi.mocked(listProjects).mockResolvedValue([summary])
@@ -174,7 +216,10 @@ describe("/project list", () => {
       await screen.findByText(/deletes the project and its references/i),
     ).toBeInTheDocument()
 
-    await user.click(screen.getByRole("button", { name: "Delete project" }))
+    const confirm = screen.getByRole("button", { name: "Delete project" })
+    expect(confirm).toBeDisabled()
+    await user.type(screen.getByRole("textbox"), "DELETE")
+    await user.click(confirm)
     await waitFor(() => expect(deleteProject).toHaveBeenCalledWith("p1"))
   })
 })

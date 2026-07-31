@@ -49,31 +49,36 @@ import { getSuperadmin } from "@/lib/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const licenceId = params.licenceId ?? ""
+  // Both awaited: the breadcrumb reads `licence` off loaderData synchronously
+  // (components/breadcrumb), and these are two cheap reads. The licence text is
+  // the slow part and keeps its own boundary below.
   const [licence, superadmin] = await Promise.all([
     getLicence(licenceId),
     getSuperadmin(),
   ])
-  // Deliberately not awaited (see routes/project.tsx): the text section
-  // suspends on this promise, showing a skeleton while the first visit
-  // downloads and stores the licence text. Later visits resolve instantly
-  // from the stored text. Best effort — null when every source fails.
-  const text: Promise<string | null> =
-    licence === null
-      ? Promise.resolve(null)
-      : licence.fullText !== null
-        ? Promise.resolve(licence.fullText)
-        : fetchLicenceText(licence)
-            .then(async (fetched) => {
-              if (fetched) await saveLicenceText(licence.id, fetched)
-              return fetched
-            })
-            .catch(() => null)
   return {
     licence,
-    text,
+    text: licenceText(licence),
     // Pre-auth: the session acts as the superadmin when the directory has one.
     superadmin: superadmin !== null,
   }
+}
+
+/**
+ * The licence body: stored text resolves instantly, a first visit downloads
+ * and stores it. Best effort — null when every source fails.
+ */
+function licenceText(
+  licence: Awaited<ReturnType<typeof getLicence>>,
+): Promise<string | null> {
+  if (licence === null) return Promise.resolve(null)
+  if (licence.fullText !== null) return Promise.resolve(licence.fullText)
+  return fetchLicenceText(licence)
+    .then(async (fetched) => {
+      if (fetched) await saveLicenceText(licence.id, fetched)
+      return fetched
+    })
+    .catch(() => null)
 }
 
 export async function clientAction({ request, params }: ActionFunctionArgs) {
@@ -492,7 +497,7 @@ function LicenceNotFound() {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button render={<Link to="/licenses" />}>Back to licenses</Button>
+        <Button render={<Link to="/licenses" viewTransition />}>Back to licenses</Button>
       </EmptyContent>
     </Empty>
   )

@@ -3,9 +3,9 @@
 # When the next PR is merged into main (production), compute the next semantic version from
 # the conventional-commit subjects since the last tag:
 #   - BREAKING CHANGE (or `type!:`) → major
-#   - feat:                          → minor
-#   - fix:                           → patch
-#   - anything else                  → patch
+#   - feat: → minor
+#   - fix: → patch
+#   - anything else → patch
 # Then create the vX.Y.Z tag on the merge commit and create a GitHub Release. Release documentation
 # and version manifests are finalized in the reviewed promotion PR so protected main is never mutated.
 #
@@ -14,8 +14,8 @@ name: Release Tag
 
 on:
   pull_request:
-    types: [closed]
-    branches: [main]
+    types: [ closed ]
+    branches: [ main ]
 
 permissions:
   contents: write   # push tag and create release

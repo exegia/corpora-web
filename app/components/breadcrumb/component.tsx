@@ -95,7 +95,7 @@ const COBreadcrumb = () => {
                 {isCurrent ? (
                   <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                 ) : (
-                  <BreadcrumbLink render={<Link to={crumb.href} />}>
+                  <BreadcrumbLink render={<Link to={crumb.href} viewTransition />}>
                     {crumb.label}
                   </BreadcrumbLink>
                 )}

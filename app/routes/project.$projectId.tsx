@@ -1,6 +1,12 @@
 import { FolderX } from "lucide-react"
-import { useState } from "react"
-import { Link, redirect, useLoaderData } from "react-router"
+import { Suspense, useState } from "react"
+import {
+  Await,
+  Link,
+  redirect,
+  useLoaderData,
+  useViewTransitionState,
+} from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { CorpusLinkList } from "@/components/project/corpus-link-list"
 import { CorpusSection } from "@/components/project/corpus-section"
@@ -9,6 +15,7 @@ import { LinkCorpusDialog } from "@/components/project/link-corpus-dialog"
 import { ProjectDetailPanel } from "@/components/project/project-detail-panel"
 import { ProjectFormDialog } from "@/components/project/project-form-dialog"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import {
   Empty,
   EmptyContent,
@@ -18,6 +25,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   attachCorpusToProject,
   detachCorpusFromProject,
@@ -47,30 +55,40 @@ import {
   updateProject,
   updateProjectStatus,
 } from "@/lib/projects"
+import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import { getSuperadmin } from "@/lib/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const projectId = params.projectId ?? ""
+  // Awaited: the breadcrumb reads `project` off loaderData synchronously
+  // (components/breadcrumb), so deferring it there leaves the trail showing
+  // "Project" instead of the name. It is one indexed row.
   const project = await getProject(projectId)
-  const [corpusOptions, licenseCatalog, organizations, superadmin, documents] =
-    project
-      ? await Promise.all([
-          listCorpusOptions(projectId),
-          listLicences(),
-          listOrganizations(),
-          getSuperadmin(),
-          listCorpusDocuments(),
-        ])
-      : [[], [], [], null, []]
-  return {
-    project,
-    corpusOptions,
-    documents,
-    licenseCatalog,
-    organizations,
-    // Pre-auth: the session acts as the superadmin when the directory has one.
-    superadmin: superadmin !== null,
-  }
+  // Deliberately not awaited (see routes/project.tsx): the five queries below
+  // are the slow part, so the workspace suspends on this promise and shows the
+  // skeleton meanwhile.
+  const data = (async () => {
+    const [corpusOptions, licenseCatalog, organizations, superadmin, documents] =
+      project
+        ? await Promise.all([
+            listCorpusOptions(projectId),
+            listLicences(),
+            listOrganizations(),
+            getSuperadmin(),
+            listCorpusDocuments(),
+          ])
+        : [[], [], [], null, []]
+    return {
+      project,
+      corpusOptions,
+      documents,
+      licenseCatalog,
+      organizations,
+      // Pre-auth: the session acts as the superadmin when the directory has one.
+      superadmin: superadmin !== null,
+    }
+  })()
+  return { project, data }
 }
 
 /** Build the discriminated Classification from form fields (FR-006..FR-009). */
@@ -193,56 +211,64 @@ function ProjectNotFound() {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button render={<Link to="/project" />}>Back to projects</Button>
+        <Button render={<Link to="/project" viewTransition />}>Back to projects</Button>
       </EmptyContent>
     </Empty>
   )
 }
 
-export default function ProjectWorkspace() {
-  const {
-    project,
-    corpusOptions,
-    documents,
-    licenseCatalog,
-    organizations,
-    superadmin,
-  } = useLoaderData<typeof clientLoader>()
-  const [editing, setEditing] = useState(false)
+/** Stands in for the panels only — the header renders from the awaited project. */
+function PanelsSkeleton() {
+  useLoadingSound()
 
-  if (!project) return <ProjectNotFound />
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading project"
+      className="flex flex-col gap-6"
+      role="status"
+    >
+      <Card className="gap-4 p-6">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div className="flex items-center justify-between gap-4" key={i}>
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        ))}
+      </Card>
+      <Separator />
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-5 w-32" />
+        <Card className="gap-3 p-6">
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-3 w-2/3" />
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+type WorkspaceData = Awaited<
+  Awaited<ReturnType<typeof clientLoader>>["data"]
+>
+
+/** The sections that need the deferred queries. */
+function WorkspacePanels({
+  project,
+  corpusOptions,
+  documents,
+  licenseCatalog,
+  organizations,
+  superadmin,
+}: WorkspaceData) {
+  useReadySound()
+
+  if (!project) return null
 
   const readOnly = isProjectReadOnly(project.status)
 
   return (
-    <section className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="break-words font-bold text-2xl capitalize font-sans">
-            {project.name}
-          </h1>
-          {project.description && (
-            <p className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">
-              {project.description}
-            </p>
-          )}
-          <p className="mt-1 text-muted-foreground text-xs">
-            Created {formatDate(project.createdAt)} · updated{" "}
-            {formatRelativeTime(project.updatedAt)}
-          </p>
-        </div>
-        {!readOnly && (
-          <div className="flex shrink-0 items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-              Edit
-            </Button>
-            <DeleteProjectDialog
-              project={{ id: project.id, name: project.name }}
-            />
-          </div>
-        )}
-      </header>
-
+    <>
       <ProjectDetailPanel
         project={project}
         licenseCatalog={licenseCatalog}
@@ -274,6 +300,63 @@ export default function ProjectWorkspace() {
         </div>
         <CorpusLinkList corpora={project.corpora} readOnly={readOnly} />
       </div>
+    </>
+  )
+}
+
+export default function ProjectWorkspace() {
+  const { project, data } = useLoaderData<typeof clientLoader>()
+  const [editing, setEditing] = useState(false)
+  // The title morphs out of the list row it was opened from. Named only while
+  // that navigation is in flight, so the name is never on two elements at once.
+  const morphing = useViewTransitionState(
+    project ? `/project/${project.id}` : "",
+  )
+
+  if (!project) return <ProjectNotFound />
+
+  const readOnly = isProjectReadOnly(project.status)
+
+  return (
+    <section className="flex flex-col gap-6">
+      {/* Outside the Suspense boundary: the project itself is awaited, so the
+          heading is painted immediately and is present in the incoming view
+          transition snapshot — a skeleton here would have nothing to morph. */}
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1
+            className="break-words font-bold text-2xl capitalize font-sans"
+            style={{ viewTransitionName: morphing ? "project-title" : "none" }}
+          >
+            {project.name}
+          </h1>
+          {project.description && (
+            <p className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">
+              {project.description}
+            </p>
+          )}
+          <p className="mt-1 text-muted-foreground text-xs">
+            Created {formatDate(project.createdAt)} · updated{" "}
+            {formatRelativeTime(project.updatedAt)}
+          </p>
+        </div>
+        {!readOnly && (
+          <div className="flex shrink-0 items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              Edit
+            </Button>
+            <DeleteProjectDialog
+              project={{ id: project.id, name: project.name }}
+            />
+          </div>
+        )}
+      </header>
+
+      <Suspense fallback={<PanelsSkeleton />}>
+        <Await resolve={data}>
+          {(resolved) => <WorkspacePanels {...resolved} />}
+        </Await>
+      </Suspense>
 
       <ProjectFormDialog
         open={editing}

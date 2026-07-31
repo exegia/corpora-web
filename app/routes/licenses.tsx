@@ -97,6 +97,7 @@ function LicenceRow({ licence }: { licence: CatalogLicence }) {
       <Link
         to={`/licenses/${encodeURIComponent(licence.id)}`}
         className="flex items-center justify-between gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-muted/60"
+        viewTransition
       >
         <div className="flex min-w-0 items-center gap-3">
           <Scale

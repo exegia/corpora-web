@@ -179,8 +179,33 @@ describe("/corpus library", () => {
 
     await user.click(await screen.findByRole("button", { name: "Delete" }))
     expect(deleteCorpusDocument).not.toHaveBeenCalled()
-    await user.click(screen.getByRole("button", { name: "Delete corpus" }))
+
+    // Gated until DELETE is typed.
+    const confirm = screen.getByRole("button", { name: "Delete corpus" })
+    expect(confirm).toBeDisabled()
+    await user.type(screen.getByRole("textbox"), "DELETE")
+    expect(confirm).toBeEnabled()
+    await user.click(confirm)
 
     await waitFor(() => expect(deleteCorpusDocument).toHaveBeenCalledWith("d1"))
+  })
+
+  it("refuses to delete a document until DELETE is typed exactly", async () => {
+    const user = userEvent.setup()
+    vi.mocked(deleteCorpusDocument).mockResolvedValue()
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }))
+    const confirm = screen.getByRole("button", { name: "Delete corpus" })
+
+    // Wrong case must not unlock it — the friction is the point.
+    await user.type(screen.getByRole("textbox"), "delete")
+    expect(confirm).toBeDisabled()
+
+    await user.clear(screen.getByRole("textbox"))
+    await user.type(screen.getByRole("textbox"), "DELET")
+    expect(confirm).toBeDisabled()
+
+    expect(deleteCorpusDocument).not.toHaveBeenCalled()
   })
 })
