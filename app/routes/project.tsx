@@ -5,8 +5,9 @@ import { Await, Link, useLoaderData } from "react-router"
 import type { ActionFunctionArgs } from "react-router"
 import { DeleteProjectDialog } from "@/components/project/delete-project-dialog"
 import { ProjectFormDialog } from "@/components/project/project-form-dialog"
-import { Badge } from "@/components/ui/badge"
+import { Badge, type BadgeProps } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import {
     Empty,
     EmptyContent,
@@ -21,6 +22,7 @@ import {
     DataError,
     deleteProject,
     listProjects,
+    type ProjectStatus,
     type ProjectSummary,
     updateProject,
 } from "@/lib/projects"
@@ -69,36 +71,64 @@ export async function clientAction({ request }: ActionFunctionArgs) {
     }
 }
 
+/** Mirrors the status vocabulary of the detail panel's STATUS_DOT_COLORS. */
+const STATUS_BADGE_VARIANTS: Record<ProjectStatus, BadgeProps["variant"]> = {
+    draft: "secondary",
+    started: "info",
+    "ready-for-review": "warning",
+    published: "success",
+    failed: "error",
+}
+
 function ProjectRow({ project }: { project: ProjectSummary }) {
     const [editing, setEditing] = useState(false)
 
     return (
-        <li className="group/row relative rounded-3xl">
-            <Button
-                className="h-auto! w-full justify-between gap-4 px-6 py-3 text-left rounded-2xl"
-                render={<Link to={`/project/${project.id}`} />}
-                variant="ghost"
+        <Card
+            className="group/row flex-row items-center gap-4 px-4 py-3.5 transition-colors has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring hover:bg-accent/40"
+            render={<li />}
+        >
+            <span
+                aria-hidden="true"
+                className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors group-hover/row:text-foreground"
             >
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                        <h3 className="truncate font-medium">{project.name}</h3>
-                        <Badge variant="secondary">{project.status}</Badge>
-                    </div>
-                    <p className="truncate font-normal text-muted-foreground text-sm">
-                        {project.description || "No description"}
-                        {" · "}
-                        <span title={project.updatedAt}>
-              updated {formatRelativeTime(project.updatedAt)}
+                <FolderKanban className="size-5" />
             </span>
-                    </p>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex items-center gap-2">
+                    <h3 className="min-w-0 truncate font-medium capitalize">
+                        {/* after: stretches the link over the whole card, so the row
+                            is clickable without nesting the action buttons in it. */}
+                        <Link
+                            className="outline-none after:absolute after:inset-0 after:rounded-2xl"
+                            to={`/project/${project.id}`}
+                        >
+                            {project.name}
+                        </Link>
+                    </h3>
+                    <Badge variant={STATUS_BADGE_VARIANTS[project.status]}>
+                        {project.status}
+                    </Badge>
                 </div>
-                <ChevronRight
-                    aria-hidden="true"
-                    className="transition-transform group-hover/row:translate-x-0.5"
-                />
-            </Button>
-            <div
-                className="absolute top-1/2 right-10 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100">
+                <p className="truncate text-muted-foreground text-xs">
+                    {project.description || "No description"}
+                    <span aria-hidden="true" className="mx-1.5 opacity-40">
+                        ·
+                    </span>
+                    <span title={project.updatedAt}>
+                        updated {formatRelativeTime(project.updatedAt)}
+                    </span>
+                </p>
+            </div>
+            {/* Fades out as the hover actions fade in, so they never overlap. */}
+            <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted-foreground transition-[transform,opacity] group-hover/row:translate-x-0.5 group-hover/row:opacity-0 group-focus-within/row:opacity-0"
+            />
+            {/* z-10 keeps these above the link's stretched overlay. Revealed by the
+                same triggers that hide the chevron, so the row is never blank —
+                including keyboard focus, which is the only way to reach these. */}
+            <div className="absolute top-1/2 right-3 z-10 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
                 <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
                     Edit
                 </Button>
@@ -113,7 +143,7 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                     description: project.description,
                 }}
             />
-        </li>
+        </Card>
     )
 }
 
@@ -134,18 +164,23 @@ function ProjectListSkeleton() {
             <ProjectHeader>
                 <Skeleton className="h-8 w-28" />
             </ProjectHeader>
-            <ul className="mt-4 flex flex-col gap-1">
+            <ul className="mt-4 flex flex-col gap-2">
                 {Array.from({ length: 4 }, (_, i) => (
-                    <li className="flex items-center justify-between gap-4 px-4 py-3" key={i}>
+                    <Card
+                        className="flex-row items-center gap-4 px-4 py-3.5"
+                        key={i}
+                        render={<li />}
+                    >
+                        <Skeleton className="size-10 shrink-0 rounded-xl" />
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                                 <Skeleton className="h-5 w-40" />
                                 <Skeleton className="h-5 w-14" />
                             </div>
-                            <Skeleton className="mt-1.5 h-4 w-64" />
+                            <Skeleton className="mt-2 h-4 w-64" />
                         </div>
                         <Skeleton className="size-4 shrink-0" />
-                    </li>
+                    </Card>
                 ))}
             </ul>
         </div>
@@ -190,7 +225,7 @@ function ProjectList({
                     </EmptyContent>
                 </Empty>
             ) : (
-                <ul className="mt-4 flex flex-col gap-1">
+                <ul className="mt-4 flex flex-col gap-2">
                     {projects.map((project) => (
                         <ProjectRow key={project.id} project={project} />
                     ))}
