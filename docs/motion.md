@@ -101,8 +101,15 @@ document.startViewTransition = (cb) => {
 ```
 
 Expect `route-enter` / `route-exit` on `::view-transition-*(route-content)`, and
-`-ua-view-transition-group-anim-project-title` for a morph. Also assert exactly
-one element holds a given name:
+`-ua-view-transition-group-anim-project-title` for a morph.
+
+**Drive one navigation at a time.** Starting a second navigation while a
+transition is in flight skips the first — that is correct browser behaviour, but
+a script that clicks two links a few hundred ms apart reports every transition as
+skipped and looks exactly like a real breakage. Assert on a single click, then
+navigate again.
+
+Also assert exactly one element holds a given name:
 
 ```js
 [...document.querySelectorAll('*')]

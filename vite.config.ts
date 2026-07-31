@@ -1,8 +1,9 @@
-/// <reference types="vitest/config" />
 import path from "node:path"
 import { reactRouter } from "@react-router/dev/vite"
 import tailwindcss from "@tailwindcss/vite"
-import { defineConfig } from "vite"
+// vitest/config, not vite: as of vite 8.2 the `test` key below is not part of
+// vite's own UserConfig, and the triple-slash reference no longer widens it.
+import { defineConfig } from "vitest/config"
 import devtoolsJson from 'vite-plugin-devtools-json';
 
 export default defineConfig({
