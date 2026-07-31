@@ -58,10 +58,35 @@ To move one, use the **`extract-component`** skill — it covers the split, the
 registry entry, the release/publish flow, and swapping this repo over to the
 published version.
 
+## Which registry
+
+The library publishes to **both** public npm and GitHub Packages. This app pulls
+from **public npm**, pinned by the committed `.npmrc`:
+
+```
+@exegia:registry=https://registry.npmjs.org/
+```
+
+Don't remove that line, and don't switch the scope to `npm.pkg.github.com`. If a
+contributor's `~/.npmrc` maps `@exegia` to GitHub Packages, their local install
+bakes authenticated `npm.pkg.github.com` URLs into `bun.lock`, and then every
+environment without a `read:packages` token — GitHub Actions, Vercel — fails the
+install with a 401. The project-level `.npmrc` overrides that. No token is
+needed for any of it, and none belongs in that file.
+
+To check an install the way CI sees it, hide the user-level config:
+
+```bash
+HOME=/tmp/empty bun install --frozen-lockfile
+```
+
 ## Version bumps
 
 After a component is published, update here with
-`bun add @exegia/corpora-ui@<version>` and add any new `@base-ui/react/*`
+`bun add @exegia/corpora-ui@<version>`, then add any new `@base-ui/react/*`
 subpaths to `optimizeDeps.include` in `vite.config.ts` (see
-[motion.md](motion.md) for why). Installing needs a GitHub token with
-`read:packages` in `.npmrc`.
+[motion.md](motion.md) for why).
+
+Keep `bun.lock` committed and in sync — CI installs with `--frozen-lockfile`, so
+bumping a range in `package.json` without re-resolving fails the build before
+anything compiles.

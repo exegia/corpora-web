@@ -106,8 +106,12 @@ open PRs without asking** — confirm with the user first.
 
 ## Step 5 — consume it back in corpora-web
 
-1. `bun add @exegia/corpora-ui@<version>` (needs a `read:packages` GitHub token
-   in `.npmrc`).
+1. Wait for the npm publish to land, then `bun add @exegia/corpora-ui@<version>`.
+   The scope is pinned to **public npm** by the committed `.npmrc` — leave that
+   alone. Pointing `@exegia` at GitHub Packages (including via a personal
+   `~/.npmrc`) bakes authenticated URLs into `bun.lock` and 401s every build
+   that has no `read:packages` token. Commit the lockfile: CI installs with
+   `--frozen-lockfile`. See `docs/corpora-ui.md`.
 2. Replace the local component with a re-export, matching the house style:
    ```tsx
    // app/components/ui/<name>.tsx
