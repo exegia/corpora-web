@@ -49,18 +49,19 @@ import { getSuperadmin } from "@/lib/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const licenceId = params.licenceId ?? ""
-  // Deliberately not awaited (see routes/project.tsx): navigation completes
-  // immediately and the page suspends on this promise, showing the skeleton
-  // meanwhile. The licence text below has its own, longer-lived boundary.
-  const detail = Promise.all([getLicence(licenceId), getSuperadmin()]).then(
-    ([licence, superadmin]) => ({
-      licence,
-      // Pre-auth: the session acts as the superadmin when the directory has one.
-      superadmin: superadmin !== null,
-      text: licenceText(licence),
-    }),
-  )
-  return { detail }
+  // Both awaited: the breadcrumb reads `licence` off loaderData synchronously
+  // (components/breadcrumb), and these are two cheap reads. The licence text is
+  // the slow part and keeps its own boundary below.
+  const [licence, superadmin] = await Promise.all([
+    getLicence(licenceId),
+    getSuperadmin(),
+  ])
+  return {
+    licence,
+    text: licenceText(licence),
+    // Pre-auth: the session acts as the superadmin when the directory has one.
+    superadmin: superadmin !== null,
+  }
 }
 
 /**
@@ -502,50 +503,12 @@ function LicenceNotFound() {
   )
 }
 
-/** Placeholder for the header and details card while the licence loads. */
-function LicenceDetailSkeleton() {
-  useLoadingSound()
-
-  return (
-    <div
-      aria-busy="true"
-      aria-label="Loading licence"
-      className="flex flex-col gap-6"
-      role="status"
-    >
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-7 w-72" />
-        <Skeleton className="h-4 w-40" />
-      </div>
-      <CardFrame>
-        <CardFrameHeader>
-          <Skeleton className="h-4 w-16" />
-        </CardFrameHeader>
-        <Card>
-          <CardPanel className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-            {Array.from({ length: 6 }, (_, i) => (
-              <div className="flex flex-col gap-1.5" key={i}>
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-4 w-32" />
-              </div>
-            ))}
-          </CardPanel>
-        </Card>
-      </CardFrame>
-      <LicenceTextSkeleton />
-    </div>
-  )
-}
-
-type LicenceDetailData = Awaited<
-  Awaited<ReturnType<typeof clientLoader>>["detail"]
->
-
 /**
  * One catalog licence: the stored detail (editable by the superadmin only)
  * and the licence rendered as markdown.
  */
-function LicenceDetail({ licence, text, superadmin }: LicenceDetailData) {
+export default function LicenceDetailPage() {
+  const { licence, text, superadmin } = useLoaderData<typeof clientLoader>()
   const [editing, setEditing] = useState(false)
 
   if (!licence) return <LicenceNotFound />
@@ -595,17 +558,5 @@ function LicenceDetail({ licence, text, superadmin }: LicenceDetailData) {
         </Await>
       </Suspense>
     </section>
-  )
-}
-
-export default function LicenceDetailPage() {
-  const { detail } = useLoaderData<typeof clientLoader>()
-
-  return (
-    <Suspense fallback={<LicenceDetailSkeleton />}>
-      <Await resolve={detail}>
-        {(resolved) => <LicenceDetail {...resolved} />}
-      </Await>
-    </Suspense>
   )
 }

@@ -54,10 +54,14 @@ import { getSuperadmin } from "@/lib/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const projectId = params.projectId ?? ""
-  // Deliberately not awaited (see routes/project.tsx): navigation completes
-  // immediately and the workspace suspends on this promise, showing the
+  // Awaited: the breadcrumb reads `project` off loaderData synchronously
+  // (components/breadcrumb), so deferring it there leaves the trail showing
+  // "Project" instead of the name. It is one indexed row.
+  const project = await getProject(projectId)
+  // Deliberately not awaited (see routes/project.tsx): the five queries below
+  // are the slow part, so the workspace suspends on this promise and shows the
   // skeleton meanwhile.
-  const data = getProject(projectId).then(async (project) => {
+  const data = (async () => {
     const [corpusOptions, licenseCatalog, organizations, superadmin, documents] =
       project
         ? await Promise.all([
@@ -77,8 +81,8 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
       // Pre-auth: the session acts as the superadmin when the directory has one.
       superadmin: superadmin !== null,
     }
-  })
-  return { data }
+  })()
+  return { project, data }
 }
 
 /** Build the discriminated Classification from form fields (FR-006..FR-009). */
