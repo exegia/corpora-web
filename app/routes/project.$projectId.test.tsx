@@ -213,7 +213,9 @@ describe("/project/:projectId workspace", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Peshitta Study" }),
     ).toBeInTheDocument()
-    expect(screen.getByText("No corpus attached")).toBeInTheDocument()
+    // The heading paints from the awaited project, ahead of the panels, so it
+    // is no longer a proxy for "everything has loaded" — await panel content.
+    expect(await screen.findByText("No corpus attached")).toBeInTheDocument()
     expect(screen.getByText("Peshitta OT")).toBeInTheDocument()
   })
 

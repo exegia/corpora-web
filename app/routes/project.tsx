@@ -1,7 +1,7 @@
 import { ChevronRight, FolderKanban, Plus } from "lucide-react"
 import { Suspense, useState } from "react"
 import type { ReactNode } from "react"
-import { Await, Link, useLoaderData } from "react-router"
+import { Await, Link, useLoaderData, useViewTransitionState } from "react-router"
 import type { ActionFunctionArgs } from "react-router"
 import { DeleteProjectDialog } from "@/components/project/delete-project-dialog"
 import { ProjectFormDialog } from "@/components/project/project-form-dialog"
@@ -82,6 +82,10 @@ const STATUS_BADGE_VARIANTS: Record<ProjectStatus, BadgeProps["variant"]> = {
 
 function ProjectRow({ project }: { project: ProjectSummary }) {
     const [editing, setEditing] = useState(false)
+    const href = `/project/${project.id}`
+    // Only the row being opened claims the shared name — a view-transition-name
+    // present on two elements at once aborts the whole transition.
+    const morphing = useViewTransitionState(href)
 
     return (
         <Card
@@ -96,12 +100,17 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex items-center gap-2">
-                    <h3 className="min-w-0 truncate font-medium capitalize">
+                    <h3
+                        className="min-w-0 truncate font-medium capitalize"
+                        style={{
+                            viewTransitionName: morphing ? "project-title" : "none",
+                        }}
+                    >
                         {/* after: stretches the link over the whole card, so the row
                             is clickable without nesting the action buttons in it. */}
                         <Link
                             className="outline-none after:absolute after:inset-0 after:rounded-2xl"
-                            to={`/project/${project.id}`}
+                            to={href}
                             viewTransition
                         >
                             {project.name}
