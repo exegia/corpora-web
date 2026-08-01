@@ -45,28 +45,42 @@ Route types are generated into `.react-router/` by `react-router typegen` (runs 
 
 ## Branching, CI, and releases
 
-Adapted from [exegia/repo-template](https://github.com/exegia/repo-template) (core CI/CD only — agentic/Claude/Copilot workflows omitted). Policy details: `.github/BRANCH-AND-RELEASE-POLICY.md`.
+Same model as [corpora-ui](https://github.com/exegia/corpora-ui), with the npm
+publish replaced by a Vercel deploy — this app is private and ships as a
+deployment, not a package. Full details: [`.github/WORKFLOW.md`](.github/WORKFLOW.md).
+
+```
+feat/add-tooltip ──PR──> release/v0.4.0 ──PR──> main ──> Vercel prod + tag v0.4.0
+      (deleted on merge)   (deleted on release)          (opens release/v0.5.0)
+```
 
 | Flow | What happens |
 | --- | --- |
-| `feature/*` \| `bug/*` \| `doc/*` \| `chore/*` → PR to `dev` | `CI` (typecheck, lint, test, build) + conventional-commit title check; merge tags `vX.Y.Z-dev.<PR>` |
-| `dev` → PR to `next` | `CI` runs; on merge, **Preview CI** validates and deploys a Vercel preview |
-| Preview CI passes | A `next` → `main` release PR is opened automatically |
-| Release PR merged | `release-tag.yml` computes the semver bump from conventional commits, tags `vX.Y.Z`, publishes a GitHub Release |
-| Release published | **Production Deploy** ships the tagged commit to Vercel |
+| `<type>/<slug>` → PR to the open `release/vX.Y.Z` | `guard` (branch name + conventional-commit PR title), `check` (typecheck, lint, test, build), and an AI review once the PR is ready for review |
+| PR merged into `release/*` | The branch deletes itself, the draft release PR into `main` is refreshed with a changelog, and the release preview redeploys |
+| `release/vX.Y.Z` → PR to `main` | `guard` also asserts `package.json` matches the branch version; `package` uploads the production build as an artifact |
+| Release PR merged | Deploys to Vercel production, tags `vX.Y.Z`, publishes a GitHub Release, then cuts the next release branch |
 
-Base-branch policy is enforced (`main` only from `next`, `next` only from `dev`); rulesets protect all three branches and require the `CI / ci` check on `main`.
+Exactly one release branch is open at a time, and it carries a rolling Vercel
+preview. `main` takes PRs only from `release/vX.Y.Z`; the ruleset requires the
+`guard`, `check` and `package` checks.
+
+Every CI step is a `make` target, so anything CI does can be reproduced
+locally — `make ci` is what runs on a PR. `make help` lists the rest.
 
 ### One-time setup
 
 ```bash
 gh auth login                          # if needed
 bunx vercel link                       # creates .vercel/project.json
-VERCEL_ORG_ID=... VERCEL_PROJECT_ID=... VERCEL_TOKEN=... \
-  .github/scripts/setup-github.sh exegia/corpora-web
+make rulesets-apply                    # push .github/rulesets/*.json
 ```
 
-The script creates the repo, pushes `main`, creates `dev` (default) and `next`, applies branch protections + rulesets, creates the `preview`/`production` environments, and wires the Vercel variables/secrets.
+Then add the secrets listed in [`.github/WORKFLOW.md`](.github/WORKFLOW.md) —
+`VERCEL_TOKEN` on the `preview` and `production` environments, and the
+automation App credentials on the repository. There is no release branch on a
+fresh repo: run **Actions → Release → Run workflow** once (or
+`make release-branch`) to open the first one.
 
 ## Deployment (Vercel)
 
