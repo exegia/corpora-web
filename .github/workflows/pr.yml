@@ -1,0 +1,109 @@
+# Everything that runs *before* a merge.
+#
+#   <type>/<slug>  ->  release/vX.Y.Z    guard + check + AI review
+#   release/vX.Y.Z ->  main              guard + check + build artifact
+#
+# Draft PRs only get the guard. The full suite starts at `ready_for_review`
+# and re-runs on every push after that.
+name: PR
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+    branches:
+      - main
+      - "release/v*"
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  INSTALL_FLAGS: --frozen-lockfile
+
+jobs:
+  guard:
+    name: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Passed as environment, never interpolated into the shell: a PR title is
+      # attacker-controlled text.
+      - name: Check base, branch name and title
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: make pr-guard
+
+  check:
+    name: check
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      - run: make ci
+
+  # Nothing is published from this repo, so the release PR's third gate is the
+  # deployable output itself: if `build/client` cannot be produced here, the
+  # release deploy would fail after the merge, on protected main.
+  package:
+    name: package
+    if: ${{ !github.event.pull_request.draft && github.base_ref == 'main' }}
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      - run: make pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corpora-web-build
+          path: build/client
+          if-no-files-found: error
+
+  review:
+    name: review
+    if: ${{ !github.event.pull_request.draft && startsWith(github.base_ref, 'release/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write # the review is posted through the issue-comments API
+      actions: write # lets the review read this PR's CI results
+      id-token: write
+    env:
+      # The `secrets` context cannot be referenced from an `if:` — GitHub rejects
+      # the whole file with "Unrecognized named-value: 'secrets'". Mapping it to a
+      # job-level env var makes it reachable from a step-level `if:`. Only
+      # emptiness is ever tested; the value is never printed.
+      CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # A permanently-red check that means "unconfigured" is worse than no
+      # check — it trains everyone to merge past red. Skip loudly instead.
+      - name: Note that review is unconfigured
+        if: ${{ env.CLAUDE_TOKEN == '' }}
+        run: |
+          {
+            echo "### Review skipped"
+            echo
+            echo "\`CLAUDE_CODE_OAUTH_TOKEN\` is not set on this repository."
+            echo "Add it under **Settings → Secrets and variables → Actions**."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Light AI review
+        if: ${{ env.CLAUDE_TOKEN != '' }}
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          prompt: "/code-review:code-review --comment https://github.com/${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          allowed_bots: "*"

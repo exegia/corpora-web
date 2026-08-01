@@ -1,0 +1,16 @@
+name: Setup
+description: Bun and Node.
+
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    # npm is only used for `npm pkg set` in `make version-set` — bun runs
+    # everything else. No registry-url: this app is private and never
+    # published, so nothing here authenticates against a registry.
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
