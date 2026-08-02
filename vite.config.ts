@@ -49,6 +49,9 @@ export default defineConfig({
                 "field",
                 "fieldset",
                 "form",
+                // Reached only through the package's own Input — nothing here
+                // imports it directly, which is why it was missed until now.
+                "input",
                 "menu",
                 "merge-props",
                 "meter",
