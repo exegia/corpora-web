@@ -2,6 +2,7 @@ import {
   Book,
   BookA,
   BookOpenText,
+  Check,
   Feather,
   Landmark,
   MessageSquareText,
@@ -10,6 +11,7 @@ import {
   Scroll,
   ScrollText,
   UserRound,
+  X,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
@@ -283,9 +285,11 @@ export function ClassifyDialog({ open, onOpenChange, current }: ClassifyDialogPr
         </DialogPanel>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <X aria-hidden="true" className="size-4" />
             Cancel
           </Button>
           <Button type="button" onClick={submit} disabled={busy || incomplete}>
+            <Check aria-hidden="true" className="size-4" />
             Save classification
           </Button>
         </DialogFooter>

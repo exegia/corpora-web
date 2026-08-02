@@ -71,6 +71,7 @@
 
 .dark {
   color-scheme: dark;
+  --destructive-foreground: var(--color-red-400);
 }
 
 @theme inline {

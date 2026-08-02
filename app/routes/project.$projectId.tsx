@@ -1,4 +1,4 @@
-import { FolderX } from "lucide-react"
+import { ArrowLeft, FolderX, Pencil } from "lucide-react"
 import { Suspense, useState } from "react"
 import {
   Await,
@@ -211,7 +211,10 @@ function ProjectNotFound() {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button render={<Link to="/project" viewTransition />}>Back to projects</Button>
+        <Button render={<Link to="/project" viewTransition />}>
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Back to projects
+        </Button>
       </EmptyContent>
     </Empty>
   )
@@ -343,6 +346,7 @@ export default function ProjectWorkspace() {
         {!readOnly && (
           <div className="flex shrink-0 items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              <Pencil aria-hidden="true" className="size-4" />
               Edit
             </Button>
             <DeleteProjectDialog

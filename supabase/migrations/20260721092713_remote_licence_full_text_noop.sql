@@ -1,0 +1,13 @@
+-- Placeholder for a migration applied directly to the remote project.
+--
+-- The remote history table records 20260721092713 "licence_full_text_and_anon_writes".
+-- That is the *same change* as the local 20260721050000 file, pushed under a
+-- different version, so its statements are already checked in there and its
+-- effects are already live (the `anon insert/update licences` policies and
+-- `licences.full_text`).
+--
+-- Without a local file the CLI refuses to push anything at all — "remote
+-- migration versions not found in local migrations directory" — so this exists
+-- purely to let the histories line up. Same pattern, and same reason, as
+-- 20260721012807_remote_licence_rename_noop.sql.
+select 1;
