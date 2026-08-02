@@ -168,6 +168,40 @@ describe("/signup", () => {
     // only assertable once it has closed (see docs/testing.md).
     expect(screen.getByLabelText("Name")).toHaveValue("Ada Researcher")
   })
+
+  it("closing without agreeing leaves consent unticked", async () => {
+    const user = userEvent.setup()
+    renderAuth("/signup")
+
+    await user.click(await screen.findByRole("button", { name: "terms" }))
+    await user.click(await screen.findByRole("button", { name: "Close" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+
+    // Base UI keeps the state on the role=checkbox element, not a native input.
+    expect(screen.getByRole("checkbox")).toHaveAttribute("aria-checked", "false")
+  })
+
+  it("agreeing in the dialog ticks consent and unblocks submit", async () => {
+    const user = userEvent.setup()
+    renderAuth("/signup")
+
+    await user.type(await screen.findByLabelText("Name"), "Ada Researcher")
+    await user.type(screen.getByLabelText("Email"), "ada@corpora.local")
+    await user.type(await screen.findByPlaceholderText("Create a password"), "Hunter22!x")
+
+    await user.click(screen.getByRole("button", { name: "terms" }))
+    await user.click(await screen.findByRole("button", { name: "I agree" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+
+    // Consent came from the dialog, not from clicking the box — the whole
+    // point of controlling it through `termsChecked`.
+    expect(screen.getByRole("checkbox")).toHaveAttribute("aria-checked", "true")
+
+    await user.click(screen.getByRole("button", { name: /create account/i }))
+    expect(
+      await screen.findByText(/enter verification code/i, {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
+  })
 })
 
 describe("/forgot-password", () => {
