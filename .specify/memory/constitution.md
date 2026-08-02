@@ -29,7 +29,7 @@ specification → clarification → plan → tasks. Specifications MUST describe
 technology-agnostic terms; implementation detail belongs in plans and contracts. Material
 ambiguities MUST be resolved (clarification session or documented assumption) before planning,
 and every requirement MUST be testable. Feature work that skips these gates MUST be treated as
-exploratory spike work and MUST NOT merge to `dev`.
+exploratory spike work and MUST NOT merge to a release branch.
 
 **Rationale**: The repo exists inside a multi-app Corpora ecosystem (web, auth, library,
 desktop) built in parallel; written, clarified specs are the coordination contract between them.
