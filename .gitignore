@@ -31,6 +31,13 @@ build/
 !.env*
 .env.keys
 !.env.example
-supabase
+# Only the CLI's scratch state. A blanket `supabase` rule silently swallowed
+# every *new* migration — the eleven already committed stayed tracked, so it
+# looked fine, while 20260719214023_remote_schema.sql and
+# 20260721050000_licence_full_text_and_anon_writes.sql never made it in. The
+# second of those defines policies that are live on the project, which is how
+# the schema history drifted from the database.
+supabase/.temp/
+supabase/.branches/
 # Run 'supabase gen types` to generate the types automatically after login to supabase.
 **/types/database.ts
