@@ -21,5 +21,8 @@ export const SUCCESS_MORPH_MS = 450
 
 /** Brand mark rendered above every auth card's title. */
 export function AuthLogo() {
-  return <Logo className="size-8 rotate-12 fill-amber-400" />
+    return <div className="flex flex-row items-center gap-2 mb-6 justify-start w-full">
+        <Logo className="size-10 rotate-12 fill-amber-400" />
+        <h2 className="text-2xl font-serif">Corpora</h2>
+    </div>
 }

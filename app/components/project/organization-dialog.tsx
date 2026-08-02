@@ -1,3 +1,4 @@
+import { Building2, Check, Plus, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useFetcher } from "react-router"
 import { Button } from "@/components/ui/button"
@@ -95,6 +96,7 @@ export function OrganizationDialog({
                   className="self-start"
                   onClick={() => setMode("create")}
                 >
+                  <Plus aria-hidden="true" className="size-4" />
                   Create a new organization…
                 </Button>
               </div>
@@ -121,6 +123,7 @@ export function OrganizationDialog({
                     className="self-start"
                     onClick={() => setMode("pick")}
                   >
+                    <Building2 aria-hidden="true" className="size-4" />
                     Pick an existing organization…
                   </Button>
                 )}
@@ -134,9 +137,15 @@ export function OrganizationDialog({
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <X aria-hidden="true" className="size-4" />
               Cancel
             </Button>
             <Button type="submit" disabled={busy}>
+              {mode === "pick" ? (
+                <Check aria-hidden="true" className="size-4" />
+              ) : (
+                <Plus aria-hidden="true" className="size-4" />
+              )}
               {mode === "pick" ? "Save" : "Create & assign"}
             </Button>
           </DialogFooter>

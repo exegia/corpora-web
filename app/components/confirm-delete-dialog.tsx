@@ -1,3 +1,4 @@
+import { Trash2, X } from "lucide-react"
 import { useState } from "react"
 import { useFetcher } from "react-router"
 import {
@@ -65,6 +66,7 @@ export function ConfirmDeleteDialog({
       <AlertDialogTrigger
         render={trigger ?? <Button variant="destructive-outline" size="sm" />}
       >
+        <Trash2 aria-hidden="true" className="size-4" />
         {triggerLabel}
       </AlertDialogTrigger>
       <AlertDialogPopup>
@@ -111,6 +113,7 @@ export function ConfirmDeleteDialog({
           </div>
           <AlertDialogFooter>
             <AlertDialogClose render={<Button type="button" variant="outline" />}>
+              <X aria-hidden="true" className="size-4" />
               Cancel
             </AlertDialogClose>
             <Button
@@ -118,6 +121,7 @@ export function ConfirmDeleteDialog({
               type="submit"
               variant="destructive"
             >
+              <Trash2 aria-hidden="true" className="size-4" />
               {confirmLabel}
             </Button>
           </AlertDialogFooter>

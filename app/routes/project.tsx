@@ -1,4 +1,4 @@
-import { ChevronRight, FolderKanban, Plus } from "lucide-react"
+import { ChevronRight, FolderKanban, Pencil, Plus } from "lucide-react"
 import { Suspense, useState } from "react"
 import type { ReactNode } from "react"
 import { Await, Link, useLoaderData, useViewTransitionState } from "react-router"
@@ -140,6 +140,7 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                 including keyboard focus, which is the only way to reach these. */}
             <div className="absolute top-1/2 right-3 z-10 flex -translate-y-1/2 items-center gap-1 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
                 <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+                    <Pencil aria-hidden="true" className="size-4" />
                     Edit
                 </Button>
                 <DeleteProjectDialog project={project} />

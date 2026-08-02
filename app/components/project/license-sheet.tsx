@@ -1,4 +1,4 @@
-import { SearchIcon } from "lucide-react"
+import { Check, Paperclip, Plus, SearchIcon, X } from "lucide-react"
 import { marked } from "marked"
 import { useMemo, useState } from "react"
 import { useFetcher } from "react-router"
@@ -140,9 +140,11 @@ function CatalogRow({
               variant="ghost"
               onClick={() => setConfirming(false)}
             >
+              <X aria-hidden="true" className="size-4" />
               Cancel
             </Button>
             <Button type="submit" size="sm" disabled={busy}>
+              <Check aria-hidden="true" className="size-4" />
               Agree & attach
             </Button>
           </fetcher.Form>
@@ -153,6 +155,7 @@ function CatalogRow({
             variant="outline"
             onClick={() => setConfirming(true)}
           >
+            <Paperclip aria-hidden="true" className="size-4" />
             Attach
           </Button>
         )}
@@ -204,6 +207,7 @@ export function LicenseSheet({
       <SheetTrigger
         render={<Button size="sm" variant="outline" disabled={disabled} />}
       >
+        <Plus aria-hidden="true" className="size-4" />
         Add licence
       </SheetTrigger>
       <SheetPopup side="right" variant="inset" showBackdrop={false}>
