@@ -28,15 +28,23 @@
 -- a lateral move, not a security model — narrowing both sets to real ownership
 -- checks is separate work.
 
+-- `drop ... if exists` first because Postgres has no `create policy if not
+-- exists`, and a migration that cannot be re-run is one that wedges the history
+-- if a push half-fails. Matches 20260721050000.
+
+drop policy if exists "authenticated full access (temporary)" on public.projects;
 create policy "authenticated full access (temporary)" on public.projects
   for all to authenticated using (true) with check (true);
 
+drop policy if exists "authenticated full access (temporary)" on public.corpora;
 create policy "authenticated full access (temporary)" on public.corpora
   for all to authenticated using (true) with check (true);
 
+drop policy if exists "authenticated full access (temporary)" on public.project_corpora;
 create policy "authenticated full access (temporary)" on public.project_corpora
   for all to authenticated using (true) with check (true);
 
+drop policy if exists "authenticated full access (temporary)" on public.project_references;
 create policy "authenticated full access (temporary)" on public.project_references
   for all to authenticated using (true) with check (true);
 
