@@ -15,7 +15,7 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@dotenvx/dotenvx": "^2.19.1",
-    "@exegia/corpora-ui": "^0.7.0",
+    "@exegia/corpora-ui": "^0.8.0",
     "@supabase/supabase-js": "^2.111.0",
     "@tailwindcss/vite": "^4",
     "buffer": "^6.0.3",

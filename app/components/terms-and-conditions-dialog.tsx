@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -7,27 +8,38 @@ import {
     DialogPanel,
     DialogPopup,
     DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog"
 
 /**
  * Terms shown from the signup form's consent checkbox.
  *
- * Controlled, with no trigger of its own: `SignupBlock` exposes the terms link
- * as an `onTerms` callback rather than a render slot, so the route owns the
- * open state and opens this from there.
+ * Self-contained: it renders its own trigger and owns its open state, so it can
+ * be handed straight to `SignupBlock`'s `termsComponent` slot, which replaces
+ * the block's built-in "terms" link in place.
+ *
+ * `onAgree` is what makes the accept path work — the caller pairs it with
+ * `termsChecked` / `onTermsCheckedChange` so agreeing here ticks the consent
+ * box on the form behind the dialog.
  *
  * The body is a working draft, not reviewed legal text — see the notice at the
  * top of the dialog, which stays until a lawyer replaces the copy.
  */
 export default function TermsAndConditionsDialog({
-    open,
-    onOpenChange,
+    trigger,
+    onAgree,
 }: {
-    open: boolean
-    onOpenChange: (open: boolean) => void
+    /** Element the dialog renders as its trigger — `render` needs an element,
+        not arbitrary ReactNode. */
+    trigger: React.ReactElement
+    /** Called when the reader accepts. Omit to offer only a close button. */
+    onAgree?: () => void
 }) {
+    const [open, setOpen] = useState(false)
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger render={trigger} />
             <DialogPopup className="sm:max-w-md" showCloseButton={false}>
                 <DialogHeader>
                     <DialogTitle>Terms & Conditions</DialogTitle>
@@ -137,11 +149,19 @@ export default function TermsAndConditionsDialog({
                     </div>
                 </DialogPanel>
                 <DialogFooter>
-                    {/* Close only. Consent is the checkbox on the form behind
-                        this dialog, and `SignupBlock` keeps that checkbox in
-                        its own state with no prop to set it — so an "I agree"
-                        button here could not actually tick it. */}
                     <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
+                    {onAgree && (
+                        // Accepting here ticks the consent box on the form
+                        // behind the dialog, via SignupBlock's `termsChecked`.
+                        <Button
+                            onClick={() => {
+                                onAgree()
+                                setOpen(false)
+                            }}
+                        >
+                            I agree
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogPopup>
         </Dialog>
