@@ -52,7 +52,7 @@ Every route module and every data-access function MUST have Vitest coverage. Rou
 tested with `createRoutesStub` and Testing Library; data-access functions are tested with the
 service client mocked at the module boundary. CI tests MUST NOT depend on live network services.
 `bun run typecheck`, `bun run lint`, `bun run test`, and `bun run build` MUST all pass before
-any PR merges (enforced by the `CI / ci` check).
+any PR merges (enforced by the `check` job, which runs `make ci`).
 
 **Rationale**: Mocking at the same seams the architecture defines (Principle II) keeps tests
 fast, deterministic, and honest about the contract each layer owns.
@@ -73,11 +73,11 @@ for the auth cutover makes that transition a policy swap instead of a migration 
 
 ### V. Branch & Release Discipline
 
-Work happens on `feature/*`, `bug/*`, `doc/*`, or `chore/*` branches (or numbered Spec Kit
-feature branches) targeting `dev`; `next` promotes only from `dev`, `main` only from `next`.
-PR titles MUST follow Conventional Commits — they drive automated semver tagging and releases.
-Direct pushes to protected branches (`dev`, `next`, `main`) are prohibited; the full policy in
-`.github/BRANCH-AND-RELEASE-POLICY.md` is authoritative where more specific.
+Work happens on `<type>/<slug>` branches targeting the single open `release/vX.Y.Z` branch,
+which in turn is the only thing that may target `main`. PR titles MUST follow Conventional
+Commits — the `guard` job rejects a PR whose title or branch name does not. Direct pushes to
+`main` are prohibited; the full policy in `.github/WORKFLOW.md` is authoritative where more
+specific.
 
 **Rationale**: Release automation (preview deploys, semver tags, production deploys) is computed
 from branch flow and commit convention; breaking either silently breaks shipping.

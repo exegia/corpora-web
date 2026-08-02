@@ -10,7 +10,7 @@ export default defineConfig({
     plugins: [!process.env.VITEST && reactRouter(), tailwindcss(), devtoolsJson()],
     resolve: {
         alias: {
-            "@": path.resolve(__dirname, "./app"),
+            "@": path.resolve(import.meta.dirname, "./app"),
         },
     },
     // Pre-bundle every bare import up front. Without this, Vite discovers deps
