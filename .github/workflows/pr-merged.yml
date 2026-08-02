@@ -1,20 +1,36 @@
-# A feature PR landed on a release branch. Clean up after it and keep the
-# release's draft PR into main up to date.
+# A commit landed on a release branch — normally a feature PR merging in.
+# Keep the release's draft PR into main up to date.
+#
+# Triggered by `push`, not `pull_request: [closed]`. This repo's PRs form a
+# GitHub stack (<type>/<slug> -> release/vX.Y.Z -> main), and for a stacked PR
+# GitHub matches `on.pull_request.branches` against the stack's *ultimate* base
+# (main) rather than the PR's own parent. The `release/v*` filter therefore
+# never matched, and this workflow silently never ran — a merged feature left
+# the release notes stale with nothing to show it had been skipped. A push
+# filter matches the ref that actually moved, which is not rewritten.
+#
+# The same rewriting is why pr.yml reads `event.pull_request.base.ref` instead
+# of `github.base_ref`; unlike an expression, a trigger filter cannot be worked
+# around, which is what forced the change of event here.
+#
+# Branch cleanup is deliberately gone: a push carries no head branch to delete.
+# The repository's "Automatically delete head branches" setting already removes
+# a merged PR's branch — that setting is what actually cleaned up the v0.3.0
+# feature branches while this workflow was not running.
 #
 # Runs as the automation GitHub App rather than GITHUB_TOKEN: a PR opened with
 # GITHUB_TOKEN cannot trigger further workflows, so the release PR's own checks
 # would never start.
-name: PR merged
+name: Release branch updated
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches:
       - "release/v*"
 
 # Two features merging at once must not both rewrite the release PR body.
 concurrency:
-  group: release-pr-${{ github.base_ref }}
+  group: release-pr-${{ github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -23,7 +39,9 @@ permissions:
 jobs:
   wrapup:
     name: wrapup
-    if: github.event.pull_request.merged == true
+    # Deleting a release branch also delivers a push; there is nothing to
+    # refresh then, and `make release-pr` would fetch a ref that is gone.
+    if: ${{ !github.event.deleted }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/create-github-app-token@v3
@@ -38,16 +56,11 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Delete the merged branch
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GH_REPO: ${{ github.repository }}
-          BRANCH: ${{ github.head_ref }}
-        run: make delete-branch
-
+      # Opens the PR when the branch is first cut and refreshes it on every
+      # later push — `make release-pr` handles both.
       - name: Open or refresh the release PR
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
-          BRANCH: ${{ github.base_ref }}
+          BRANCH: ${{ github.ref_name }}
         run: make release-pr
