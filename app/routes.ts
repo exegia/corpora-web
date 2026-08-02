@@ -14,9 +14,8 @@ export default [
 
   route("logout", "routes/logout.tsx"),
 
-  // Public and outside both layouts: readable before an account exists, and a
-  // reading column rather than a card or the app shell.
-  route("terms", "routes/terms.tsx"),
+  // No /terms route: the terms are a dialog over the signup form, so reading
+  // them cannot discard what has been typed. See components/terms-and-conditions-dialog.
 
   // Everything below is behind `requireSession` in the layout's loader, which
   // runs before any child loader.

@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it } from "vitest"
 import { DEMO_CODE, REJECTED_EMAIL, signInWithPassword, startRecoverySession } from "@/lib/auth"
 import ForgotPasswordRoute, {
   clientLoader as forgotLoader,
@@ -12,7 +12,6 @@ import ProtectedLayout, {
 } from "@/routes/protected-layout"
 import ResetPasswordRoute, { clientLoader as resetLoader } from "@/routes/reset-password"
 import SignupRoute, { clientLoader as signupLoader } from "@/routes/signup"
-import TermsRoute from "@/routes/terms"
 import VerifyRoute from "@/routes/verify"
 
 const nothing = () => null
@@ -53,7 +52,6 @@ function renderAuth(initialEntry: string) {
       loader: resetLoader as never,
     },
     { path: "/verify", Component: VerifyRoute },
-    { path: "/terms", Component: TermsRoute },
     { path: "/", Component: () => <h1>Dashboard</h1> },
     { path: "/corpus", Component: () => <h1>Corpus</h1> },
   ])
@@ -150,29 +148,25 @@ describe("/signup", () => {
     expect(screen.getByText("a••@corpora.local")).toBeInTheDocument()
   })
 
-  it("opens the terms in a new tab so the half-filled form survives", async () => {
-    const open = vi.spyOn(window, "open").mockReturnValue(null)
+  it("opens the terms in a dialog, leaving the half-filled form intact", async () => {
     const user = userEvent.setup()
     renderAuth("/signup")
 
     await user.type(await screen.findByLabelText("Name"), "Ada Researcher")
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+
     await user.click(screen.getByRole("button", { name: "terms" }))
 
-    expect(open).toHaveBeenCalledWith("/terms", "_blank", "noopener,noreferrer")
-    // Still on signup, with what was typed intact.
-    expect(screen.getByLabelText("Name")).toHaveValue("Ada Researcher")
-    open.mockRestore()
-  })
-})
+    const dialog = await screen.findByRole("dialog")
+    expect(dialog).toHaveTextContent(/acceptance of terms/i)
+    // The draft notice must stay until the copy has been through legal.
+    expect(dialog).toHaveTextContent(/draft/i)
 
-describe("/terms", () => {
-  it("renders the terms, reachable signed out", async () => {
-    renderAuth("/terms")
-    expect(await screen.findByRole("heading", { name: "Terms of use" })).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /back to sign up/i })).toHaveAttribute(
-      "href",
-      "/signup",
-    )
+    await user.click(screen.getByRole("button", { name: "Close" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    // An open Base UI dialog aria-hides the rest of the app, so the form is
+    // only assertable once it has closed (see docs/testing.md).
+    expect(screen.getByLabelText("Name")).toHaveValue("Ada Researcher")
   })
 })
 

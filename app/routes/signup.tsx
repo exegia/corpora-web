@@ -1,7 +1,9 @@
 import { SignupBlock } from "@exegia/corpora-ui"
 import type { SocialProvider } from "@exegia/corpora-ui"
+import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router"
 import { AuthLogo, AUTH_ACCENT, AUTH_PROVIDERS, SUCCESS_MORPH_MS } from "@/components/auth"
+import TermsAndConditionsDialog from "@/components/terms-and-conditions-dialog"
 import { requireAnon, safeRedirectTo, signInWithProvider, signUpWithPassword } from "@/lib/auth"
 import type { Route } from "./+types/signup"
 
@@ -15,6 +17,9 @@ export default function Signup() {
     const [params] = useSearchParams()
     const redirectTo = safeRedirectTo(params.get("redirectTo"))
     const search = redirectTo === "/" ? "" : `?redirectTo=${encodeURIComponent(redirectTo)}`
+    // The block exposes the terms link as a callback, not a render slot, so
+    // the open state lives here.
+    const [termsOpen, setTermsOpen] = useState(false)
 
     return (
         <>
@@ -36,11 +41,11 @@ export default function Signup() {
                     window.setTimeout(() => navigate(redirectTo, { replace: true }), SUCCESS_MORPH_MS)
                 }}
                 onLogin={() => navigate(`/login${search}`)}
-                // New tab, not a navigation: reading the terms must not discard a
-                // half-filled signup form.
-                onTerms={() => window.open("/terms", "_blank", "noopener,noreferrer")}
+                // A dialog rather than a navigation: reading the terms must not
+                // discard a half-filled signup form.
+                onTerms={() => setTermsOpen(true)}
             />
-
+            <TermsAndConditionsDialog open={termsOpen} onOpenChange={setTermsOpen} />
         </>
     )
 }

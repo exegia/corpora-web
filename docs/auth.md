@@ -15,11 +15,20 @@ should not move a single route module or component.
 | `/verify` | `CodeAuthBlock` | none — has an account, no session yet |
 | `/reset-password` | composed locally | none — arrives *signed in* via the recovery link |
 | `/logout` | — | action-only, `POST` |
-| `/terms` | — | public; linked from the signup consent checkbox |
 
-`/terms` opens in a new tab rather than navigating, so reading it does not
-discard a half-filled signup form. Its body is a **working draft**, marked as
-such on the page itself, and needs real reviewed wording before public sign-ups.
+The terms are a **dialog, not a route** —
+`app/components/terms-and-conditions-dialog.tsx`, opened from the signup form's
+consent checkbox. `SignupBlock` exposes that link as an `onTerms` callback
+rather than a render slot, so the route owns the open state and the dialog is
+controlled. A dialog rather than a page because reading the terms must not
+discard a half-filled form.
+
+Its footer closes and nothing more: consent is the checkbox on the form behind
+it, and `SignupBlock` keeps that checkbox in its own state with no prop to set
+it, so an "I agree" button could not actually tick it.
+
+The body is a **working draft**, marked as such in the dialog itself, and needs
+real reviewed wording before public sign-ups.
 
 `app/routes.ts` puts the first five under `routes/auth-layout.tsx` (centered
 card, no sidebar) and everything else under `routes/protected-layout.tsx`,

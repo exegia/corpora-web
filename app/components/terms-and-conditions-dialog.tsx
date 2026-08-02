@@ -7,23 +7,43 @@ import {
     DialogPanel,
     DialogPopup,
     DialogTitle,
-    DialogTrigger,
-    DialogContent,
 } from "@/components/ui/dialog"
 
-export default function TermsAndConditionsDialog() {
+/**
+ * Terms shown from the signup form's consent checkbox.
+ *
+ * Controlled, with no trigger of its own: `SignupBlock` exposes the terms link
+ * as an `onTerms` callback rather than a render slot, so the route owns the
+ * open state and opens this from there.
+ *
+ * The body is a working draft, not reviewed legal text — see the notice at the
+ * top of the dialog, which stays until a lawyer replaces the copy.
+ */
+export default function TermsAndConditionsDialog({
+    open,
+    onOpenChange,
+}: {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+}) {
     return (
-        <Dialog>
-            <DialogTrigger render={<Button variant="outline" />}>
-                Terms & Conditions
-            </DialogTrigger>
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogPopup className="sm:max-w-md" showCloseButton={false}>
                 <DialogHeader>
                     <DialogTitle>Terms & Conditions</DialogTitle>
                 </DialogHeader>
                 <DialogPanel>
-                    <DialogContent className="flex flex-col gap-4 [&_strong]:font-semibold [&_strong]:text-foreground">
+                    {/* A plain div, not DialogContent — that name is an alias
+                        for DialogPopup here, so nesting it renders a second
+                        headerless dialog. DialogPanel already supplies the
+                        padding and the scroll area. */}
+                    <div className="flex flex-col gap-4 [&_strong]:font-semibold [&_strong]:text-foreground">
                         <div className="flex flex-col gap-4">
+                            <p className="border-muted-foreground/32 bg-muted/40 rounded-lg border border-dashed p-3 text-sm">
+                                <strong>Draft.</strong> A working outline, not
+                                reviewed legal text. The wording still needs to be
+                                settled before Corpora accepts public sign-ups.
+                            </p>
                             <div className="flex flex-col gap-1">
                                 <p>
                                     <strong>Acceptance of Terms</strong>
@@ -114,11 +134,14 @@ export default function TermsAndConditionsDialog() {
                                 </p>
                             </div>
                         </div>
-                    </DialogContent>
+                    </div>
                 </DialogPanel>
                 <DialogFooter>
-                    <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
-                    <Button type="button">I agree</Button>
+                    {/* Close only. Consent is the checkbox on the form behind
+                        this dialog, and `SignupBlock` keeps that checkbox in
+                        its own state with no prop to set it — so an "I agree"
+                        button here could not actually tick it. */}
+                    <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
                 </DialogFooter>
             </DialogPopup>
         </Dialog>
