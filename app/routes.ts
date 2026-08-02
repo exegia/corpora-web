@@ -10,6 +10,8 @@ export default [
     route("forgot-password", "routes/forgot-password.tsx"),
     route("reset-password", "routes/reset-password.tsx"),
     route("verify", "routes/verify.tsx"),
+    // Where OAuth providers and emailed links land.
+    route("auth/callback", "routes/auth.callback.tsx"),
   ]),
 
   route("logout", "routes/logout.tsx"),

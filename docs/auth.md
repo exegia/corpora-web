@@ -1,9 +1,9 @@
 # Authentication
 
-The screens come from `@exegia/corpora-ui`'s auth blocks. **Nothing is wired to
-Supabase yet** — this is the UI stage. The whole backend surface is one file,
-[`app/lib/auth.ts`](../app/lib/auth.ts), and swapping it for Supabase Auth
-should not move a single route module or component.
+The screens come from `@exegia/corpora-ui`'s auth blocks, backed by Supabase
+Auth. The whole backend surface is one file,
+[`app/lib/auth.ts`](../app/lib/auth.ts) — route modules import from there and
+never touch `supabase-js`, matching `lib/projects` and `lib/users`.
 
 ## Routes
 
@@ -14,7 +14,13 @@ should not move a single route module or component.
 | `/forgot-password` | `ForgotPasswordBlock` | `requireAnon` |
 | `/verify` | `CodeAuthBlock` | none — has an account, no session yet |
 | `/reset-password` | composed locally | none — arrives *signed in* via the recovery link |
+| `/auth/callback` | — | none — mid-handshake, neither reliably in nor out |
 | `/logout` | — | action-only, `POST` |
+
+`/auth/callback` is where every out-of-app journey lands: an OAuth provider, a
+signup confirmation link, or a password-reset link. It exchanges a PKCE `?code=`
+for a session (implicit-flow fragments are consumed by supabase-js itself), then
+redirects to a vetted `?next=`. Only its failure path renders anything.
 
 The terms are a **dialog, not a route** —
 `app/components/terms-and-conditions-dialog.tsx`, opened from the signup form's
@@ -50,34 +56,54 @@ the blocks' progressive-disclosure feel.
 
 Both are pinned by tests in `app/lib/auth.test.ts`.
 
-## Stand-in behaviour (remove when Supabase lands)
+## RLS: signing in changes which policies apply
 
-The session is a localStorage record under `corpora.auth.session`.
+**A migration must land before sign-in is usable.** Signing in flips the
+Postgres role from `anon` to `authenticated`, and a policy only applies to the
+roles it names. Four tables from 001 carry a single `to anon` policy, so a
+signed-in user matches nothing — and **RLS denial returns zero rows, not an
+error**, so every list page empties silently with no failed request.
 
-| | |
-| --- | --- |
-| Any email + password | signs in |
-| `locked@corpora.local` | always fails, so the error shake is demoable |
-| Signup | never returns a session — hands off to `/verify` |
-| `/verify` code | `123456` |
+Measured on the live project rather than inferred:
 
-## When you wire Supabase up
+```sql
+set local role anon;           select count(*) from public.projects;  -- 1
+set local role authenticated;  select count(*) from public.projects;  -- 0
+```
 
-Replace the bodies in `app/lib/auth.ts` with `supabase.auth.*`. Beyond that,
-three things need attention that no test here can catch:
+`supabase/migrations/20260802060000_authenticated_workspace_policies.sql` adds a
+parallel `to authenticated` policy for `projects`, `corpora`, `project_corpora`
+and `project_references`. Verified by running it inside a transaction and
+rolling back: the authenticated count goes 0 → 1.
 
-- **RLS.** Signing in flips the Postgres role from `anon` to `authenticated`.
-  Four tables — `projects`, `corpora`, `project_corpora`, `project_references` —
-  carry `for all to anon` policies (`supabase/migrations/20260719000000_project_workspace.sql`).
-  Those stop applying to a signed-in user, and RLS denial returns **zero rows,
-  not an error**, so every list page would silently empty. The remaining tables
-  use role-less policies, which cover both. Verify against the live project
-  before assuming the local migrations are current — they have drifted before.
-- **Redirect allowlist.** OAuth and emailed links need their callback URL added
-  under Authentication → URL Configuration.
-- **The `/verify` code screen** only works if the "Confirm signup" email
-  template sends `{{ .Token }}`. The default template sends a link instead, in
-  which case that route needs a callback route rather than a code field.
+It adds a second policy rather than widening the existing one to `public`,
+because the original is named "(temporary)" and is meant to be dropped — folding
+`authenticated` into it would make a blanket permissive policy permanent.
+
+Check the live project, not the migration history, which has drifted:
+
+```bash
+supabase db query "select tablename, policyname, roles::text from pg_policies where schemaname='public'" --linked
+```
+
+Separately, `public.books` has RLS enabled and **zero** policies, so it is
+unreadable by every role including `anon`. That is broken today and unrelated to
+auth.
+
+## What the dashboard still has to provide
+
+Three things cannot be set from this repo, and each is unverifiable here:
+
+- **Redirect allowlist.** `/auth/callback` must be listed under Authentication →
+  URL Configuration → Redirect URLs, or OAuth and every emailed link fail on
+  return.
+- **Providers.** `AUTH_PROVIDERS` in `app/components/auth` offers Google and
+  GitHub; each must be enabled under Authentication → Providers.
+- **The `/verify` code screen** only works if the "Confirm signup" email template
+  sends `{{ .Token }}`. Supabase ships it sending `{{ .ConfirmationURL }}`, in
+  which case the user follows a link and lands on `/auth/callback` instead. Both
+  routes exist, so either template works — but only one of them makes `/verify`
+  reachable.
 
 ## Known upstream quirk
 

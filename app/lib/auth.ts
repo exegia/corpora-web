@@ -1,18 +1,15 @@
-// Auth seam for the authentication UI.
+// Data-access layer for authentication (Supabase Auth).
 //
-// SCOPE: this is the *UI stage*. Nothing here talks to Supabase yet — the
-// session lives in localStorage so the screens, the guards and the tests are
-// all exercisable end to end. Every function below is the exact shape the
-// Supabase implementation will have, so wiring it up later is a change to this
-// file only; no route module or component should need to move.
+// Route modules import ONLY from this module — never supabase-js directly,
+// matching `lib/projects` and `lib/users`.
 //
-// Route modules import ONLY from this module.
-//
-// When the real implementation lands, see `docs/auth.md` — signing in flips
-// the Postgres role from `anon` to `authenticated`, and four tables currently
-// carry `for all to anon` policies that would silently return zero rows.
+// The blocks in `@exegia/corpora-ui` surface a failure by *rejecting* the
+// submit handler and rendering `error.message`, so every function here throws
+// an `AuthError` whose message is already fit to show a user.
 
+import type { Provider, User } from "@supabase/supabase-js"
 import { redirect } from "react-router"
+import { getSupabase } from "@/lib/supabase"
 
 export class AuthError extends Error {
   constructor(message: string) {
@@ -28,7 +25,7 @@ export interface SessionUser {
   emailConfirmed: boolean
 }
 
-export type AuthProvider = "google" | "apple" | "github" | "x"
+export type AuthProvider = Provider
 
 /** Paths served by the auth layout — never a valid post-login destination. */
 export const AUTH_PATHS = [
@@ -37,69 +34,43 @@ export const AUTH_PATHS = [
   "/forgot-password",
   "/reset-password",
   "/verify",
+  "/auth/callback",
 ] as const
 
 export const LOGIN_PATH = "/login"
 export const DEFAULT_AUTHENTICATED_PATH = "/"
 
-const STORAGE_KEY = "corpora.auth.session"
+// ---- Session -------------------------------------------------------------
+
+function toSessionUser(user: User): SessionUser {
+  const meta = user.user_metadata ?? {}
+  const name = meta.name ?? meta.full_name
+  return {
+    id: user.id,
+    email: user.email ?? "",
+    name: typeof name === "string" && name.trim() ? name.trim() : null,
+    emailConfirmed: Boolean(user.email_confirmed_at ?? user.confirmed_at),
+  }
+}
 
 /**
- * Stand-in credential rules, chosen so every state in the blocks is reachable
- * by hand: any well-formed email signs in, except this one, which always
- * fails — that is how you demo the error shake without a backend.
+ * The signed-in user, or null.
+ *
+ * Reads the persisted session rather than calling `getUser()`, so a route
+ * guard costs no network round-trip on every navigation — supabase-js refreshes
+ * the token in the background. That makes this a claim about the *token*, not a
+ * server re-validation; the server re-checks on every data request anyway, via
+ * RLS, which is where authorisation actually belongs.
  */
-export const REJECTED_EMAIL = "locked@corpora.local"
-
-/** Stand-in verification code accepted by `/verify`. */
-export const DEMO_CODE = "123456"
-
-// ---- Session storage -----------------------------------------------------
-
-function readStoredSession(): SessionUser | null {
-  if (typeof window === "undefined") return null
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<SessionUser>
-    if (typeof parsed?.id !== "string" || typeof parsed?.email !== "string") {
-      return null
-    }
-    return {
-      id: parsed.id,
-      email: parsed.email,
-      name: typeof parsed.name === "string" ? parsed.name : null,
-      emailConfirmed: parsed.emailConfirmed !== false,
-    }
-  } catch {
-    // A corrupt or unreadable store is indistinguishable from being signed
-    // out, and treating it that way is the safe direction.
-    return null
-  }
-}
-
-function writeStoredSession(user: SessionUser | null): void {
-  if (typeof window === "undefined") return
-  try {
-    if (user) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
-    else window.localStorage.removeItem(STORAGE_KEY)
-  } catch {
-    // Private-mode quota failures must not break the flow.
-  }
-}
-
-function makeUser(email: string, name?: string | null, emailConfirmed = true): SessionUser {
-  return {
-    id: `local-${email.trim().toLowerCase()}`,
-    email: email.trim(),
-    name: name?.trim() ? name.trim() : null,
-    emailConfirmed,
-  }
-}
-
-/** The signed-in user, or null. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
-  return readStoredSession()
+  const { data, error } = await getSupabase().auth.getSession()
+  if (error) {
+    throw new AuthError(
+      `Could not read the session: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  const user = data.session?.user
+  return user ? toSessionUser(user) : null
 }
 
 export async function isAuthenticated(): Promise<boolean> {
@@ -168,21 +139,27 @@ export async function signInWithPassword(credentials: {
   email: string
   password: string
 }): Promise<SessionUser> {
-  const email = credentials.email.trim()
-  if (email.toLowerCase() === REJECTED_EMAIL) {
-    throw new AuthError("That email and password don't match an account.")
+  const { data, error } = await getSupabase().auth.signInWithPassword({
+    email: credentials.email.trim(),
+    password: credentials.password,
+  })
+  if (error) {
+    // Supabase returns one message for a wrong password and for an address
+    // with no account — deliberately, so the form cannot be used to probe who
+    // has signed up. Rephrased, not narrowed.
+    throw new AuthError(
+      error.message === "Invalid login credentials"
+        ? "That email and password don't match an account."
+        : (error.message ?? "Unable to login."),
+    )
   }
-  if (!credentials.password) {
-    throw new AuthError("Enter your password to continue.")
-  }
-  const user = makeUser(email)
-  writeStoredSession(user)
-  return user
+  if (!data.user) throw new AuthError("Unable to login.")
+  return toSessionUser(data.user)
 }
 
 export interface SignUpResult {
-  user: SessionUser
-  /** True when the address has to be confirmed before the account is usable. */
+  user: SessionUser | null
+  /** True when the address must be confirmed before the account is usable. */
   needsConfirmation: boolean
 }
 
@@ -191,74 +168,141 @@ export async function signUpWithPassword(details: {
   email: string
   password: string
 }): Promise<SignUpResult> {
-  const email = details.email.trim()
-  if (email.toLowerCase() === REJECTED_EMAIL) {
-    throw new AuthError("An account with that email already exists.")
+  const { data, error } = await getSupabase().auth.signUp({
+    email: details.email.trim(),
+    password: details.password,
+    options: {
+      data: details.name?.trim() ? { name: details.name.trim() } : undefined,
+      emailRedirectTo: callbackUrl(),
+    },
+  })
+  if (error) throw new AuthError(error.message ?? "Unable to create your account.")
+  return {
+    user: data.user ? toSessionUser(data.user) : null,
+    // No session means confirmation is required. Supabase also returns a
+    // user-shaped response with no session for an address that already exists,
+    // which is intentional — it refuses to confirm who has an account. Both
+    // land on /verify, which is the correct behaviour for both.
+    needsConfirmation: data.session === null,
   }
-  // Confirmation is on in the real flow, so signup hands off to /verify and
-  // deliberately leaves no session behind.
-  return { user: makeUser(email, details.name, false), needsConfirmation: true }
 }
 
 export async function signOut(): Promise<void> {
-  writeStoredSession(null)
+  const { error } = await getSupabase().auth.signOut()
+  if (error) throw new AuthError(error.message ?? "Unable to sign out.")
 }
 
 // ---- Password recovery ---------------------------------------------------
 
 export async function sendPasswordReset(email: string): Promise<void> {
-  if (email.trim().toLowerCase() === REJECTED_EMAIL) {
-    throw new AuthError("We couldn't send a link to that address.")
-  }
+  const { error } = await getSupabase().auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: callbackUrl("/reset-password"),
+  })
+  if (error) throw new AuthError(error.message ?? "Unable to send the reset link.")
 }
 
 export async function updatePassword(password: string): Promise<void> {
-  if (password.length < 8) {
-    throw new AuthError("Passwords need at least 8 characters.")
-  }
+  const { error } = await getSupabase().auth.updateUser({ password })
+  if (error) throw new AuthError(error.message ?? "Unable to update your password.")
 }
 
-// ---- Email code / confirmation ------------------------------------------
+// ---- Email confirmation --------------------------------------------------
 
-/** Verifies the 6-digit signup code and starts the session. */
+/**
+ * Verifies the 6-digit signup code and starts the session.
+ *
+ * Only reachable when the "Confirm signup" email template sends `{{ .Token }}`.
+ * Supabase ships that template sending `{{ .ConfirmationURL }}` instead, in
+ * which case the user follows a link and lands on `/auth/callback` — so both
+ * routes exist and either template works.
+ */
 export async function verifySignupCode(
   email: string,
   code: string,
 ): Promise<SessionUser> {
-  if (code !== DEMO_CODE) {
-    throw new AuthError("That code is not valid. Check the email and try again.")
-  }
-  const user = makeUser(email)
-  writeStoredSession(user)
-  return user
+  const { data, error } = await getSupabase().auth.verifyOtp({
+    email: email.trim(),
+    token: code,
+    type: "signup",
+  })
+  if (error) throw new AuthError(error.message ?? "That code is not valid.")
+  if (!data.user) throw new AuthError("That code is not valid.")
+  return toSessionUser(data.user)
 }
 
 export async function resendSignupConfirmation(email: string): Promise<void> {
-  if (!email.trim()) throw new AuthError("We don't have an address to resend to.")
+  const { error } = await getSupabase().auth.resend({
+    type: "signup",
+    email: email.trim(),
+    options: { emailRedirectTo: callbackUrl() },
+  })
+  if (error) throw new AuthError(error.message ?? "Unable to resend the code.")
 }
 
 // ---- OAuth ---------------------------------------------------------------
 
 /**
- * Stands in for the provider handshake. The real version redirects the whole
- * document and never resolves; this one signs a placeholder identity in so the
- * button's loading → success states are exercisable.
+ * Starts a provider handshake. This navigates the whole document, so on success
+ * it never resolves — the provider returns the user to `/auth/callback`.
+ *
+ * The callback URL must be allowlisted in the Supabase dashboard under
+ * Authentication → URL Configuration → Redirect URLs, and the provider enabled
+ * under Authentication → Providers. Neither is reachable from this codebase.
  */
 export async function signInWithProvider(
   provider: AuthProvider,
-  _redirectTo?: string | null,
-): Promise<SessionUser> {
-  const user = makeUser(`${provider}-user@corpora.local`, provider)
-  writeStoredSession(user)
-  return user
+  redirectTo?: string | null,
+): Promise<void> {
+  const next = safeRedirectTo(redirectTo)
+  const { error } = await getSupabase().auth.signInWithOAuth({
+    provider,
+    options: { redirectTo: callbackUrl(next === "/" ? undefined : next) },
+  })
+  if (error) {
+    throw new AuthError(error.message ?? `Unable to continue with ${provider}.`)
+  }
+}
+
+// ---- Redirect landing ----------------------------------------------------
+
+/**
+ * Completes a return from an emailed link or an OAuth provider, and reports
+ * where to send the user next.
+ *
+ * supabase-js consumes an implicit-flow fragment on its own at client start;
+ * the PKCE `?code=` flow needs this explicit exchange. Handling both means the
+ * route works whichever flow the project is configured for.
+ */
+export async function completeAuthRedirect(
+  href: string,
+): Promise<{ user: SessionUser | null; next: string }> {
+  const url = new URL(href)
+  const params = url.searchParams
+  // Errors arrive in the query on PKCE and in the fragment on implicit flow.
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ""))
+  const description = params.get("error_description") ?? hash.get("error_description")
+  if (description) throw new AuthError(description)
+
+  const code = params.get("code")
+  if (code) {
+    const { error } = await getSupabase().auth.exchangeCodeForSession(code)
+    if (error) throw new AuthError(error.message ?? "Unable to complete sign in.")
+  }
+
+  return {
+    user: await getCurrentUser(),
+    next: safeRedirectTo(params.get("next")),
+  }
 }
 
 /**
- * Starts a recovery session, the way following an emailed reset link will.
- * Exists so `/reset-password` is reachable before the mail flow is wired.
+ * Absolute URL for the auth landing route. Supabase requires an absolute
+ * redirect, and it must match an allowlisted entry in the dashboard.
  */
-export async function startRecoverySession(email: string): Promise<SessionUser> {
-  const user = makeUser(email)
-  writeStoredSession(user)
-  return user
+function callbackUrl(next?: string): string {
+  const path = next
+    ? `/auth/callback?next=${encodeURIComponent(next)}`
+    : "/auth/callback"
+  if (typeof window === "undefined") return path
+  return new URL(path, window.location.origin).toString()
 }

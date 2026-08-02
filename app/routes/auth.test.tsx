@@ -1,8 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
-import { beforeEach, describe, expect, it } from "vitest"
-import { DEMO_CODE, REJECTED_EMAIL, signInWithPassword, startRecoverySession } from "@/lib/auth"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import ForgotPasswordRoute, {
   clientLoader as forgotLoader,
 } from "@/routes/forgot-password"
@@ -13,6 +12,45 @@ import ProtectedLayout, {
 import ResetPasswordRoute, { clientLoader as resetLoader } from "@/routes/reset-password"
 import SignupRoute, { clientLoader as signupLoader } from "@/routes/signup"
 import VerifyRoute from "@/routes/verify"
+
+// Mocked at the Supabase boundary rather than at `@/lib/auth`, so the real
+// guards, the real redirect vetting and the real error mapping all still run —
+// these tests are about the routes wired to genuine auth logic, with only the
+// network faked.
+const { authApi } = vi.hoisted(() => ({
+  authApi: {
+    getSession: vi.fn(),
+    signInWithPassword: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+    resetPasswordForEmail: vi.fn(),
+    updateUser: vi.fn(),
+    verifyOtp: vi.fn(),
+    resend: vi.fn(),
+    signInWithOAuth: vi.fn(),
+    exchangeCodeForSession: vi.fn(),
+  },
+}))
+
+vi.mock("@/lib/supabase", () => ({ getSupabase: () => ({ auth: authApi }) }))
+
+const ADA = {
+  id: "u-1",
+  email: "ada@corpora.local",
+  email_confirmed_at: "2026-08-01T00:00:00Z",
+  user_metadata: { name: "Ada Researcher" },
+}
+
+function givenSignedIn() {
+  authApi.getSession.mockResolvedValue({
+    data: { session: { user: ADA } },
+    error: null,
+  })
+}
+
+function givenSignedOut() {
+  authApi.getSession.mockResolvedValue({ data: { session: null }, error: null })
+}
 
 const nothing = () => null
 
@@ -59,7 +97,15 @@ function renderAuth(initialEntry: string) {
 }
 
 beforeEach(() => {
-  window.localStorage.clear()
+  vi.clearAllMocks()
+  givenSignedOut()
+  // The happy path for each call the routes make; individual cases override.
+  authApi.signInWithPassword.mockResolvedValue({ data: { user: ADA }, error: null })
+  authApi.signUp.mockResolvedValue({ data: { user: ADA, session: null }, error: null })
+  authApi.resetPasswordForEmail.mockResolvedValue({ error: null })
+  authApi.updateUser.mockResolvedValue({ error: null })
+  authApi.verifyOtp.mockResolvedValue({ data: { user: ADA }, error: null })
+  authApi.signOut.mockResolvedValue({ error: null })
 })
 
 describe("/login", () => {
@@ -101,11 +147,17 @@ describe("/login", () => {
   })
 
   it("shows the failure inline and stays put", async () => {
+    // Supabase answers a wrong password and an unknown address identically, so
+    // the form cannot be used to probe who has an account.
+    authApi.signInWithPassword.mockResolvedValue({
+      data: {},
+      error: { message: "Invalid login credentials" },
+    })
     const user = userEvent.setup()
     renderAuth("/login")
 
-    await user.type(await screen.findByLabelText("Email"), REJECTED_EMAIL)
-    await user.type(await screen.findByLabelText("Password"), "hunter22")
+    await user.type(await screen.findByLabelText("Email"), "ada@corpora.local")
+    await user.type(await screen.findByLabelText("Password"), "wrong")
     await user.click(screen.getByRole("button", { name: "Login" }))
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/don't match an account/i)
@@ -113,7 +165,7 @@ describe("/login", () => {
   })
 
   it("bounces a signed-in visitor straight to the app", async () => {
-    await signInWithPassword({ email: "ada@corpora.local", password: "hunter22" })
+    givenSignedIn()
     renderAuth("/login")
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument()
@@ -196,11 +248,15 @@ describe("/verify", () => {
   })
 
   it("rejects a wrong code", async () => {
+    authApi.verifyOtp.mockResolvedValue({
+      data: {},
+      error: { message: "Token has expired or is invalid" },
+    })
     const user = userEvent.setup()
     renderAuth("/verify?email=ada%40corpora.local")
 
     await typeCode(user, "000000")
-    expect(await screen.findByRole("alert")).toHaveTextContent(/not valid/i)
+    expect(await screen.findByRole("alert")).toHaveTextContent(/expired or is invalid/i)
     expect(screen.queryByRole("heading", { name: "Dashboard" })).not.toBeInTheDocument()
   })
 
@@ -212,7 +268,7 @@ describe("/verify", () => {
     const user = userEvent.setup()
     renderAuth("/verify?email=ada%40corpora.local")
 
-    await typeCode(user, DEMO_CODE)
+    await typeCode(user, "123456")
     expect(
       await screen.findByRole("heading", { name: "Dashboard" }, { timeout: 3000 }),
     ).toBeInTheDocument()
@@ -225,8 +281,10 @@ describe("/reset-password", () => {
     expect(await screen.findByText(/link has expired/i)).toBeInTheDocument()
   })
 
+  // Following a recovery link signs the user in, so arriving here with a
+  // session is the happy path, not a guard failure.
   it("updates the password once both fields agree", async () => {
-    await startRecoverySession("ada@corpora.local")
+    givenSignedIn()
     const user = userEvent.setup()
     renderAuth("/reset-password")
 
@@ -267,18 +325,20 @@ describe("route guards", () => {
   })
 
   it("lets a signed-in visitor through to the route", async () => {
-    await signInWithPassword({ email: "ada@corpora.local", password: "hunter22" })
+    givenSignedIn()
     renderProtected("/corpus")
     expect(await screen.findByRole("heading", { name: "Corpus" })).toBeInTheDocument()
   })
 
   it("shows the account menu for the signed-in user", async () => {
-    await signInWithPassword({ email: "ada@corpora.local", password: "hunter22" })
+    givenSignedIn()
     renderProtected("/")
 
+    // Labelled by the display name from `user_metadata`, falling back to the
+    // address only when there is no name.
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /account menu for ada@corpora\.local/i }),
+        screen.getByRole("button", { name: /account menu for Ada Researcher/i }),
       ).toBeInTheDocument(),
     )
   })
