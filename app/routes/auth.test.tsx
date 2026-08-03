@@ -2,6 +2,9 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import AuthCallbackRoute, {
+  clientLoader as callbackLoader,
+} from "@/routes/auth.callback"
 import ForgotPasswordRoute, {
   clientLoader as forgotLoader,
 } from "@/routes/forgot-password"
@@ -104,6 +107,9 @@ function renderAuth(initialEntry: string) {
 beforeEach(() => {
   vi.clearAllMocks()
   givenSignedOut()
+  // The guards read the fragment off `window.location`, which persists between
+  // tests in jsdom.
+  window.location.hash = ""
   // The happy path for each call the routes make; individual cases override.
   authApi.signInWithPassword.mockResolvedValue({ data: { user: ADA }, error: null })
   authApi.signUp.mockResolvedValue({ data: { user: ADA, session: null }, error: null })
@@ -353,6 +359,13 @@ describe("route guards", () => {
         path: "/login",
         Component: () => <h1>Login</h1>,
       },
+      {
+        path: "/auth/callback",
+        Component: AuthCallbackRoute,
+        HydrateFallback: nothing,
+        // biome-ignore lint: route module functions match at runtime
+        loader: callbackLoader as never,
+      },
     ])
     return render(<Stub initialEntries={[initialEntry]} />)
   }
@@ -361,6 +374,20 @@ describe("route guards", () => {
     renderProtected("/corpus")
     expect(await screen.findByRole("heading", { name: "Login" })).toBeInTheDocument()
     expect(screen.queryByRole("heading", { name: "Corpus" })).not.toBeInTheDocument()
+  })
+
+  // The whole chain a broken provider takes in production: OAuth returns to
+  // the Site URL, which is the guarded app root, carrying the reason in the
+  // fragment. Before this it bounced to /login and the reason was lost.
+  it("shows a failed provider round-trip instead of flashing back to /login", async () => {
+    window.location.hash =
+      "#error=server_error&error_description=Unable+to+exchange+external+code"
+    renderProtected("/")
+
+    expect(await screen.findByText(/couldn't finish signing you in/i)).toBeInTheDocument()
+    // The provider's own reason, not a generic message.
+    expect(screen.getByText("Unable to exchange external code")).toBeInTheDocument()
+    expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument()
   })
 
   it("lets a signed-in visitor through to the route", async () => {

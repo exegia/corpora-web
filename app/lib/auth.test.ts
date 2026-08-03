@@ -73,6 +73,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   givenSignedOut()
   sessionStorage.clear()
+  // The guards read the fragment off `window.location`, which persists between
+  // tests in jsdom.
+  window.location.hash = ""
 })
 
 describe("safeRedirectTo", () => {
@@ -146,6 +149,44 @@ describe("requireSession", () => {
     await expect(requireSession(request("/project"))).resolves.toMatchObject({
       email: "ada@corpora.local",
     })
+  })
+
+  // A failed OAuth round-trip comes back to the Site URL — the app root, which
+  // this guard protects — with the reason in the fragment. Bouncing to /login
+  // would drop it, which is what made a rejected Apple client secret look like
+  // an unexplained flash back to the login screen.
+  it("hands a failed provider round-trip to /auth/callback instead of /login", async () => {
+    window.location.hash =
+      "#error=server_error&error_description=Unable+to+exchange+external+code"
+    expect(await locationOf(() => requireSession(request("/")))).toBe(
+      `/auth/callback?error_description=${encodeURIComponent("Unable to exchange external code")}`,
+    )
+  })
+
+  // PKCE reports the failure in the query, where the loader can already see it.
+  it("also catches a failure reported in the query", async () => {
+    expect(
+      await locationOf(() =>
+        requireSession(request("/?error_description=Invalid+client")),
+      ),
+    ).toBe(`/auth/callback?error_description=${encodeURIComponent("Invalid client")}`)
+  })
+
+  // The failure that motivated this is GoTrue's 500 path, not the 4xx one, and
+  // it need not carry the readable key. Recognising the codes is what stops an
+  // unfamiliar shape from silently bouncing to /login again.
+  it("still recognises a failure that carries no error_description", async () => {
+    window.location.hash = "#error=server_error&error_code=unexpected_failure"
+    expect(await locationOf(() => requireSession(request("/")))).toBe(
+      `/auth/callback?error_description=${encodeURIComponent("Sign in failed (unexpected_failure).")}`,
+    )
+  })
+
+  // Without this the guard would send every signed-out visitor to the error
+  // card once any stray fragment was in the URL.
+  it("still bounces to /login when the fragment is not an auth failure", async () => {
+    window.location.hash = "#section-two"
+    expect(await locationOf(() => requireSession(request("/")))).toBe("/login")
   })
 })
 

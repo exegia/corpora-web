@@ -115,12 +115,56 @@ function pathWithSearch(request: Request): string {
 // ---- Route guards --------------------------------------------------------
 
 /**
+ * Reads a GoTrue failure out of a set of params, whichever keys it used.
+ *
+ * `error_description` is the readable one, but it is not always present:
+ * a rejected link carries it, while the 500 path behind a refused provider
+ * credential need not. Falling back to the codes means an unfamiliar shape
+ * still registers *as* a failure — the alternative is treating it as "no
+ * error" and losing the reason exactly where it matters most.
+ */
+function authErrorIn(params: URLSearchParams): string | null {
+  const description = params.get("error_description")
+  if (description) return description
+  const code = params.get("error_code") ?? params.get("error")
+  return code ? `Sign in failed (${code}).` : null
+}
+
+/**
+ * A failed auth round-trip reports its reason in the URL *fragment*, which a
+ * loader cannot see: `Request` drops the fragment, so `request.url` never
+ * carries it. `window.location` is the only place it survives.
+ *
+ * The query is checked too because the PKCE flow puts errors there instead,
+ * and that form *does* reach the loader.
+ */
+function authErrorInUrl(request: Request): string | null {
+  const fromQuery = authErrorIn(new URL(request.url).searchParams)
+  if (fromQuery) return fromQuery
+  if (typeof window === "undefined") return null
+  return authErrorIn(new URLSearchParams(window.location.hash.replace(/^#/, "")))
+}
+
+/**
  * Guard for authenticated routes. Throws a redirect to `/login`, carrying the
  * attempted location so the login screen can send the user back afterwards.
  */
 export async function requireSession(request: Request): Promise<SessionUser> {
   const user = await getCurrentUser()
   if (user) return user
+
+  // A failed OAuth round-trip lands *here*, not on /auth/callback. The 0.9.0
+  // web binding sends no `redirect_to`, so GoTrue returns the browser to the
+  // project's Site URL — which in production is the app root, and the root is
+  // guarded. Bouncing straight to /login would discard the provider's reason
+  // and read as an unexplained flash back to the login screen; that is exactly
+  // how a rejected Apple client secret presented in prod. Hand it to
+  // /auth/callback instead, whose whole job is rendering this failure.
+  const authError = authErrorInUrl(request)
+  if (authError) {
+    throw redirect(`/auth/callback?error_description=${encodeURIComponent(authError)}`)
+  }
+
   const from = pathWithSearch(request)
   const search =
     from === DEFAULT_AUTHENTICATED_PATH
@@ -335,9 +379,12 @@ export async function completeAuthRedirect(
   const url = new URL(href)
   const params = url.searchParams
   // Errors arrive in the query on PKCE and in the fragment on implicit flow.
+  // Read through the same key-tolerant helper the guard uses, so a failure
+  // GoTrue reported without `error_description` surfaces as a failure here
+  // rather than falling through to the "link has expired" message.
   const hash = new URLSearchParams(url.hash.replace(/^#/, ""))
-  const description = params.get("error_description") ?? hash.get("error_description")
-  if (description) throw new AuthError(description)
+  const failure = authErrorIn(params) ?? authErrorIn(hash)
+  if (failure) throw new AuthError(failure)
 
   const code = params.get("code")
   if (code) {
