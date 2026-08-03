@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "dotenvx run -- react-router dev",
+    "dev:local": "dotenvx run -f .env.local -f .env -- react-router dev",
     "build": "dotenvx run -- react-router build",
     "preview": "vite preview",
     "typecheck": "dotenvx run -- react-router typegen && tsc",
