@@ -14,7 +14,7 @@ export function AppLayout({ user }: { user?: SessionUser }) {
 
   return (
     <Provider className="p-2 h-screen">
-      <Drawer />
+      <Drawer user={user} />
       <Wrapper className="relative shadow-2xl">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <Trigger />
