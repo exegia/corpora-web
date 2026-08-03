@@ -5,6 +5,14 @@ Auth. The whole backend surface is one file,
 [`app/lib/auth.ts`](../app/lib/auth.ts) — route modules import from there and
 never touch `supabase-js`, matching `lib/projects` and `lib/users`.
 
+OAuth goes through `@exegia/use-auth` / `@exegia/plugin-supabase-auth`
+(pinned exactly — they move together with the sibling `../corpora-auth` repo).
+`app/lib/auth.ts` lazily calls `configureWeb({ client: getSupabase().auth })`
+before the first binding runs, so the bindings share the app's supabase-js
+session rather than constructing a second GoTrue client that would fight over
+token refresh. Lazy rather than a module-scope side effect because tests mock
+`@/lib/supabase` and the SPA-mode build imports route modules in Node.
+
 ## Routes
 
 | Path | Block | Guard |
@@ -21,6 +29,18 @@ never touch `supabase-js`, matching `lib/projects` and `lib/users`.
 signup confirmation link, or a password-reset link. It exchanges a PKCE `?code=`
 for a session (implicit-flow fragments are consumed by supabase-js itself), then
 redirects to a vetted `?next=`. Only its failure path renders anything.
+
+**OAuth's return leg is different from the emailed links.** The 0.9.0 web
+binding sends no `redirect_to`, so GoTrue returns the browser to the
+project's **Site URL** — the app cannot choose the landing page per call, and
+the Redirect URLs allowlist is irrelevant to OAuth (it still gates the
+emailed links, which pass an explicit `emailRedirectTo`). Because `?next=`
+cannot travel through that round-trip, `signInWithProvider` stashes the
+post-sign-in destination in sessionStorage and `completeAuthRedirect`
+consumes it on landing. On success the provider promise never settles in the
+starting document (the page navigates away); it rejects only when the
+redirect could not start, with the auth kit's user-facing message for the
+structured error kind.
 
 The terms are a **dialog, not a route** —
 `app/components/terms-and-conditions-dialog.tsx`, opened from the signup form's
@@ -94,11 +114,16 @@ auth.
 
 Three things cannot be set from this repo, and each is unverifiable here:
 
-- **Redirect allowlist.** `/auth/callback` must be listed under Authentication →
-  URL Configuration → Redirect URLs, or OAuth and every emailed link fail on
-  return.
+- **Site URL and the redirect allowlist.** OAuth returns to the **Site URL**
+  (see above), so it must point at the app. The emailed links still need
+  `/auth/callback` listed under Authentication → URL Configuration → Redirect
+  URLs, or they fail on return.
 - **Providers.** `AUTH_PROVIDERS` in `app/components/auth` offers Google and
-  GitHub; each must be enabled under Authentication → Providers.
+  Apple; each must be enabled under Authentication → Providers **with real
+  OAuth credentials** — the dashboard lets a provider be toggled on without a
+  secret, and the failure only surfaces at `/authorize` time as
+  `validation_failed: missing OAuth secret`. Probe without side effects:
+  `curl "https://<ref>.supabase.co/auth/v1/authorize?provider=google" -H "apikey: <publishable>"`.
 - **The `/verify` code screen** only works if the "Confirm signup" email template
   sends `{{ .Token }}`. Supabase ships it sending `{{ .ConfirmationURL }}`, in
   which case the user follows a link and lands on `/auth/callback` instead. Both
