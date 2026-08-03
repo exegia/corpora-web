@@ -30,5 +30,6 @@ export default [
     route("corpus", "routes/corpus.tsx"),
     route("licenses", "routes/licenses.tsx"),
     route("licenses/:licenceId", "routes/licenses.$licenceId.tsx"),
+    route("profile", "routes/profile.tsx"),
   ]),
 ] satisfies RouteConfig

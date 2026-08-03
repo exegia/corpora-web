@@ -24,6 +24,8 @@ export interface SessionUser {
   id: string
   email: string
   name: string | null
+  /** Portrait URL — set by the profile page, or by an OAuth provider. */
+  avatarUrl: string | null
   emailConfirmed: boolean
 }
 
@@ -47,10 +49,13 @@ export const DEFAULT_AUTHENTICATED_PATH = "/"
 function toSessionUser(user: User): SessionUser {
   const meta = user.user_metadata ?? {}
   const name = meta.name ?? meta.full_name
+  // `avatar_url` is ours (lib/profile); `picture` is what OAuth providers set.
+  const avatar = meta.avatar_url ?? meta.picture
   return {
     id: user.id,
     email: user.email ?? "",
     name: typeof name === "string" && name.trim() ? name.trim() : null,
+    avatarUrl: typeof avatar === "string" && avatar.trim() ? avatar.trim() : null,
     emailConfirmed: Boolean(user.email_confirmed_at ?? user.confirmed_at),
   }
 }
