@@ -5,11 +5,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  Frame,
+  FrameDescription,
+  FrameFooter,
+  FrameHeader,
+  FramePanel,
+  FrameTitle,
+} from "@/components/ui/frame"
 import { Input } from "@/components/ui/input"
 import {
   InputGroup,
@@ -217,14 +219,15 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <fetcher.Form method="post">
-        <Card className="gap-0 p-4 sm:px-6 sm:py-5">
-          <CardHeader className="border-b p-0 pb-4 sm:pb-5">
-            <CardTitle>Profile Details</CardTitle>
-            <CardDescription>
+        <Frame>
+          <FrameHeader>
+            <FrameTitle>Profile Details</FrameTitle>
+            <FrameDescription>
               How you appear across the Corpora workspace.
-            </CardDescription>
-          </CardHeader>
+            </FrameDescription>
+          </FrameHeader>
 
+          <FramePanel className="py-0">
           <Row>
             <RowLabel
               title="Profile Photo"
@@ -472,8 +475,9 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
               onChange={(event) => set("bio")(event.target.value)}
             />
           </Row>
+          </FramePanel>
 
-          <div className="flex items-center justify-end gap-2 pt-4 sm:pt-5">
+          <FrameFooter className="flex items-center justify-end gap-2">
             <span aria-live="polite" className="me-auto text-sm">
               {error ? <span className="text-destructive">{error}</span> : null}
               {saved && !error && !dirty ? (
@@ -483,8 +487,8 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
             <Button disabled={!dirty || saving} loading={saving} type="submit">
               Save changes
             </Button>
-          </div>
-        </Card>
+          </FrameFooter>
+        </Frame>
       </fetcher.Form>
     </div>
   )
