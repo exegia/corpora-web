@@ -310,11 +310,19 @@ function ensureAuthBindings(): void {
 }
 
 /**
- * The post-sign-in destination has to survive the OAuth round-trip. The web
- * bindings send no `redirect_to` — GoTrue returns the browser to the
- * project's Site URL — so unlike the emailed links the destination cannot
- * travel as `?next=` in the URL. sessionStorage is same-tab, same-origin,
- * which is exactly the scope of a redirect round-trip.
+ * Fallback carrier for the post-sign-in destination.
+ *
+ * From plugin 0.10.0 the destination normally travels in the URL, as the
+ * `?next=` on the `redirectTo` handed to GoTrue. This stash covers the case
+ * where that does not arrive: `redirectTo` is honoured only if the URL is in
+ * the project's Redirect URLs allow-list, and a rejected one is **not** an
+ * error — GoTrue quietly falls back to the Site URL, landing on `/` with no
+ * `?next=` at all. `completeAuthRedirect` prefers the URL and falls back here,
+ * so a misconfigured allow-list costs the continuation rather than the
+ * sign-in.
+ *
+ * sessionStorage is same-tab, same-origin, which is exactly the scope of a
+ * redirect round-trip.
  */
 const OAUTH_NEXT_KEY = "corpora.oauth.next"
 
@@ -347,16 +355,27 @@ function consumeOAuthNext(): string | null {
  * `oauthFlowInterrupted`, …).
  *
  * The provider must be enabled in the Supabase dashboard (Authentication →
- * Providers), and the return leg lands wherever the project's Site URL
- * points — neither is reachable from this codebase.
+ * Providers). The return leg is asked for explicitly via `redirectTo`, which
+ * the binding has supported since plugin 0.10.0; GoTrue honours it only when
+ * the URL is allow-listed, and otherwise falls back to the Site URL without
+ * complaint — see the note on the sessionStorage stash above.
  */
 export async function signInWithProvider(
   provider: AuthProvider,
   redirectTo?: string | null,
 ): Promise<void> {
   ensureAuthBindings()
-  stashOAuthNext(safeRedirectTo(redirectTo))
-  const result = await authActions.signInWithOAuth({ provider })
+  const next = safeRedirectTo(redirectTo)
+  // Written before the redirect starts, and read only if `?next=` fails to
+  // make the round-trip. Cheap insurance against a silent allow-list miss.
+  stashOAuthNext(next)
+  const result = await authActions.signInWithOAuth({
+    provider,
+    // Absolute, because GoTrue requires it and matches it against the
+    // allow-list verbatim. Sending the app to /auth/callback rather than the
+    // Site URL is what lets the destination ride along as `?next=`.
+    redirectTo: callbackUrl(next),
+  })
   if (!result.ok) {
     consumeOAuthNext()
     throw new AuthError(resolveMessage(result.error))

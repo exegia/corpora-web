@@ -394,8 +394,47 @@ describe("signInWithProvider", () => {
     expect(authApi.signInWithOAuth).toHaveBeenCalledWith(
       expect.objectContaining({ provider: "google" }),
     )
-    // The continuation is stashed for /auth/callback to consume after landing.
+    // The stash is still written, but it is now the fallback rather than the
+    // carrier — GoTrue ignores an allow-list miss silently, and this is what
+    // keeps the continuation alive when `?next=` never arrives.
     expect(sessionStorage.getItem("corpora.oauth.next")).toBe("/library")
+  })
+
+  // The point of the 0.10.0 bindings: the destination rides in the URL, so the
+  // round-trip comes back to /auth/callback instead of the Site URL and the
+  // continuation no longer depends on same-tab storage surviving.
+  it("asks GoTrue to return to /auth/callback carrying the destination", async () => {
+    authApi.signInWithOAuth.mockResolvedValue({
+      data: { provider: "google", url: "https://accounts.google.com/o/oauth2/auth" },
+      error: null,
+    })
+
+    void signInWithProvider("google", "/project/abc?tab=corpus")
+    await vi.waitFor(() => expect(authApi.signInWithOAuth).toHaveBeenCalled())
+
+    const { options } = authApi.signInWithOAuth.mock.calls[0][0]
+    // Absolute, because GoTrue matches it against the allow-list verbatim.
+    expect(options.redirectTo).toBe(
+      `${window.location.origin}/auth/callback?next=${encodeURIComponent("/project/abc?tab=corpus")}`,
+    )
+  })
+
+  // An off-site redirectTo must not become the landing page — that would be an
+  // open redirect wearing the callback's clothes.
+  it("vets the destination before it travels", async () => {
+    authApi.signInWithOAuth.mockResolvedValue({
+      data: { provider: "google", url: "https://accounts.google.com/o/oauth2/auth" },
+      error: null,
+    })
+
+    void signInWithProvider("google", "https://evil.example/steal")
+    await vi.waitFor(() => expect(authApi.signInWithOAuth).toHaveBeenCalled())
+
+    const { options } = authApi.signInWithOAuth.mock.calls[0][0]
+    expect(options.redirectTo).toBe(
+      `${window.location.origin}/auth/callback?next=${encodeURIComponent("/")}`,
+    )
+    expect(options.redirectTo).not.toContain("evil.example")
   })
 
   it("rejects with the auth kit's message when the provider is misconfigured", async () => {
