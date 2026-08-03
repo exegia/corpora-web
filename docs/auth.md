@@ -30,31 +30,36 @@ signup confirmation link, or a password-reset link. It exchanges a PKCE `?code=`
 for a session (implicit-flow fragments are consumed by supabase-js itself), then
 redirects to a vetted `?next=`. Only its failure path renders anything.
 
-**OAuth's return leg is different from the emailed links.** The 0.9.0 web
-binding sends no `redirect_to`, so GoTrue returns the browser to the
-project's **Site URL** — the app cannot choose the landing page per call, and
-the Redirect URLs allowlist is irrelevant to OAuth (it still gates the
-emailed links, which pass an explicit `emailRedirectTo`). Because `?next=`
-cannot travel through that round-trip, `signInWithProvider` stashes the
-post-sign-in destination in sessionStorage and `completeAuthRedirect`
-consumes it on landing. On success the provider promise never settles in the
-starting document (the page navigates away); it rejects only when the
-redirect could not start, with the auth kit's user-facing message for the
-structured error kind.
+**OAuth's return leg is different from the emailed links.** `signInWithProvider`
+asks for its landing page explicitly, passing `redirectTo` —
+`/auth/callback?next=…`, absolute — to the web binding, which has supported the
+option since plugin 0.10.0. So the destination rides in the URL exactly as it
+does for an emailed link, and `completeAuthRedirect` reads it off `?next=`. On
+success the provider promise never settles in the starting document (the page
+navigates away); it rejects only when the redirect could not start, with the
+auth kit's user-facing message for the structured error kind.
 
-**In production that Site URL is the app root, so OAuth never actually reaches
-`/auth/callback`.** Confirmed against the live project — any GoTrue redirect
-lands on `https://corpora.exegia.co`. Two consequences worth knowing before
-you touch this code:
+**A `redirectTo` GoTrue does not accept fails silently.** It is honoured only
+when the URL matches the project's **Redirect URLs** allowlist — glob patterns,
+so `https://corpora.exegia.co/**` is what covers the `?next=` form. On a miss
+GoTrue does not error: it falls back to the project's **Site URL**, which is the
+app root, and the browser lands on `/` with no `?next=` at all.
 
-- Success still works, but only because supabase-js consumes the implicit
-  fragment during `detectSessionInUrl` at client start, on whatever route it
-  lands on. `requireSession` awaits `getSession()`, which waits for that
-  initialisation, so the guard sees the new session.
-- The sessionStorage stash above is therefore **inert in production** — nothing
-  consumes it, and the post-sign-in `redirectTo` is dropped. Fixing that means
-  either pointing Site URL at `/auth/callback` or giving the web binding a
-  `redirectTo` (plugin 0.10.0 adds one); it is not fixable from this file.
+That is why `signInWithProvider` still writes the destination to sessionStorage
+before starting the redirect, and `completeAuthRedirect` reads
+`params.get("next") ?? stashed`. The stash is the **fallback**, not the carrier:
+if the allowlist ever stops matching, the cost is a suboptimal landing page
+rather than a lost continuation, and nothing about it is visible as a failed
+request.
+
+Landing on `/` still signs the user in either way — supabase-js consumes the
+implicit fragment during `detectSessionInUrl` at client start, on whatever route
+it lands on, and `requireSession` awaits `getSession()`, which waits for that
+initialisation.
+
+Before 0.10.0 the binding sent no `redirect_to` at all, every round-trip landed
+on the Site URL, and the stash was the only carrier — which meant it was
+silently inert in production, because nothing on `/` consumed it.
 
 Failures had the worse version of the same problem: GoTrue reports them in the
 URL **fragment**, a fragment never reaches a loader (`Request` drops it), and
