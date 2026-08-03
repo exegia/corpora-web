@@ -15,6 +15,7 @@ const SECTION_LABELS: Record<string, string> = {
   project: "Projects",
   corpus: "Corpus",
   licenses: "Licenses",
+  profile: "Profile",
 }
 
 interface Crumb {

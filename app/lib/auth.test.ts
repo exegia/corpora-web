@@ -106,6 +106,7 @@ describe("getCurrentUser", () => {
       id: "u-1",
       email: "ada@corpora.local",
       name: "Ada Researcher",
+      avatarUrl: null,
       emailConfirmed: true,
     })
   })
