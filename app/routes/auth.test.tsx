@@ -369,15 +369,15 @@ describe("route guards", () => {
     expect(await screen.findByRole("heading", { name: "Corpus" })).toBeInTheDocument()
   })
 
-  it("shows the account menu for the signed-in user", async () => {
+  it("shows the sidebar profile card for the signed-in user", async () => {
     givenSignedIn()
     renderProtected("/")
 
-    // Labelled by the display name from `user_metadata`, falling back to the
-    // address only when there is no name.
+    // The sidebar footer's profile card is the account menu now — labelled by
+    // the display name from `user_metadata` with the address as the handle.
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /account menu for Ada Researcher/i }),
+        screen.getByRole("button", { name: /Ada Researcher.*account menu/i }),
       ).toBeInTheDocument(),
     )
   })
