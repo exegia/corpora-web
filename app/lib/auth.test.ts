@@ -6,6 +6,7 @@ import {
   requireSession,
   safeRedirectTo,
   signInWithPassword,
+  signInWithProvider,
   signUpWithPassword,
 } from "@/lib/auth"
 
@@ -24,6 +25,11 @@ const { authApi } = vi.hoisted(() => ({
     resend: vi.fn(),
     signInWithOAuth: vi.fn(),
     exchangeCodeForSession: vi.fn(),
+    // The @exegia web bindings subscribe here while waiting for the OAuth
+    // round-trip; on a full-page redirect the event never fires.
+    onAuthStateChange: vi.fn(() => ({
+      data: { subscription: { unsubscribe: () => {} } },
+    })),
   },
 }))
 
@@ -66,6 +72,7 @@ async function locationOf(run: () => Promise<unknown>): Promise<string> {
 beforeEach(() => {
   vi.clearAllMocks()
   givenSignedOut()
+  sessionStorage.clear()
 })
 
 describe("safeRedirectTo", () => {
@@ -293,5 +300,80 @@ describe("completeAuthRedirect", () => {
     const result = await completeAuthRedirect("https://corpora.test/auth/callback")
     expect(authApi.exchangeCodeForSession).not.toHaveBeenCalled()
     expect(result.user).toBeNull()
+  })
+
+  // The OAuth round-trip cannot carry `?next=` (the web bindings send no
+  // redirect_to), so the destination waits in sessionStorage instead.
+  it("falls back to the stashed OAuth destination when the URL has no next", async () => {
+    givenSignedIn()
+    sessionStorage.setItem("corpora.oauth.next", "/library")
+
+    const result = await completeAuthRedirect(
+      "https://corpora.test/auth/callback#access_token=abc",
+    )
+
+    expect(result.next).toBe("/library")
+    // Consumed, not merely read — a stale stash must not outlive one landing.
+    expect(sessionStorage.getItem("corpora.oauth.next")).toBeNull()
+  })
+
+  it("prefers an explicit ?next over the stash and still clears it", async () => {
+    givenSignedIn()
+    sessionStorage.setItem("corpora.oauth.next", "/library")
+
+    const result = await completeAuthRedirect(
+      "https://corpora.test/auth/callback?next=%2Fcorpus",
+    )
+
+    expect(result.next).toBe("/corpus")
+    expect(sessionStorage.getItem("corpora.oauth.next")).toBeNull()
+  })
+})
+
+describe("signInWithProvider", () => {
+  it("starts the redirect through the shared client and stays pending", async () => {
+    authApi.signInWithOAuth.mockResolvedValue({
+      data: { provider: "google", url: "https://accounts.google.com/o/oauth2/auth" },
+      error: null,
+    })
+
+    const attempt = signInWithProvider("google", "/library")
+
+    // On the web the document navigates away, so success never settles here —
+    // pending is the contract, not a hang.
+    const outcome = await Promise.race([
+      attempt.then(
+        () => "settled",
+        () => "settled",
+      ),
+      new Promise((resolve) => setTimeout(() => resolve("pending"), 50)),
+    ])
+    expect(outcome).toBe("pending")
+    expect(authApi.signInWithOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "google" }),
+    )
+    // The continuation is stashed for /auth/callback to consume after landing.
+    expect(sessionStorage.getItem("corpora.oauth.next")).toBe("/library")
+  })
+
+  it("rejects with the auth kit's message when the provider is misconfigured", async () => {
+    // Shaped like an auth-js AuthApiError: the bindings classify it by code
+    // into kind `configuration`, and resolveMessage supplies the user copy.
+    authApi.signInWithOAuth.mockResolvedValue({
+      data: { provider: "google", url: null },
+      error: {
+        __isAuthError: true,
+        name: "AuthApiError",
+        code: "provider_disabled",
+        status: 400,
+        message: "provider is not enabled",
+      },
+    })
+
+    await expect(signInWithProvider("google", "/library")).rejects.toThrow(
+      "Authentication isn't configured correctly. Please contact the app developer.",
+    )
+    // A failed start must not leave a stale continuation behind.
+    expect(sessionStorage.getItem("corpora.oauth.next")).toBeNull()
   })
 })

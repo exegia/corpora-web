@@ -11,7 +11,7 @@ export const AUTH_ACCENT: AuthAccent = "corpora"
  * Providers) and its callback allowlisted under URL Configuration. Trim this
  * array to `[]` to hide the section entirely.
  */
-export const AUTH_PROVIDERS: SocialProvider[] = ["google", "github"]
+export const AUTH_PROVIDERS: SocialProvider[] = ["google", "apple"]
 
 /**
  * How long the success state stays up before the route navigates away. Long

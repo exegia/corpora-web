@@ -19,6 +19,9 @@ export default defineConfig({
     optimizeDeps: {
         include: [
             "@exegia/corpora-ui",
+            "@exegia/plugin-supabase-auth",
+            "@exegia/plugin-supabase-auth/web",
+            "@exegia/use-auth",
             "@supabase/supabase-js",
             "buffer",
             "class-variance-authority",
@@ -90,5 +93,13 @@ export default defineConfig({
         setupFiles: ["./app/test/setup.ts"],
         include: ["app/**/*.test.{ts,tsx}"],
         css: false,
+        server: {
+            deps: {
+                // use-auth 0.9.0 ships extensionless relative imports in its
+                // ESM dist; Node's resolver (used for externalized deps)
+                // rejects them, so route the package through Vite instead.
+                inline: ["@exegia/use-auth"],
+            },
+        },
     },
 })
