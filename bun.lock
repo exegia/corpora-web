@@ -7,7 +7,9 @@
       "dependencies": {
         "@base-ui/react": "^1.6.0",
         "@dotenvx/dotenvx": "^2.19.1",
-        "@exegia/corpora-ui": "^0.8.0",
+        "@exegia/corpora-ui": "^0.9.0",
+        "@exegia/plugin-supabase-auth": "0.9.0",
+        "@exegia/use-auth": "0.9.0",
         "@supabase/supabase-js": "^2.111.0",
         "@tailwindcss/vite": "^4",
         "buffer": "^6.0.3",
@@ -151,7 +153,11 @@
 
     "@emnapi/wasi-threads": ["@emnapi/wasi-threads@2.0.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-9DsSk+o5NBX0CCJT8s0EROGSGxjR/tKu6aBTaVyq+SjAEQH4XcdcRxPBRzsBLizTTJ49MJjF+jgu3qnO9GLQcQ=="],
 
-    "@exegia/corpora-ui": ["@exegia/corpora-ui@0.8.0", "", { "dependencies": { "@base-ui/react": "^1.6.0", "@remixicon/react": "^4.9.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "cuelume": "^0.2.1", "lucide-react": "^1.27.0", "motion": "^12.43.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "react": "^19.0.0", "react-dom": "^19.0.0" } }, "sha512-/baLHxqli1pW6qvba/HQgfr3gw/qFE3yYJ3vd4ZG7AJ9IytwJBtnnXQkEfnbdXbqA9+my9yFMAW8x22GTDNkSg=="],
+    "@exegia/corpora-ui": ["@exegia/corpora-ui@0.9.0", "", { "dependencies": { "@base-ui/react": "^1.6.0", "@remixicon/react": "^4.9.0", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "cuelume": "^0.2.1", "lucide-react": "^1.27.0", "motion": "^12.43.0", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "react": "^19.0.0", "react-dom": "^19.0.0" } }, "sha512-9tlUa6lzkcnLnMAMkxSEFhKy6Fd+jcy6D+rndrFs/rarTMHOxNDZ/y5yQ0ex2cTLoXKlir06BbIs0rw4dz6KDw=="],
+
+    "@exegia/plugin-supabase-auth": ["@exegia/plugin-supabase-auth@0.9.0", "", { "dependencies": { "@supabase/auth-js": "^2.111.0", "@tauri-apps/api": "^2.11.1" } }, "sha512-eARGUyVzrEXoCeABdHSvXvsSZIShSVphL7QZDGuWLZVsTLl+tNLh60jjwiVwBHXHmXVppGmq2tW5SXi9pumn+g=="],
+
+    "@exegia/use-auth": ["@exegia/use-auth@0.9.0", "", { "dependencies": { "@exegia/plugin-supabase-auth": "0.9.0", "zod": "^4.4.3" }, "peerDependencies": { "react": "^19.2.8", "react-dom": "^19.2.8" } }, "sha512-m2eY2MmXMSvm7gW1+fEOZ+LdVuyshFlUqCIDiJX0TSXVJ7HK9RMl/54RscX9U6cZINx23+01mqdRpAFKPZGiJQ=="],
 
     "@exodus/bytes": ["@exodus/bytes@1.15.1", "", { "peerDependencies": { "@noble/hashes": "^1.8.0 || ^2.0.0" }, "optionalPeers": ["@noble/hashes"] }, "sha512-S6mL0yNB/Abt9Ei4tq8gDhcczc4S3+vQ4ra7vxnAf+YHC02srtqxKKZghx2Dq6p0e66THKwR6r8N6P95wEty7Q=="],
 
@@ -302,6 +308,8 @@
     "@tailwindcss/oxide-win32-x64-msvc": ["@tailwindcss/oxide-win32-x64-msvc@4.3.3", "", { "os": "win32", "cpu": "x64" }, "sha512-yJ0pwIVc/nYeGoV02WtsN8KYyLQv7kyI2wDnkezyJlGGjkd4QLwDGAwl47YpPJeuI0M0ObaXGSPjvWDPeTPggw=="],
 
     "@tailwindcss/vite": ["@tailwindcss/vite@4.3.3", "", { "dependencies": { "@tailwindcss/node": "4.3.3", "@tailwindcss/oxide": "4.3.3", "tailwindcss": "4.3.3" }, "peerDependencies": { "vite": "^5.2.0 || ^6 || ^7 || ^8" } }, "sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw=="],
+
+    "@tauri-apps/api": ["@tauri-apps/api@2.11.1", "", {}, "sha512-M2FPuYND2m+wh5hfW9ZpSdxMPdEJovPBWwoHJmwUpysTYNHaOkVFN419m/K0LIgjb/7KU2vBgsUepJWugQCvAA=="],
 
     "@testing-library/dom": ["@testing-library/dom@10.4.1", "", { "dependencies": { "@babel/code-frame": "^7.10.4", "@babel/runtime": "^7.12.5", "@types/aria-query": "^5.0.1", "aria-query": "5.3.0", "dom-accessibility-api": "^0.5.9", "lz-string": "^1.5.0", "picocolors": "1.1.1", "pretty-format": "^27.0.2" } }, "sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg=="],
 
@@ -876,6 +884,8 @@
     "yocto-spinner": ["yocto-spinner@1.2.2", "", { "dependencies": { "yoctocolors": "^2.1.1" } }, "sha512-DODGl1wJjA/s5pnJFKau9lIYHT81lnhob1i3e1TjxZRxEhWRKl74nTbWE6H5KlkViQQTo/Z29YFdxzTZAMY3ng=="],
 
     "yoctocolors": ["yoctocolors@2.2.0", "", {}, "sha512-xYqdZFUK/VYazNl/oCDYN+3WloWQwMfZxBoiNt6qNyk+xfOdi598muWE42rNZFp1kNOiqW936q5RhUdnpqElSg=="],
+
+    "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
     "@babel/core/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 

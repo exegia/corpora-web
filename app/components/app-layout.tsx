@@ -1,5 +1,4 @@
 import { Outlet } from "react-router"
-import { UserMenu } from "@/components/auth/user-menu"
 import { Provider, Drawer, Wrapper, Trigger } from "@/components/sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { SessionUser } from "@/lib/auth"
@@ -14,15 +13,15 @@ export function AppLayout({ user }: { user?: SessionUser }) {
 
   return (
     <Provider className="p-2 h-screen">
-      <Drawer />
+      <Drawer user={user} />
       <Wrapper className="relative shadow-2xl">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <Trigger />
           <COBreadcrumb />
+          {/* Account actions live on the sidebar's profile card, not here. */}
           <div className="ml-auto flex items-center gap-1">
             <SoundToggle />
             <ThemeToggle />
-            {user && <UserMenu user={user} />}
           </div>
         </header>
 

@@ -148,8 +148,17 @@ const Threads = ({
         const container = containerRef.current
         if (!container) return
 
-        const renderer = new Renderer({ alpha: true })
+        // No WebGL context (headless browsers, remote desktops, exhausted
+        // contexts) must degrade to a plain background, not crash the screen:
+        // OGL dereferences the context unguarded during construction.
+        let renderer: Renderer
+        try {
+            renderer = new Renderer({ alpha: true })
+        } catch {
+            return
+        }
         const gl = renderer.gl
+        if (!gl) return
         gl.clearColor(0, 0, 0, 0)
         gl.enable(gl.BLEND)
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)

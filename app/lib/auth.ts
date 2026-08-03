@@ -7,6 +7,8 @@
 // submit handler and rendering `error.message`, so every function here throws
 // an `AuthError` whose message is already fit to show a user.
 
+import { configureWeb } from "@exegia/plugin-supabase-auth/web"
+import { authActions, resolveMessage } from "@exegia/use-auth"
 import type { Provider, User } from "@supabase/supabase-js"
 import { redirect } from "react-router"
 import { getSupabase } from "@/lib/supabase"
@@ -22,6 +24,8 @@ export interface SessionUser {
   id: string
   email: string
   name: string | null
+  /** Portrait URL — set by the profile page, or by an OAuth provider. */
+  avatarUrl: string | null
   emailConfirmed: boolean
 }
 
@@ -45,10 +49,13 @@ export const DEFAULT_AUTHENTICATED_PATH = "/"
 function toSessionUser(user: User): SessionUser {
   const meta = user.user_metadata ?? {}
   const name = meta.name ?? meta.full_name
+  // `avatar_url` is ours (lib/profile); `picture` is what OAuth providers set.
+  const avatar = meta.avatar_url ?? meta.picture
   return {
     id: user.id,
     email: user.email ?? "",
     name: typeof name === "string" && name.trim() ? name.trim() : null,
+    avatarUrl: typeof avatar === "string" && avatar.trim() ? avatar.trim() : null,
     emailConfirmed: Boolean(user.email_confirmed_at ?? user.confirmed_at),
   }
 }
@@ -108,12 +115,56 @@ function pathWithSearch(request: Request): string {
 // ---- Route guards --------------------------------------------------------
 
 /**
+ * Reads a GoTrue failure out of a set of params, whichever keys it used.
+ *
+ * `error_description` is the readable one, but it is not always present:
+ * a rejected link carries it, while the 500 path behind a refused provider
+ * credential need not. Falling back to the codes means an unfamiliar shape
+ * still registers *as* a failure — the alternative is treating it as "no
+ * error" and losing the reason exactly where it matters most.
+ */
+function authErrorIn(params: URLSearchParams): string | null {
+  const description = params.get("error_description")
+  if (description) return description
+  const code = params.get("error_code") ?? params.get("error")
+  return code ? `Sign in failed (${code}).` : null
+}
+
+/**
+ * A failed auth round-trip reports its reason in the URL *fragment*, which a
+ * loader cannot see: `Request` drops the fragment, so `request.url` never
+ * carries it. `window.location` is the only place it survives.
+ *
+ * The query is checked too because the PKCE flow puts errors there instead,
+ * and that form *does* reach the loader.
+ */
+function authErrorInUrl(request: Request): string | null {
+  const fromQuery = authErrorIn(new URL(request.url).searchParams)
+  if (fromQuery) return fromQuery
+  if (typeof window === "undefined") return null
+  return authErrorIn(new URLSearchParams(window.location.hash.replace(/^#/, "")))
+}
+
+/**
  * Guard for authenticated routes. Throws a redirect to `/login`, carrying the
  * attempted location so the login screen can send the user back afterwards.
  */
 export async function requireSession(request: Request): Promise<SessionUser> {
   const user = await getCurrentUser()
   if (user) return user
+
+  // A failed OAuth round-trip lands *here*, not on /auth/callback. The 0.9.0
+  // web binding sends no `redirect_to`, so GoTrue returns the browser to the
+  // project's Site URL — which in production is the app root, and the root is
+  // guarded. Bouncing straight to /login would discard the provider's reason
+  // and read as an unexplained flash back to the login screen; that is exactly
+  // how a rejected Apple client secret presented in prod. Hand it to
+  // /auth/callback instead, whose whole job is rendering this failure.
+  const authError = authErrorInUrl(request)
+  if (authError) {
+    throw redirect(`/auth/callback?error_description=${encodeURIComponent(authError)}`)
+  }
+
   const from = pathWithSearch(request)
   const search =
     from === DEFAULT_AUTHENTICATED_PATH
@@ -241,25 +292,74 @@ export async function resendSignupConfirmation(email: string): Promise<void> {
 
 // ---- OAuth ---------------------------------------------------------------
 
+let authBindingsConfigured = false
+
 /**
- * Starts a provider handshake. This navigates the whole document, so on success
- * it never resolves — the provider returns the user to `/auth/callback`.
+ * Points the `@exegia/use-auth` bindings at the app's own supabase-js client,
+ * so both share one session, one storage key and one refresh timer — two
+ * GoTrue clients on the same storage key fight over the refresh. Lazy rather
+ * than a module-scope side effect so importing this file never constructs a
+ * client (tests mock `@/lib/supabase`; the SPA-mode build imports route
+ * modules in Node). Every binding-backed function calls this first, which is
+ * what "configure before any binding runs" requires.
+ */
+function ensureAuthBindings(): void {
+  if (authBindingsConfigured) return
+  configureWeb({ client: getSupabase().auth })
+  authBindingsConfigured = true
+}
+
+/**
+ * The post-sign-in destination has to survive the OAuth round-trip. The web
+ * bindings send no `redirect_to` — GoTrue returns the browser to the
+ * project's Site URL — so unlike the emailed links the destination cannot
+ * travel as `?next=` in the URL. sessionStorage is same-tab, same-origin,
+ * which is exactly the scope of a redirect round-trip.
+ */
+const OAUTH_NEXT_KEY = "corpora.oauth.next"
+
+function stashOAuthNext(next: string): void {
+  try {
+    if (next === DEFAULT_AUTHENTICATED_PATH) sessionStorage.removeItem(OAUTH_NEXT_KEY)
+    else sessionStorage.setItem(OAUTH_NEXT_KEY, next)
+  } catch {
+    // Storage can be unavailable (private mode). Losing the continuation only
+    // means landing on the default page after sign-in.
+  }
+}
+
+function consumeOAuthNext(): string | null {
+  try {
+    const next = sessionStorage.getItem(OAUTH_NEXT_KEY)
+    sessionStorage.removeItem(OAUTH_NEXT_KEY)
+    return next
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Starts a provider handshake through the `@exegia/use-auth` bindings. This
+ * navigates the whole document, so on success the promise never settles in
+ * this document — do not gate anything on it resolving. It settles only when
+ * the redirect could not be started, rejecting with the auth kit's
+ * user-facing message for the structured error kind (`configuration`,
+ * `oauthFlowInterrupted`, …).
  *
- * The callback URL must be allowlisted in the Supabase dashboard under
- * Authentication → URL Configuration → Redirect URLs, and the provider enabled
- * under Authentication → Providers. Neither is reachable from this codebase.
+ * The provider must be enabled in the Supabase dashboard (Authentication →
+ * Providers), and the return leg lands wherever the project's Site URL
+ * points — neither is reachable from this codebase.
  */
 export async function signInWithProvider(
   provider: AuthProvider,
   redirectTo?: string | null,
 ): Promise<void> {
-  const next = safeRedirectTo(redirectTo)
-  const { error } = await getSupabase().auth.signInWithOAuth({
-    provider,
-    options: { redirectTo: callbackUrl(next === "/" ? undefined : next) },
-  })
-  if (error) {
-    throw new AuthError(error.message ?? `Unable to continue with ${provider}.`)
+  ensureAuthBindings()
+  stashOAuthNext(safeRedirectTo(redirectTo))
+  const result = await authActions.signInWithOAuth({ provider })
+  if (!result.ok) {
+    consumeOAuthNext()
+    throw new AuthError(resolveMessage(result.error))
   }
 }
 
@@ -279,9 +379,12 @@ export async function completeAuthRedirect(
   const url = new URL(href)
   const params = url.searchParams
   // Errors arrive in the query on PKCE and in the fragment on implicit flow.
+  // Read through the same key-tolerant helper the guard uses, so a failure
+  // GoTrue reported without `error_description` surfaces as a failure here
+  // rather than falling through to the "link has expired" message.
   const hash = new URLSearchParams(url.hash.replace(/^#/, ""))
-  const description = params.get("error_description") ?? hash.get("error_description")
-  if (description) throw new AuthError(description)
+  const failure = authErrorIn(params) ?? authErrorIn(hash)
+  if (failure) throw new AuthError(failure)
 
   const code = params.get("code")
   if (code) {
@@ -289,9 +392,13 @@ export async function completeAuthRedirect(
     if (error) throw new AuthError(error.message ?? "Unable to complete sign in.")
   }
 
+  // Emailed links carry `?next=` in the URL; the OAuth round-trip cannot, so
+  // its continuation waits in sessionStorage. Consumed unconditionally so a
+  // stale stash never outlives one landing.
+  const stashed = consumeOAuthNext()
   return {
     user: await getCurrentUser(),
-    next: safeRedirectTo(params.get("next")),
+    next: safeRedirectTo(params.get("next") ?? stashed),
   }
 }
 
