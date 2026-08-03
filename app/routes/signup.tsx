@@ -37,8 +37,10 @@ export default function Signup() {
                 window.setTimeout(() => navigate(next, { replace: true }), SUCCESS_MORPH_MS)
             }}
             onProviderSelect={async (provider: SocialProvider) => {
+                // The document navigates away to the provider, so this settles
+                // only when the redirect could not start — the block renders
+                // the rejection. The round-trip returns via /auth/callback.
                 await signInWithProvider(provider, redirectTo)
-                window.setTimeout(() => navigate(redirectTo, { replace: true }), SUCCESS_MORPH_MS)
             }}
             onLogin={() => navigate(`/login${search}`)}
             termsChecked={termsAccepted}

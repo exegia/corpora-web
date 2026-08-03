@@ -31,8 +31,10 @@ export default function Login() {
         window.setTimeout(() => navigate(redirectTo, { replace: true }), SUCCESS_MORPH_MS)
       }}
       onProviderSelect={async (provider: SocialProvider) => {
+        // The document navigates away to the provider, so this settles only
+        // when the redirect could not start — the block renders the rejection.
+        // The round-trip returns via a full page load on /auth/callback.
         await signInWithProvider(provider, redirectTo)
-        window.setTimeout(() => navigate(redirectTo, { replace: true }), SUCCESS_MORPH_MS)
       }}
       onForgotPassword={() => navigate(`/forgot-password${search}`)}
       onSignup={() => navigate(`/signup${search}`)}

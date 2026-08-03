@@ -7,6 +7,8 @@
 // submit handler and rendering `error.message`, so every function here throws
 // an `AuthError` whose message is already fit to show a user.
 
+import { configureWeb } from "@exegia/plugin-supabase-auth/web"
+import { authActions, resolveMessage } from "@exegia/use-auth"
 import type { Provider, User } from "@supabase/supabase-js"
 import { redirect } from "react-router"
 import { getSupabase } from "@/lib/supabase"
@@ -241,25 +243,74 @@ export async function resendSignupConfirmation(email: string): Promise<void> {
 
 // ---- OAuth ---------------------------------------------------------------
 
+let authBindingsConfigured = false
+
 /**
- * Starts a provider handshake. This navigates the whole document, so on success
- * it never resolves — the provider returns the user to `/auth/callback`.
+ * Points the `@exegia/use-auth` bindings at the app's own supabase-js client,
+ * so both share one session, one storage key and one refresh timer — two
+ * GoTrue clients on the same storage key fight over the refresh. Lazy rather
+ * than a module-scope side effect so importing this file never constructs a
+ * client (tests mock `@/lib/supabase`; the SPA-mode build imports route
+ * modules in Node). Every binding-backed function calls this first, which is
+ * what "configure before any binding runs" requires.
+ */
+function ensureAuthBindings(): void {
+  if (authBindingsConfigured) return
+  configureWeb({ client: getSupabase().auth })
+  authBindingsConfigured = true
+}
+
+/**
+ * The post-sign-in destination has to survive the OAuth round-trip. The web
+ * bindings send no `redirect_to` — GoTrue returns the browser to the
+ * project's Site URL — so unlike the emailed links the destination cannot
+ * travel as `?next=` in the URL. sessionStorage is same-tab, same-origin,
+ * which is exactly the scope of a redirect round-trip.
+ */
+const OAUTH_NEXT_KEY = "corpora.oauth.next"
+
+function stashOAuthNext(next: string): void {
+  try {
+    if (next === DEFAULT_AUTHENTICATED_PATH) sessionStorage.removeItem(OAUTH_NEXT_KEY)
+    else sessionStorage.setItem(OAUTH_NEXT_KEY, next)
+  } catch {
+    // Storage can be unavailable (private mode). Losing the continuation only
+    // means landing on the default page after sign-in.
+  }
+}
+
+function consumeOAuthNext(): string | null {
+  try {
+    const next = sessionStorage.getItem(OAUTH_NEXT_KEY)
+    sessionStorage.removeItem(OAUTH_NEXT_KEY)
+    return next
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Starts a provider handshake through the `@exegia/use-auth` bindings. This
+ * navigates the whole document, so on success the promise never settles in
+ * this document — do not gate anything on it resolving. It settles only when
+ * the redirect could not be started, rejecting with the auth kit's
+ * user-facing message for the structured error kind (`configuration`,
+ * `oauthFlowInterrupted`, …).
  *
- * The callback URL must be allowlisted in the Supabase dashboard under
- * Authentication → URL Configuration → Redirect URLs, and the provider enabled
- * under Authentication → Providers. Neither is reachable from this codebase.
+ * The provider must be enabled in the Supabase dashboard (Authentication →
+ * Providers), and the return leg lands wherever the project's Site URL
+ * points — neither is reachable from this codebase.
  */
 export async function signInWithProvider(
   provider: AuthProvider,
   redirectTo?: string | null,
 ): Promise<void> {
-  const next = safeRedirectTo(redirectTo)
-  const { error } = await getSupabase().auth.signInWithOAuth({
-    provider,
-    options: { redirectTo: callbackUrl(next === "/" ? undefined : next) },
-  })
-  if (error) {
-    throw new AuthError(error.message ?? `Unable to continue with ${provider}.`)
+  ensureAuthBindings()
+  stashOAuthNext(safeRedirectTo(redirectTo))
+  const result = await authActions.signInWithOAuth({ provider })
+  if (!result.ok) {
+    consumeOAuthNext()
+    throw new AuthError(resolveMessage(result.error))
   }
 }
 
@@ -289,9 +340,13 @@ export async function completeAuthRedirect(
     if (error) throw new AuthError(error.message ?? "Unable to complete sign in.")
   }
 
+  // Emailed links carry `?next=` in the URL; the OAuth round-trip cannot, so
+  // its continuation waits in sessionStorage. Consumed unconditionally so a
+  // stale stash never outlives one landing.
+  const stashed = consumeOAuthNext()
   return {
     user: await getCurrentUser(),
-    next: safeRedirectTo(params.get("next")),
+    next: safeRedirectTo(params.get("next") ?? stashed),
   }
 }
 

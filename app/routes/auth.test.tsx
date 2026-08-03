@@ -29,6 +29,11 @@ const { authApi } = vi.hoisted(() => ({
     resend: vi.fn(),
     signInWithOAuth: vi.fn(),
     exchangeCodeForSession: vi.fn(),
+    // The @exegia web bindings subscribe here while waiting for the OAuth
+    // round-trip; on a full-page redirect the event never fires.
+    onAuthStateChange: vi.fn(() => ({
+      data: { subscription: { unsubscribe: () => {} } },
+    })),
   },
 }))
 
