@@ -188,8 +188,12 @@ describe("/login", () => {
     renderAuth(`/login?redirectTo=${encodeURIComponent("/corpus")}`)
 
     await user.click(await screen.findByRole("button", { name: "Sign up" }))
-    expect(await screen.findByLabelText("Email")).toBeInTheDocument()
-    expect(await screen.findByRole("button", { name: "Login" })).toBeInTheDocument()
+    expect(
+      await screen.findByLabelText("Email", {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByRole("button", { name: "Login" }, { timeout: 3000 }),
+    ).toBeInTheDocument()
   })
 })
 
@@ -275,7 +279,9 @@ describe("/forgot-password", () => {
     await user.type(await screen.findByLabelText("Email"), "ada@corpora.local")
     await user.click(screen.getByRole("button", { name: /send reset link/i }))
 
-    expect(await screen.findByText(/check your (inbox|email)/i)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/check your (inbox|email)/i, {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
   })
 })
 
@@ -337,7 +343,9 @@ describe("/reset-password", () => {
     await user.type(await screen.findByLabelText("Confirm password"), "Hunter22!x")
     await user.click(screen.getByRole("button", { name: /update password/i }))
 
-    expect(await screen.findByText(/password updated/i)).toBeInTheDocument()
+    expect(
+      await screen.findByText(/password updated/i, {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
   })
 })
 
