@@ -1,6 +1,9 @@
+import { LinkedAccountsBlock, SOCIAL_PROVIDERS } from "@exegia/corpora-ui"
+import type { LinkedIdentity, SocialProvider } from "@exegia/corpora-ui"
 import { BadgeCheckIcon, UploadIcon, XIcon } from "lucide-react"
-import { useMemo, useRef, useState } from "react"
-import { useFetcher } from "react-router"
+import { Suspense, useMemo, useRef, useState } from "react"
+import { Await, useFetcher, useRevalidator } from "react-router"
+import { AUTH_PROVIDERS } from "@/components/auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,7 +31,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { AuthError, getCurrentUser } from "@/lib/auth"
+import {
+  AuthError,
+  getCurrentUser,
+  linkProvider,
+  listIdentities,
+  unlinkProvider,
+  type Identity,
+} from "@/lib/auth"
 import {
   getProfile,
   TRADITIONS,
@@ -50,6 +60,10 @@ export async function clientLoader() {
     profile,
     email: user?.email ?? "",
     emailConfirmed: user?.emailConfirmed ?? false,
+    // Deliberately not awaited: this one is a GoTrue round-trip, so only the
+    // connected-accounts card suspends while the form renders immediately.
+    // A load failure resolves to null — never presented as an empty list.
+    identities: listIdentities().catch(() => null),
   }
 }
 
@@ -181,6 +195,78 @@ function Row({ children }: { children: React.ReactNode }) {
  */
 function RowControl({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col justify-center">{children}</div>
+}
+
+/** Narrows a GoTrue provider string to one the block can draw an icon for. */
+function isSocialProvider(provider: string): provider is SocialProvider {
+  return provider in SOCIAL_PROVIDERS
+}
+
+/**
+ * The email/password identity is filtered out: it is managed by the email and
+ * password rows above, not by connect/disconnect buttons. That makes the
+ * block's last-method guard conservative — an email + one-provider account
+ * sees its provider's Disconnect disabled even though the password would keep
+ * the account reachable. Safe, but stricter than GoTrue's own rule; lifting it
+ * needs a corpora-ui release that can be told about out-of-list methods.
+ */
+function toLinkedIdentities(identities: Identity[]): LinkedIdentity[] {
+  return identities.flatMap((identity) =>
+    isSocialProvider(identity.provider)
+      ? [
+          {
+            id: identity.identityId,
+            provider: identity.provider,
+            email: identity.email,
+          },
+        ]
+      : [],
+  )
+}
+
+/**
+ * The sign-in identities card. `linkProvider` navigates the document away on
+ * success, so its promise settling always means failure — the block renders
+ * the rejection inline. After an unlink the route revalidates; the resolved
+ * card stays mounted while the fresh list loads (see docs/data-loading.md).
+ */
+function ConnectedAccounts({ identities }: { identities: Identity[] | null }) {
+  const revalidator = useRevalidator()
+
+  if (identities === null) {
+    return (
+      <Frame>
+        <FrameHeader>
+          <FrameTitle>Connected accounts</FrameTitle>
+          <FrameDescription>
+            Manage the accounts you can use to sign in.
+          </FrameDescription>
+        </FrameHeader>
+        <FramePanel>
+          <p className="text-sm text-destructive">
+            We couldn't load your connected accounts. Reload the page to try
+            again.
+          </p>
+        </FramePanel>
+      </Frame>
+    )
+  }
+
+  return (
+    <LinkedAccountsBlock
+      identities={toLinkedIdentities(identities)}
+      providers={AUTH_PROVIDERS}
+      onLink={async (provider) => {
+        await linkProvider(provider)
+      }}
+      onUnlink={async (identityId) => {
+        await unlinkProvider(identityId)
+        // The loader is the source of truth; hold the row's spinner until the
+        // refreshed list is in.
+        await revalidator.revalidate()
+      }}
+    />
+  )
 }
 
 export default function Profile({ loaderData }: Route.ComponentProps) {
@@ -490,6 +576,12 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
           </FrameFooter>
         </Frame>
       </fetcher.Form>
+
+      <Suspense fallback={<LinkedAccountsBlock loading />}>
+        <Await resolve={loaderData.identities}>
+          {(identities) => <ConnectedAccounts identities={identities} />}
+        </Await>
+      </Suspense>
     </div>
   )
 }

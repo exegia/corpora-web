@@ -2,12 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   completeAuthRedirect,
   getCurrentUser,
+  linkProvider,
+  listIdentities,
   requireAnon,
   requireSession,
   safeRedirectTo,
   signInWithPassword,
   signInWithProvider,
   signUpWithPassword,
+  unlinkProvider,
 } from "@/lib/auth"
 
 // The module under test reaches Supabase only through `getSupabase`, so the
@@ -25,6 +28,9 @@ const { authApi } = vi.hoisted(() => ({
     resend: vi.fn(),
     signInWithOAuth: vi.fn(),
     exchangeCodeForSession: vi.fn(),
+    getUserIdentities: vi.fn(),
+    linkIdentity: vi.fn(),
+    unlinkIdentity: vi.fn(),
     // The @exegia web bindings subscribe here while waiting for the OAuth
     // round-trip; on a full-page redirect the event never fires.
     onAuthStateChange: vi.fn(() => ({
@@ -456,5 +462,162 @@ describe("signInWithProvider", () => {
     )
     // A failed start must not leave a stale continuation behind.
     expect(sessionStorage.getItem("corpora.oauth.next")).toBeNull()
+  })
+})
+
+// GoTrue's snake_case identity rows, as `getUserIdentities` returns them.
+const EMAIL_IDENTITY = {
+  identity_id: "row-email",
+  id: "u-1",
+  provider: "email",
+  identity_data: { email: "ada@corpora.local" },
+  created_at: "2026-07-01T00:00:00Z",
+  last_sign_in_at: "2026-08-01T00:00:00Z",
+}
+
+const GOOGLE_IDENTITY = {
+  identity_id: "row-google",
+  id: "google-sub-1",
+  provider: "google",
+  identity_data: { email: "ada@gmail.example" },
+  created_at: "2026-08-02T00:00:00Z",
+  last_sign_in_at: null,
+}
+
+describe("listIdentities", () => {
+  it("maps GoTrue's rows onto the app shape, email identity included", async () => {
+    authApi.getUserIdentities.mockResolvedValue({
+      data: { identities: [EMAIL_IDENTITY, GOOGLE_IDENTITY] },
+      error: null,
+    })
+
+    const list = await listIdentities()
+
+    // The email identity stays in the list: it is what tells "last social
+    // identity" apart from "last way into the account".
+    expect(list).toEqual([
+      expect.objectContaining({
+        identityId: "row-email",
+        provider: "email",
+        email: "ada@corpora.local",
+      }),
+      expect.objectContaining({
+        identityId: "row-google",
+        provider: "google",
+        email: "ada@gmail.example",
+      }),
+    ])
+  })
+
+  it("throws an AuthError instead of leaking the binding's rejection", async () => {
+    authApi.getUserIdentities.mockResolvedValue({
+      data: null,
+      error: {
+        __isAuthError: true,
+        name: "AuthSessionMissingError",
+        status: 400,
+        message: "session missing",
+      },
+    })
+
+    await expect(listIdentities()).rejects.toThrow(
+      "Your session has expired. Please sign in again.",
+    )
+  })
+})
+
+describe("linkProvider", () => {
+  it("starts the link redirect back to /profile and stays pending", async () => {
+    authApi.linkIdentity.mockResolvedValue({
+      data: { provider: "google", url: "https://accounts.google.com/o/oauth2/auth" },
+      error: null,
+    })
+
+    const attempt = linkProvider("google")
+
+    // As with signInWithProvider: the document navigates away on success, so
+    // pending is the contract, not a hang.
+    const outcome = await Promise.race([
+      attempt.then(
+        () => "settled",
+        () => "settled",
+      ),
+      new Promise((resolve) => setTimeout(() => resolve("pending"), 50)),
+    ])
+    expect(outcome).toBe("pending")
+
+    const { provider, options } = authApi.linkIdentity.mock.calls[0][0]
+    expect(provider).toBe("google")
+    expect(options.redirectTo).toBe(
+      `${window.location.origin}/auth/callback?next=${encodeURIComponent("/profile")}`,
+    )
+    // The fallback stash, for when the allow-list quietly drops `?next=`.
+    expect(sessionStorage.getItem("corpora.oauth.next")).toBe("/profile")
+  })
+
+  it("rejects with the auth kit's message when manual linking is disabled", async () => {
+    authApi.linkIdentity.mockResolvedValue({
+      data: { provider: "google", url: null },
+      error: {
+        __isAuthError: true,
+        name: "AuthApiError",
+        code: "manual_linking_disabled",
+        status: 400,
+        message: "Manual linking is disabled",
+      },
+    })
+
+    await expect(linkProvider("google")).rejects.toThrow(
+      "Authentication isn't configured correctly. Please contact the app developer.",
+    )
+    // A failed start must not leave a stale continuation behind.
+    expect(sessionStorage.getItem("corpora.oauth.next")).toBeNull()
+  })
+})
+
+describe("unlinkProvider", () => {
+  it("disconnects by row key and resolves with the refreshed list", async () => {
+    authApi.getUserIdentities
+      .mockResolvedValueOnce({
+        data: { identities: [EMAIL_IDENTITY, GOOGLE_IDENTITY] },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { identities: [EMAIL_IDENTITY] },
+        error: null,
+      })
+    authApi.unlinkIdentity.mockResolvedValue({ data: {}, error: null })
+
+    const list = await unlinkProvider("row-google")
+
+    // auth-js unlinks by the full identity row, so the binding resolves the
+    // row key to the row first.
+    expect(authApi.unlinkIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({ identity_id: "row-google" }),
+    )
+    expect(list).toEqual([
+      expect.objectContaining({ identityId: "row-email", provider: "email" }),
+    ])
+  })
+
+  it("maps GoTrue's last-identity refusal to the user-facing message", async () => {
+    authApi.getUserIdentities.mockResolvedValue({
+      data: { identities: [GOOGLE_IDENTITY] },
+      error: null,
+    })
+    authApi.unlinkIdentity.mockResolvedValue({
+      data: null,
+      error: {
+        __isAuthError: true,
+        name: "AuthApiError",
+        code: "single_identity_not_deletable",
+        status: 422,
+        message: "User must have at least 1 identity after unlinking",
+      },
+    })
+
+    await expect(unlinkProvider("row-google")).rejects.toThrow(
+      "This is the only way to sign in to this account, so it can't be disconnected.",
+    )
   })
 })
