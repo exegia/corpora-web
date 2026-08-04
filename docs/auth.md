@@ -166,6 +166,31 @@ Three things cannot be set from this repo, and each is unverifiable here:
   which case the user follows a link and lands on `/auth/callback` instead. Both
   routes exist, so either template works — but only one of them makes `/verify`
   reachable.
+- **Manual linking.** The `/profile` connected-accounts card needs
+  Authentication → Providers → *Allow manual linking* (config.toml:
+  `auth.enable_manual_linking`). Off, GoTrue rejects `linkIdentity` /
+  `unlinkIdentity` and `GET /user/identities`; the card renders the mapped
+  configuration message rather than crashing, but nothing can be connected.
+
+## Account linking
+
+`/profile` renders `LinkedAccountsBlock` behind `<Await>`; the identities
+promise is the one deferred piece of that loader. All calls go through
+`lib/auth`: `listIdentities`, `linkProvider`, `unlinkProvider`.
+
+- **Linking is a full OAuth round-trip on the current session.** `linkProvider`
+  navigates the document away, so its promise settling always means failure —
+  the return leg lands on `/auth/callback?next=/profile` exactly like sign-in,
+  with the same sessionStorage stash as fallback.
+- **The email identity stays in `listIdentities`' result** but is filtered out
+  of the card: it is managed by the email field, not connect buttons. Until the
+  block can be told about off-list methods (corpora-ui PR #57,
+  `hasOtherSignInMethods`), that makes the last-method guard conservative — an
+  email + one-provider account cannot disconnect its provider even though the
+  password would keep the account reachable. Pinned by a test in
+  `app/routes/profile.test.tsx`.
+- **GoTrue enforces at-least-one-identity server-side**; the card's guard is
+  UX, not the security boundary.
 
 ## Known upstream quirk
 
