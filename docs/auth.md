@@ -183,12 +183,12 @@ promise is the one deferred piece of that loader. All calls go through
   the return leg lands on `/auth/callback?next=/profile` exactly like sign-in,
   with the same sessionStorage stash as fallback.
 - **The email identity stays in `listIdentities`' result** but is filtered out
-  of the card: it is managed by the email field, not connect buttons. Until the
-  block can be told about off-list methods (corpora-ui PR #57,
-  `hasOtherSignInMethods`), that makes the last-method guard conservative — an
-  email + one-provider account cannot disconnect its provider even though the
-  password would keep the account reachable. Pinned by a test in
-  `app/routes/profile.test.tsx`.
+  of the card: it is managed by the email field, not connect buttons. Its
+  presence is passed to the block as `hasOtherSignInMethods` (corpora-ui ≥
+  0.10.0), so the last-method guard only fires when a social identity really is
+  the last way in — an email + one-provider account can disconnect its
+  provider, while a lone social identity with no email stays guarded. Both
+  sides are pinned by tests in `app/routes/profile.test.tsx`.
 - **GoTrue enforces at-least-one-identity server-side**; the card's guard is
   UX, not the security boundary.
 

@@ -204,11 +204,9 @@ function isSocialProvider(provider: string): provider is SocialProvider {
 
 /**
  * The email/password identity is filtered out: it is managed by the email and
- * password rows above, not by connect/disconnect buttons. That makes the
- * block's last-method guard conservative — an email + one-provider account
- * sees its provider's Disconnect disabled even though the password would keep
- * the account reachable. Safe, but stricter than GoTrue's own rule; lifting it
- * needs a corpora-ui release that can be told about out-of-list methods.
+ * password rows above, not by connect/disconnect buttons. Its presence still
+ * reaches the block through `hasOtherSignInMethods`, so the last-method guard
+ * only engages when a social identity really is the only way in.
  */
 function toLinkedIdentities(identities: Identity[]): LinkedIdentity[] {
   return identities.flatMap((identity) =>
@@ -255,6 +253,7 @@ function ConnectedAccounts({ identities }: { identities: Identity[] | null }) {
   return (
     <LinkedAccountsBlock
       identities={toLinkedIdentities(identities)}
+      hasOtherSignInMethods={identities.some((i) => i.provider === "email")}
       providers={AUTH_PROVIDERS}
       onLink={async (provider) => {
         await linkProvider(provider)
