@@ -157,12 +157,29 @@ describe("connected accounts", () => {
     )
   })
 
-  it("guards the last social identity from being disconnected", async () => {
-    // Email + one provider: GoTrue would allow this unlink (the password
-    // remains), but the block cannot yet be told about out-of-list methods,
-    // so the guard is deliberately conservative. Pinned so a corpora-ui
-    // upgrade that lifts it shows up as a failing test, not a silent change.
+  it("lets an email-backed account disconnect its only social identity", async () => {
+    // Email + one provider: the password keeps the account reachable, and
+    // `hasOtherSignInMethods` tells the block so — the last-method guard
+    // stays out of the way and the unlink goes through.
     givenIdentities([EMAIL_IDENTITY, GOOGLE_IDENTITY])
+    renderProfile()
+    const user = userEvent.setup()
+
+    const disconnect = await screen.findByRole("button", { name: "Disconnect Google" })
+    expect(disconnect).toBeEnabled()
+    await user.click(disconnect)
+
+    await waitFor(() =>
+      expect(authApi.unlinkIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ identity_id: "row-google" }),
+      ),
+    )
+  })
+
+  it("guards a lone social identity with no email fallback", async () => {
+    // No email identity at all: the Google row really is the only way in,
+    // so the guard must still hold.
+    givenIdentities([GOOGLE_IDENTITY])
     renderProfile()
 
     const disconnect = await screen.findByRole("button", { name: "Disconnect Google" })
