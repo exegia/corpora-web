@@ -1,6 +1,14 @@
 import { SOCIAL_PROVIDERS } from "@exegia/corpora-ui"
 import type { LinkedIdentity, SocialProvider } from "@exegia/corpora-ui"
-import { BadgeCheckIcon, UploadIcon, XIcon } from "lucide-react"
+import {
+  BadgeCheckIcon,
+  BookMarkedIcon,
+  FolderKanbanIcon,
+  ShieldCheckIcon,
+  UploadIcon,
+  UserIcon,
+  XIcon,
+} from "lucide-react"
 import { AnimatePresence, motion } from "motion/react"
 import { Suspense, useId, useMemo, useRef, useState } from "react"
 import { Await, useFetcher, useRevalidator } from "react-router"
@@ -33,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import {
   AuthError,
@@ -243,6 +252,17 @@ function ConnectedAccountsFrame({ children }: { children: React.ReactNode }) {
     </Frame>
   )
 }
+
+/**
+ * Named rather than "tab-1"/"tab-2" so the value survives being reordered, and
+ * so a future `?tab=` query param has something stable to map onto.
+ */
+const PROFILE_TAB = {
+  general: "general",
+  security: "security",
+  projects: "projects",
+  references: "references",
+} as const
 
 const LAST_METHOD_EXPLANATION =
   "This is your only way to sign in, so it can't be disconnected."
@@ -537,7 +557,34 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <Tabs
+      className="mx-auto w-full max-w-3xl gap-6"
+      defaultValue={PROFILE_TAB.general}
+    >
+      <TabsList>
+        <TabsTab value={PROFILE_TAB.general}>
+          <UserIcon aria-hidden="true" />
+          General
+        </TabsTab>
+        <TabsTab value={PROFILE_TAB.security}>
+          <ShieldCheckIcon aria-hidden="true" />
+          Sign-in and security
+        </TabsTab>
+        {/* Not built yet. Present so the shape of the page is honest about
+            what is coming, disabled so it cannot be selected — Base UI keeps
+            it focusable and marks it `aria-disabled`, which is what tells a
+            screen reader "exists, not available" rather than hiding it. */}
+        <TabsTab disabled value={PROFILE_TAB.projects}>
+          <FolderKanbanIcon aria-hidden="true" />
+          Projects
+        </TabsTab>
+        <TabsTab disabled value={PROFILE_TAB.references}>
+          <BookMarkedIcon aria-hidden="true" />
+          References
+        </TabsTab>
+      </TabsList>
+
+      <TabsPanel value={PROFILE_TAB.general}>
       <fetcher.Form method="post">
         <Frame>
           <FrameHeader>
@@ -810,12 +857,18 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
           </FrameFooter>
         </Frame>
       </fetcher.Form>
+      </TabsPanel>
 
-      <Suspense fallback={<ConnectedAccountsFallback />}>
-        <Await resolve={loaderData.identities}>
-          {(identities) => <ConnectedAccounts identities={identities} />}
-        </Await>
-      </Suspense>
-    </div>
+      <TabsPanel value={PROFILE_TAB.security}>
+        {/* Still deferred, and still behind its own Suspense boundary: the
+            identities request starts with the loader, not when this tab is
+            first opened, so switching to it lands on resolved data. */}
+        <Suspense fallback={<ConnectedAccountsFallback />}>
+          <Await resolve={loaderData.identities}>
+            {(identities) => <ConnectedAccounts identities={identities} />}
+          </Await>
+        </Suspense>
+      </TabsPanel>
+    </Tabs>
   )
 }
