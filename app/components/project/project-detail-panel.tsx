@@ -3,19 +3,17 @@ import {
     Circle,
     Pencil,
     Plus,
-    Scale,
     Send,
     ShieldCheck,
     Trash,
-    Undo2,
-    X,
+    Undo2
 } from "lucide-react"
 import { useState } from "react"
 import { useFetcher } from "react-router"
 import { ClassifyDialog } from "@/components/project/classify-dialog"
-import { LicenseSheet } from "@/components/project/license-sheet"
+
 import { OrganizationDialog } from "@/components/project/organization-dialog"
-import { Badge } from "@/components/ui/badge"
+
 import { Button } from "@exegia/corpora-ui"
 import {
     Card,
@@ -28,6 +26,8 @@ import { ButtonGroup } from "@/components/ui/group"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
+import LicensePickerSection from "@/components/project/license-picker-section"
+import AlertBlock from "@/components/alert.block"
 import MetadataBlock from "@/components/metadata.block"
 import StatusBlock from "@/components/status.block"
 import {
@@ -147,57 +147,7 @@ function ReviewChecklist({ project }: { project: ProjectDetail }) {
     )
 }
 
-/** One attached licence, styled like the corpus card: leading icon + meta. */
-function AttachedLicenseRow({
-                                license,
-                                readOnly,
-                            }: {
-    license: AttachedLicense
-    readOnly: boolean
-}) {
-    const fetcher = useFetcher<{ ok: boolean; error?: string }>()
-    const busy = fetcher.state !== "idle"
 
-    return (
-        <li className="flex items-center justify-between gap-3 rounded-lg border p-3">
-            <div className="flex min-w-0 items-center gap-3">
-                <Scale
-                    aria-hidden="true"
-                    className="size-5 shrink-0 text-muted-foreground"
-                />
-                <div className="min-w-0">
-                    <p className="truncate font-medium text-sm">
-                        {license.title}
-                        {license.status !== "active" && (
-                            <Badge variant="destructive" className="ms-2">
-                                {license.status}
-                            </Badge>
-                        )}
-                    </p>
-                    <p className="truncate text-muted-foreground text-xs">
-                        Agreed {formatDate(license.agreedAt)} by{" "}
-                        {license.agreedBy.name ?? license.agreedBy.username}
-                    </p>
-                    {fetcher.data?.ok === false && fetcher.data.error && (
-                        <p role="alert" className="text-destructive text-xs">
-                            {fetcher.data.error}
-                        </p>
-                    )}
-                </div>
-            </div>
-            {!readOnly && (
-                <fetcher.Form method="post" className="shrink-0">
-                    <input type="hidden" name="intent" value="detach-license" />
-                    <input type="hidden" name="licenseId" value={license.id} />
-                    <Button type="submit" size="sm" variant="ghost" disabled={busy}>
-                        <X aria-hidden="true" className="size-4" />
-                        Remove
-                    </Button>
-                </fetcher.Form>
-            )}
-        </li>
-    )
-}
 
 export interface ProjectDetailPanelProps {
     project: ProjectDetail
@@ -234,12 +184,13 @@ export function ProjectDetailPanel({
     const showChecklist =
         !["ready-for-review", "published"].includes(project.status) && issues.length > 0
 
-    return (
+  return (
+      <>
         <CardFrame>
             <CardFrameHeader>
                 <CardFrameTitle render={<h2 />}>Details</CardFrameTitle>
             </CardFrameHeader>
-            <div className="grid sm:grid-cols-6 gap-x-2">
+            <div className="grid sm:grid-cols-6 gap-x-1">
               <Card className="sm:col-span-2">
                 <CardPanel>
                   <MetadataBlock
@@ -251,124 +202,143 @@ export function ProjectDetailPanel({
                         fetcher={statusFetcher}
                     />} />
                     {showChecklist && <ReviewChecklist project={project} />}
+                    {project.status === "ready-for-review" && !superadmin && (
+                        <p className="mt-1 text-muted-foreground text-xs">
+                            Waiting for the superadmin to approve.
+                        </p>
+                    )}
+                    {statusFetcher.data?.ok === false && statusFetcher.data.error && (
+                        <p role="alert" className="mt-1 text-destructive text-xs">
+                            {statusFetcher.data.error}
+                        </p>
+                    )}
                 </CardPanel>
               </Card>
               <Card className="sm:col-span-4">
-                <CardPanel className="grid sm:grid-cols-2">
+                <CardPanel className="grid gap-4 sm:grid-cols-2">
                   <MetadataBlock
                     label="Classification"
-                    value={classification}
+                    value={
+                      classification ? (
+                        <span className="capitalize">{classification}</span>
+                      ) : (
+                        "Unclassified"
+                      )
+                    }
                     action={
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setClassifying(true)}
-                      >
-                        <Pencil aria-hidden="true" className="size-4" />
-                        Edit
-                      </Button>
+                      !readOnly && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setClassifying(true)}
+                        >
+                          <Pencil aria-hidden="true" className="size-4" />
+                          Classify
+                        </Button>
+                      )
                     }
                   />
-                  <MetadataBlock label="Creator" value={project.creator.name ?? project.creator.username} />
-             <MetadataBlock label="Organization" value={project.organization?.name}   action={
-               <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={() => setClassifying(true)}
-               >
-                 <Pencil aria-hidden="true" className="size-4" />
-                 Edit
-               </Button>
-             } />
-               <MetadataBlock label="Website" value={<Button variant="link" size="sm">{project.organization?.website}</Button>}   action={
-                 <Button
-                   variant="outline"
-                   size="sm"
-                   onClick={() => setClassifying(true)}
-                 >
-                   <Pencil aria-hidden="true" className="size-4" />
-                   Edit
-                 </Button>
-               } />
-                </CardPanel>
-              </Card>
-            </div>
-   
-                <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-                
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        {statusFetcher.data?.ok === false && statusFetcher.data.error && (
-                            <p role="alert" className="mt-1 text-destructive text-xs">
-                                {statusFetcher.data.error}
-                            </p>
-                        )}
-                      </div>
-                    {project.organization && (
-                        <orgClearFetcher.Form method="post">
-                            <input
+                  <MetadataBlock
+                    label="Creator"
+                    value={project.creator.name ?? project.creator.username}
+                  />
+                  <MetadataBlock
+                    label="Organization"
+                    value={
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {project.organization ? (
+                            <span className="min-w-0 truncate">
+                              {project.organization.name}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              No organization
+                            </span>
+                          )}
+                          {!readOnly && project.organization && (
+                            <orgClearFetcher.Form method="post">
+                              <input
                                 type="hidden"
                                 name="intent"
                                 value="set-organization"
-                            />
-                            <input type="hidden" name="organizationId" value="" />
-                            <Button
+                              />
+                              <input
+                                type="hidden"
+                                name="organizationId"
+                                value=""
+                              />
+                              <Button
                                 type="submit"
                                 size="sm"
                                 variant="ghost"
                                 disabled={orgClearFetcher.state !== "idle"}
-                            >
+                              >
                                 <Trash aria-hidden="true" className="size-4" />
                                 Remove
-                            </Button>
-                        </orgClearFetcher.Form>
-                    )}
-                              
-                            {orgClearFetcher.data?.ok === false && orgClearFetcher.data.error && (
-                                <p role="alert" className="text-destructive text-xs">
-                                    {orgClearFetcher.data.error}
-                                </p>
-                            )}
-                     
-
-                        <div className="flex flex-col gap-1">
-                            <dt className="font-medium">Dates</dt>
-                            <dd className="text-muted-foreground">
-                                Created {formatDate(project.createdAt)} · updated{" "}
-                                <span title={project.updatedAt}>
-                  {formatRelativeTime(project.updatedAt)}
-                </span>
-                            </dd>
+                              </Button>
+                            </orgClearFetcher.Form>
+                          )}
                         </div>
-                    </dl>
-
-                    <div className="mt-4">
-                        <div className="flex items-center justify-between gap-3">
-                            <h3 className="font-medium text-sm">Licences</h3>
-                            <LicenseSheet
-                                catalog={licenseCatalog}
-                                attachedIds={project.licenses.map((license) => license.id)}
-                                agreedByUserId={project.creator.id}
-                                disabled={readOnly}
-                            />
-                        </div>
-                        {project.licenses.length === 0 ? (
-                            <p className="py-2 text-muted-foreground text-sm">
-                                No licences attached. A licence is required before the project
-                                can go to review — attach one from the catalog.
+                        {orgClearFetcher.data?.ok === false &&
+                          orgClearFetcher.data.error && (
+                            <p role="alert" className="text-destructive text-xs">
+                              {orgClearFetcher.data.error}
                             </p>
-                        ) : (
-                            <ul className="mt-2 flex flex-col gap-2">
-                                {project.licenses.map((license) => (
-                                    <AttachedLicenseRow
-                                        key={license.id}
-                                        license={license}
-                                        readOnly={readOnly}
-                                    />
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-    
+                          )}
+                      </>
+                    }
+                    action={
+                      !readOnly && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingOrganization(true)}
+                        >
+                          {project.organization ? (
+                            <Pencil aria-hidden="true" className="size-4" />
+                          ) : (
+                            <Plus aria-hidden="true" className="size-4" />
+                          )}
+                          {project.organization ? "Change" : "Assign"}
+                        </Button>
+                      )
+                    }
+                  />
+                  <MetadataBlock
+                    label="Website"
+                    value={
+                      project.organization?.website && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          render={
+                            <a
+                              href={project.organization.website}
+                              target="_blank"
+                              rel="noreferrer"
+                            />
+                          }
+                        >
+                          {project.organization.website}
+                        </Button>
+                      )
+                    }
+                  />
+                  <MetadataBlock
+                    label="Dates"
+                    value={
+                      <span className="text-muted-foreground">
+                        Created {formatDate(project.createdAt)} · updated{" "}
+                        <span title={project.updatedAt}>
+                          {formatRelativeTime(project.updatedAt)}
+                        </span>
+                      </span>
+                    }
+                  />
+                </CardPanel>
+              </Card>
+        </div>
 
             <ClassifyDialog
                 open={classifying}
@@ -385,6 +355,8 @@ export function ProjectDetailPanel({
                 organizations={organizations}
                 currentId={project.organization?.id ?? null}
             />
-        </CardFrame>
+      </CardFrame>
+      <LicensePickerSection project={project} readOnly={readOnly} licenseCatalog={licenseCatalog} />
+      </>
     )
 }

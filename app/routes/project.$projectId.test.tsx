@@ -388,12 +388,9 @@ describe("read-only while in review (003)", () => {
 
   it("hides every editing affordance and shows the review banner", async () => {
     renderRoute()
-    // Queried by text, not a bare role="status": the loading skeleton is also
-    // a status live region, and it resolves first.
-    expect(await screen.findByText(/in review/i)).toHaveAttribute(
-      "role",
-      "status",
-    )
+    // The banner is an AlertBlock, whose root carries role="alert"; the
+    // title and description are separate children, so match on text content.
+    expect(await screen.findByRole("alert")).toHaveTextContent(/in review/i)
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Classify" })).not.toBeInTheDocument()

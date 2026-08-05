@@ -280,7 +280,7 @@ function WorkspacePanels({
         readOnly={readOnly}
       />
 
-      <Separator />
+      
 
       <CorpusSection
         corpus={project.corpus}
@@ -288,8 +288,6 @@ function WorkspacePanels({
         documents={documents}
         readOnly={readOnly}
       />
-
-      <Separator />
 
       <div>
         <div className="flex items-center justify-between gap-3">
