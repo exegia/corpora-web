@@ -293,13 +293,9 @@ export function ProjectDetailPanel({
                 </CardPanel>
               </Card>
             </div>
-            <Card className="grid sm:grid-cols-2">
-              <CardPanel className="grid sm:grid-cols-2">
-              
+   
                 <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-                  <div className="flex flex-col gap-1">
-                    <dt className="font-medium">Status</dt>
-                    <dd>
+                
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         {statusFetcher.data?.ok === false && statusFetcher.data.error && (
                             <p role="alert" className="mt-1 text-destructive text-xs">
@@ -307,33 +303,6 @@ export function ProjectDetailPanel({
                             </p>
                         )}
                       </div>
-                    </dd>
-                  </div>
-                        <div className="flex flex-col gap-1">
-                            <dt className="font-medium">Organization</dt>
-                            <dd className="flex items-center justify-between gap-2">
-                                {project.organization ? (
-                                    <span className="min-w-0 truncate">
-                    {project.organization.name}
-                                        {project.organization.website && (
-                                            <>
-                                                {" · "}
-                                                <a
-                                                    href={project.organization.website}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-muted-foreground underline-offset-2 hover:underline"
-                                                >
-                                                    {project.organization.website}
-                                                </a>
-                                            </>
-                                        )}
-                  </span>
-                                ) : (
-                                    <span className="text-muted-foreground">No organization</span>
-                                )}
-                                {!readOnly && (
-                                    <span className="flex shrink-0 items-center gap-1">
                     {project.organization && (
                         <orgClearFetcher.Form method="post">
                             <input
@@ -353,27 +322,13 @@ export function ProjectDetailPanel({
                             </Button>
                         </orgClearFetcher.Form>
                     )}
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => setEditingOrganization(true)}
-                                        >
-                                            {project.organization ? (
-                                                <Pencil aria-hidden="true" className="size-4" />
-                                            ) : (
-                                                <Plus aria-hidden="true" className="size-4" />
-                                            )}
-                                            {project.organization ? "Change" : "Assign"}
-                    </Button>
-                  </span>
-                                )}
-                            </dd>
+                              
                             {orgClearFetcher.data?.ok === false && orgClearFetcher.data.error && (
                                 <p role="alert" className="text-destructive text-xs">
                                     {orgClearFetcher.data.error}
                                 </p>
                             )}
-                        </div>
+                     
 
                         <div className="flex flex-col gap-1">
                             <dt className="font-medium">Dates</dt>
@@ -413,8 +368,7 @@ export function ProjectDetailPanel({
                             </ul>
                         )}
                     </div>
-                </CardPanel>
-            </Card>
+    
 
             <ClassifyDialog
                 open={classifying}
