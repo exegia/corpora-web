@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { formatRelativeTime } from "@/lib/format"
 import {
   createProject,
   DataError,
@@ -99,7 +100,42 @@ describe("/project list", () => {
       await screen.findByRole("link", { name: /Peshitta Study/ }),
     ).toBeInTheDocument()
     expect(screen.getByText("draft")).toBeInTheDocument()
-    expect(screen.getByText(/updated/)).toBeInTheDocument()
+    // The column header carries the "updated" wording now; the cell holds the
+    // relative time, with the exact timestamp on its title.
+    expect(
+      screen.getByRole("columnheader", { name: "Updated" }),
+    ).toBeInTheDocument()
+    expect(screen.getByTitle(summary.updatedAt)).toHaveTextContent(
+      formatRelativeTime(summary.updatedAt),
+    )
+  })
+
+  it("renders one table row per project, with trailing row actions", async () => {
+    vi.mocked(listProjects).mockResolvedValue([summary])
+    renderRoute()
+
+    const row = await screen.findByRole("row", { name: /Peshitta Study/ })
+    // The row navigates via a link stretched over it, not a nested button —
+    // <button> inside <a> is invalid and behaves inconsistently.
+    expect(within(row).getByRole("link", { name: "Peshitta Study" })).toHaveAttribute(
+      "href",
+      "/project/p1",
+    )
+    // Icon-only actions: the accessible name comes from aria-label, so the
+    // trigger must not also render the dialog's default "Delete" text.
+    const edit = within(row).getByRole("button", { name: "Edit" })
+    const remove = within(row).getByRole("button", { name: "Delete" })
+    expect(edit).toHaveTextContent("")
+    expect(remove).toHaveTextContent("")
+  })
+
+  it("opens the edit dialog from the row's edit action", async () => {
+    const user = userEvent.setup()
+    vi.mocked(listProjects).mockResolvedValue([summary])
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }))
+    expect(await screen.findByLabelText("Name")).toHaveValue("Peshitta Study")
   })
 
   it("creates a project from the dialog with a required creator", async () => {
