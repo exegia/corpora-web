@@ -82,7 +82,7 @@ function givenIdentities(rows: Array<Record<string, unknown>>) {
  * card is genuinely absent from the DOM on the General tab, which is the
  * behaviour, not a testing quirk.
  */
-async function renderProfile() {
+async function renderProfile({ tab = /sign-in and security/i } = {}) {
   const Stub = createRoutesStub([
     {
       path: "/profile",
@@ -94,9 +94,11 @@ async function renderProfile() {
     },
   ])
   const result = render(<Stub initialEntries={["/profile"]} />)
-  await userEvent.click(
-    await screen.findByRole("tab", { name: /sign-in and security/i }),
-  )
+  // General is already active, so clicking it would be a no-op the tab
+  // primitive may not even re-render for.
+  if (!tab.test("General")) {
+    await userEvent.click(await screen.findByRole("tab", { name: tab }))
+  }
   return result
 }
 
@@ -262,5 +264,79 @@ describe("connected accounts", () => {
     await renderProfile()
     const failure = await screen.findByText(/couldn't load your connected accounts/i)
     expect(frameAround(failure)).not.toBeNull()
+  })
+})
+
+describe("profile form", () => {
+  /**
+   * The save control is the only "you have unsaved changes" signal now that it
+   * lives in the header — if it rendered while clean it would say nothing, and
+   * if it failed to appear the edit would look unsaveable.
+   */
+  it("reveals save only once something is dirty", async () => {
+    givenIdentities([EMAIL_IDENTITY])
+    await renderProfile({ tab: /General/ })
+
+    const save = () => screen.queryByRole("button", { name: /save changes/i })
+    // Await the form first. The route has a clientLoader, so asserting
+    // straight after render() would find no button because nothing has
+    // mounted yet — passing for the wrong reason whatever the button does.
+    const username = await screen.findByPlaceholderText("adaresearcher")
+    expect(save()).not.toBeInTheDocument()
+
+    await userEvent.type(username, "x")
+    await waitFor(() => expect(save()).toBeInTheDocument())
+  })
+
+  /**
+   * One form spans both cards, so the header button has to submit the fields
+   * in the second one too — the failure this pins is a save that quietly drops
+   * everything below the card its button sits in.
+   */
+  it("saves fields from both cards through the one header button", async () => {
+    givenIdentities([EMAIL_IDENTITY])
+    await renderProfile({ tab: /General/ })
+
+    await userEvent.type(
+      await screen.findByPlaceholderText("University of Tübingen"),
+      "Exegia",
+    )
+    await userEvent.click(await screen.findByRole("button", { name: /save changes/i }))
+
+    await waitFor(() =>
+      expect(authApi.updateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ affiliation: "Exegia" }),
+        }),
+      ),
+    )
+  })
+})
+
+describe("danger zone", () => {
+  /**
+   * The whole point of the gate is that it cannot be cleared by reflex, so
+   * both the near-miss word and the wrong casing have to keep it shut.
+   */
+  it("keeps delete disabled until the exact phrase is typed", async () => {
+    givenIdentities([EMAIL_IDENTITY])
+    await renderProfile()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole("button", { name: /delete account/i }))
+    const confirm = await screen.findByRole("button", { name: /delete this account/i })
+    const box = screen.getByPlaceholderText("delete my account")
+    expect(confirm).toBeDisabled()
+
+    await user.type(box, "DELETE")
+    expect(confirm).toBeDisabled()
+
+    await user.clear(box)
+    await user.type(box, "Delete My Account")
+    expect(confirm).toBeDisabled()
+
+    await user.clear(box)
+    await user.type(box, "delete my account")
+    await waitFor(() => expect(confirm).toBeEnabled())
   })
 })

@@ -78,6 +78,10 @@
   /* motion tokens (transitions.dev scale) — required by corpora-ui components */
   --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
   --animate-input-shake: input-shake 0.4s ease-in-out;
+  /* Shorter and shallower than route-enter (260ms/8px): switching a tab is a
+     smaller move than arriving on a route, and 200ms matches the tab list's
+     own indicator so the underline and the content settle together. */
+  --animate-tab-panel-enter: tab-panel-enter 200ms var(--ease-smooth-out) both;
   --font-heading: var(--font-sans);
   --font-mono: var(--font-mono, ui-monospace, monospace);
   --font-sans: "Cal Sans", ui-sans-serif, system-ui, sans-serif;
@@ -250,6 +254,17 @@
   to {
     opacity: 0;
     translate: 0 -4px;
+  }
+}
+
+/* Base UI unmounts the inactive panel, so there is no outgoing half to
+   animate — the enter *is* the whole transition. Enter-only is also the
+   honest shape here: the old panel is already gone by the time the new one
+   mounts, and faking a crossfade would need both kept alive. */
+@keyframes tab-panel-enter {
+  from {
+    opacity: 0;
+    translate: 0 4px;
   }
 }
 
