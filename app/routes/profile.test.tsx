@@ -206,4 +206,52 @@ describe("connected accounts", () => {
     ).toBeInTheDocument()
     expect(screen.queryByText(/no sign-in methods connected yet/i)).not.toBeInTheDocument()
   })
+
+  /**
+   * The card is a Frame like every other panel on the page, and the pending,
+   * loaded and failed states all have to be that *same* Frame — otherwise the
+   * card visibly re-chromes when the deferred identities land. A screenshot
+   * only ever catches the resolved state, so pin it here instead.
+   */
+  it("keeps the same frame while pending, once loaded, and on failure", async () => {
+    /**
+     * Anchored to the state's *own* content and walked upwards. Querying for
+     * any `frame-panel-title` would pass on the strength of the Profile
+     * Details frame alone and never notice this card losing its own.
+     */
+    const frameAround = (node: HTMLElement) => {
+      const frame = node.closest("[data-slot=frame]")
+      // Not just any Frame — the one whose header titles this card.
+      const title = frame?.querySelector("[data-slot=frame-panel-title]")
+      return title?.textContent === "Connected accounts" ? frame : null
+    }
+
+    // Pending: getUserIdentities never settles, so the Suspense fallback holds.
+    authApi.getUserIdentities.mockReturnValue(new Promise(() => {}))
+    const pending = renderProfile()
+    const spinner = await screen.findByText(/loading connected accounts/i)
+    expect(frameAround(spinner)).not.toBeNull()
+    pending.unmount()
+
+    givenIdentities([EMAIL_IDENTITY, GOOGLE_IDENTITY])
+    const loaded = renderProfile()
+    expect(frameAround(await screen.findByText("Google"))).not.toBeNull()
+    // The block's own card chrome is stripped, so the Frame's panel is the
+    // only surface — an intact auth-block card would double border and radius.
+    expect(document.querySelector("[data-slot=auth-block]")).toHaveClass("border-0")
+    loaded.unmount()
+
+    authApi.getUserIdentities.mockResolvedValue({
+      data: null,
+      error: {
+        __isAuthError: true,
+        name: "AuthRetryableFetchError",
+        status: 0,
+        message: "fetch failed",
+      },
+    })
+    renderProfile()
+    const failure = await screen.findByText(/couldn't load your connected accounts/i)
+    expect(frameAround(failure)).not.toBeNull()
+  })
 })

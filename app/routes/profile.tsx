@@ -223,6 +223,45 @@ function toLinkedIdentities(identities: Identity[]): LinkedIdentity[] {
 }
 
 /**
+ * The card shell, shared by all three states. Loading, error and loaded each
+ * render it, so the header cannot drift between them and the card does not
+ * change shape as the deferred identities resolve.
+ */
+function ConnectedAccountsFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <Frame>
+      <FrameHeader>
+        <FrameTitle>Connected accounts</FrameTitle>
+        <FrameDescription>
+          Manage the accounts you can use to sign in.
+        </FrameDescription>
+      </FrameHeader>
+      {children}
+    </Frame>
+  )
+}
+
+/**
+ * `LinkedAccountsBlock` draws its own Card, which is the wrong chrome inside a
+ * Frame — every other panel on this page is a `FramePanel`. The block has no
+ * prop to drop it, so strip it here and let `FramePanel` own the surface:
+ *
+ * - the Card's border/background/radius/shadow, including its `before:` inset
+ *   highlight, which would otherwise stack with FramePanel's own
+ * - `card-header`, since the Frame above already renders the title. It stays in
+ *   the DOM under `display: none`, so it is not announced twice — do not
+ *   "fix" the apparent duplication by deleting FrameHeader
+ * - `card-panel`'s padding, which FramePanel already supplies
+ *
+ * Keyed to `data-slot`, which the block sets on direct children of its root.
+ */
+const BLOCK_AS_PANEL_CONTENT = [
+  "rounded-none border-0 bg-transparent shadow-none before:hidden",
+  "[&>[data-slot=card-header]]:hidden",
+  "[&>[data-slot=card-panel]]:p-0",
+].join(" ")
+
+/**
  * The sign-in identities card. `linkProvider` navigates the document away on
  * success, so its promise settling always means failure — the block renders
  * the rejection inline. After an unlink the route revalidates; the resolved
@@ -233,38 +272,48 @@ function ConnectedAccounts({ identities }: { identities: Identity[] | null }) {
 
   if (identities === null) {
     return (
-      <Frame>
-        <FrameHeader>
-          <FrameTitle>Connected accounts</FrameTitle>
-          <FrameDescription>
-            Manage the accounts you can use to sign in.
-          </FrameDescription>
-        </FrameHeader>
+      <ConnectedAccountsFrame>
         <FramePanel>
           <p className="text-sm text-destructive">
             We couldn't load your connected accounts. Reload the page to try
             again.
           </p>
         </FramePanel>
-      </Frame>
+      </ConnectedAccountsFrame>
     )
   }
 
   return (
-    <LinkedAccountsBlock
-      identities={toLinkedIdentities(identities)}
-      hasOtherSignInMethods={identities.some((i) => i.provider === "email")}
-      providers={AUTH_PROVIDERS}
-      onLink={async (provider) => {
-        await linkProvider(provider)
-      }}
-      onUnlink={async (identityId) => {
-        await unlinkProvider(identityId)
-        // The loader is the source of truth; hold the row's spinner until the
-        // refreshed list is in.
-        await revalidator.revalidate()
-      }}
-    />
+    <ConnectedAccountsFrame>
+      <FramePanel>
+        <LinkedAccountsBlock
+          className={BLOCK_AS_PANEL_CONTENT}
+          identities={toLinkedIdentities(identities)}
+          hasOtherSignInMethods={identities.some((i) => i.provider === "email")}
+          providers={AUTH_PROVIDERS}
+          onLink={async (provider) => {
+            await linkProvider(provider)
+          }}
+          onUnlink={async (identityId) => {
+            await unlinkProvider(identityId)
+            // The loader is the source of truth; hold the row's spinner until
+            // the refreshed list is in.
+            await revalidator.revalidate()
+          }}
+        />
+      </FramePanel>
+    </ConnectedAccountsFrame>
+  )
+}
+
+/** The deferred fallback, in the same shell so the card does not re-chrome. */
+function ConnectedAccountsFallback() {
+  return (
+    <ConnectedAccountsFrame>
+      <FramePanel>
+        <LinkedAccountsBlock className={BLOCK_AS_PANEL_CONTENT} loading />
+      </FramePanel>
+    </ConnectedAccountsFrame>
   )
 }
 
@@ -576,7 +625,7 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
         </Frame>
       </fetcher.Form>
 
-      <Suspense fallback={<LinkedAccountsBlock loading />}>
+      <Suspense fallback={<ConnectedAccountsFallback />}>
         <Await resolve={loaderData.identities}>
           {(identities) => <ConnectedAccounts identities={identities} />}
         </Await>
