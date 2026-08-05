@@ -511,3 +511,26 @@ export async function unlinkProvider(identityId: string): Promise<Identity[]> {
     throw toThrowableAuthError(cause, "Unable to disconnect that account.")
   }
 }
+
+/**
+ * Deletes the signed-in user's own account.
+ *
+ * NOT YET WIRED TO A BACKEND. Deleting a user requires the service_role key,
+ * which cannot live in this app — it is a browser-only SPA, and `.env.example`
+ * is explicit that no secret may carry a VITE_ prefix because there is no
+ * server here to hold one. So this needs one of:
+ *
+ *   - a `delete_current_user()` Postgres function, SECURITY DEFINER, deleting
+ *     from auth.users where id = auth.uid(), called through `.rpc()`; or
+ *   - an Edge Function in ../corpora-supabase holding the service key.
+ *
+ * Until one exists this throws, and the confirm dialog renders the message
+ * inline. It is deliberately a real failure rather than a silent no-op: a
+ * delete that appears to succeed and does not is the worse outcome by far.
+ * Swap the throw for the call and the rest of the flow is already in place.
+ */
+export async function deleteAccount(): Promise<void> {
+  throw new AuthError(
+    "Account deletion isn't available yet. Contact support and we'll remove it for you.",
+  )
+}

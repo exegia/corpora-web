@@ -34,12 +34,18 @@ export interface ConfirmDeleteDialogProps {
   trigger?: React.ReactElement
   /** Trigger text. Overridden entirely when `trigger` has its own children. */
   triggerLabel?: string
+  /**
+   * The phrase to type. Defaults to `DELETE` — scale it with the blast
+   * radius: a project is one word, an account is a sentence you cannot type
+   * by reflex.
+   */
+  confirmWord?: string
 }
 
 /**
- * Confirmation gate for irreversible deletes: the user has to type DELETE
- * before the submit button enables. Owns its own fetcher so the pending and
- * error states come for free at every call site.
+ * Confirmation gate for irreversible deletes: the user has to type the confirm
+ * phrase before the submit button enables. Owns its own fetcher so the pending
+ * and error states come for free at every call site.
  */
 export function ConfirmDeleteDialog({
   title,
@@ -49,11 +55,12 @@ export function ConfirmDeleteDialog({
   fields,
   trigger,
   triggerLabel = "Delete",
+  confirmWord = CONFIRM_WORD,
 }: ConfirmDeleteDialogProps) {
   const fetcher = useFetcher<{ ok: boolean; error?: string }>()
   const [typed, setTyped] = useState("")
   const busy = fetcher.state !== "idle"
-  const confirmed = typed === CONFIRM_WORD
+  const confirmed = typed === confirmWord
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
 
   return (
@@ -85,7 +92,7 @@ export function ConfirmDeleteDialog({
               <FieldLabel>
                 Type{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-destructive-foreground text-xs">
-                  {CONFIRM_WORD}
+                  {confirmWord}
                 </code>{" "}
                 in the input below to continue:
               </FieldLabel>
@@ -99,7 +106,7 @@ export function ConfirmDeleteDialog({
                 autoComplete="off"
                 className="w-full border-destructive ring-destructive/24 has-focus-visible:border-destructive/64 [&_input]:placeholder:text-destructive/40"
                 onChange={(event) => setTyped(event.currentTarget.value)}
-                placeholder={CONFIRM_WORD}
+                placeholder={confirmWord}
                 spellCheck={false}
                 type="text"
                 value={typed}

@@ -14,6 +14,7 @@ import { Suspense, useId, useMemo, useRef, useState } from "react"
 import { Await, useFetcher, useRevalidator } from "react-router"
 import { AUTH_PROVIDERS } from "@/components/auth"
 import { BrandMark } from "@/components/brand-marks"
+import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { play } from "@/lib/sounds"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -21,7 +22,6 @@ import { Button } from "@/components/ui/button"
 import {
   Frame,
   FrameDescription,
-  FrameFooter,
   FrameHeader,
   FramePanel,
   FrameTitle,
@@ -45,9 +45,11 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import {
   AuthError,
+  deleteAccount,
   getCurrentUser,
   linkProvider,
   listIdentities,
+  sendPasswordReset,
   unlinkProvider,
   type Identity,
 } from "@/lib/auth"
@@ -82,6 +84,25 @@ export async function clientLoader() {
 export async function clientAction({ request }: Route.ClientActionArgs) {
   const form = await request.formData()
   const field = (name: string) => String(form.get(name) ?? "")
+
+  if (field("intent") === PROFILE_INTENT.deleteAccount) {
+    try {
+      await deleteAccount()
+      // Nothing local survives the account, so leave rather than revalidate
+      // into a page whose loader now 401s.
+      window.location.assign("/login")
+      return { ok: true as const }
+    } catch (error) {
+      if (error instanceof AuthError) {
+        return { ok: false as const, error: error.message }
+      }
+      return {
+        ok: false as const,
+        error: "Something went wrong. Your account was not deleted.",
+      }
+    }
+  }
+
   try {
     await updateProfile({
       name: field("name"),
@@ -263,6 +284,17 @@ const PROFILE_TAB = {
   projects: "projects",
   references: "references",
 } as const
+
+/** Action intents. `save` is the implicit default when none is submitted. */
+const PROFILE_INTENT = {
+  deleteAccount: "delete-account",
+} as const
+
+/**
+ * GitHub's phrasing, and its reasoning: long enough that muscle memory cannot
+ * produce it, and it names the thing being destroyed rather than the verb.
+ */
+const DELETE_ACCOUNT_PHRASE = "delete my account"
 
 const LAST_METHOD_EXPLANATION =
   "This is your only way to sign in, so it can't be disconnected."
@@ -495,6 +527,110 @@ function ConnectedAccounts({ identities }: { identities: Identity[] | null }) {
 }
 
 /**
+ * Password reset. Deliberately the emailed-link flow rather than an inline
+ * old/new password pair: the link proves control of the mailbox, which is what
+ * makes it safe on an already-open session someone else may have walked up to.
+ * Reuses `sendPasswordReset` — the same call behind /forgot-password — so the
+ * link lands on /reset-password exactly as it does when signed out.
+ */
+function PasswordCard({ email }: { email: string }) {
+  const [state, setState] = useState<"idle" | "sending" | "sent">("idle")
+  const [error, setError] = useState<string | null>(null)
+
+  async function send() {
+    if (state === "sending" || !email) return
+    setError(null)
+    setState("sending")
+    try {
+      await sendPasswordReset(email)
+      setState("sent")
+      play("success")
+    } catch (cause) {
+      setState("idle")
+      setError(
+        cause instanceof Error ? cause.message : "Unable to send the reset link.",
+      )
+      play("error")
+    }
+  }
+
+  return (
+    <Frame>
+      <FrameHeader>
+        <FrameTitle>Password</FrameTitle>
+        <FrameDescription>
+          Change the password you use to sign in with email.
+        </FrameDescription>
+      </FrameHeader>
+      <FramePanel className="flex flex-col items-start gap-3">
+        {state === "sent" ? (
+          <p className="text-muted-foreground text-sm" role="status">
+            Sent. Check <span className="text-foreground">{email}</span> for a
+            link to set a new password.
+          </p>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            We'll email <span className="text-foreground">{email}</span> a link
+            to set a new one. Your current password keeps working until you do.
+          </p>
+        )}
+        {error && (
+          <p className="text-destructive text-sm" role="alert">
+            {error}
+          </p>
+        )}
+        <Button
+          disabled={state === "sending" || !email}
+          loading={state === "sending"}
+          onClick={() => void send()}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {state === "sent" ? "Resend reset link" : "Send reset link"}
+        </Button>
+      </FramePanel>
+    </Frame>
+  )
+}
+
+/**
+ * The irreversible corner, in its own card and styled like GitHub's: a
+ * destructive-bordered panel, a red button, and a dialog that will not submit
+ * until the phrase is typed in full. The phrase is a sentence rather than one
+ * word precisely because it cannot be typed by reflex.
+ */
+function DangerZoneCard() {
+  return (
+    <Frame>
+      <FrameHeader>
+        <FrameTitle className="text-destructive">Danger zone</FrameTitle>
+        <FrameDescription>
+          Irreversible actions. Please be certain.
+        </FrameDescription>
+      </FrameHeader>
+      <FramePanel className="flex flex-wrap items-center justify-between gap-4 border-destructive/48">
+        <div className="flex min-w-0 flex-col">
+          <span className="font-medium text-sm">Delete this account</span>
+          <span className="text-muted-foreground text-sm">
+            Your profile, projects and corpora are removed permanently.
+          </span>
+        </div>
+        <ConfirmDeleteDialog
+          confirmLabel="Delete this account"
+          confirmWord={DELETE_ACCOUNT_PHRASE}
+          description="This permanently removes your account, profile, projects and corpora. It cannot be undone."
+          intent={PROFILE_INTENT.deleteAccount}
+          title="Delete your account?"
+          trigger={<Button size="sm" variant="destructive" />}
+          triggerLabel="Delete account"
+        />
+      </FramePanel>
+    </Frame>
+  )
+}
+
+/**
  * The deferred fallback, in the same shell so the card does not re-chrome. The
  * skeleton rows match `IdentityRow`'s height and tile, so the resolved list
  * lands in place instead of shunting the card's height as it arrives.
@@ -584,14 +720,34 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
         </TabsTab>
       </TabsList>
 
-      <TabsPanel value={PROFILE_TAB.general}>
-      <fetcher.Form method="post">
+      <TabsPanel className="flex flex-col gap-6" value={PROFILE_TAB.general}>
+      <fetcher.Form className="flex flex-col gap-6" method="post">
         <Frame>
-          <FrameHeader>
-            <FrameTitle>Profile Details</FrameTitle>
-            <FrameDescription>
-              How you appear across the Corpora workspace.
-            </FrameDescription>
+          {/* The save control lives in the header of the first card because
+              one form spans both cards — a footer button under the second
+              would look like it only saved that one. It is absent until
+              something is dirty, so the header stays quiet at rest and the
+              button's appearance is itself the "unsaved changes" signal. */}
+          <FrameHeader className="flex-row items-start justify-between gap-4">
+            <div className="flex flex-col">
+              <FrameTitle>Profile</FrameTitle>
+              <FrameDescription>
+                How you appear across the Corpora workspace.
+              </FrameDescription>
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              <span aria-live="polite" className="text-sm">
+                {error ? <span className="text-destructive">{error}</span> : null}
+                {saved && !error && !dirty ? (
+                  <span className="text-muted-foreground">Profile saved.</span>
+                ) : null}
+              </span>
+              {dirty || saving ? (
+                <Button loading={saving} size="sm" type="submit">
+                  Save changes
+                </Button>
+              ) : null}
+            </div>
           </FrameHeader>
 
           <FramePanel className="py-0">
@@ -708,7 +864,23 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
               </InputGroup>
             </RowControl>
           </Row>
+          </FramePanel>
+        </Frame>
 
+        {/* "About you" rather than "Additional Info": these fields are not
+            leftovers, they are the scholarly identity other people read —
+            vocation, tradition, languages, affiliation, bio. Naming them by
+            what they are beats naming them by what they are not. */}
+        <Frame>
+          <FrameHeader>
+            <FrameTitle>About you</FrameTitle>
+            <FrameDescription>
+              Your background and where to find you. Shown on your public
+              profile.
+            </FrameDescription>
+          </FrameHeader>
+
+          <FramePanel className="py-0">
           <Row>
             <RowLabel
               title="Persona"
@@ -843,23 +1015,11 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
             />
           </Row>
           </FramePanel>
-
-          <FrameFooter className="flex items-center justify-end gap-2">
-            <span aria-live="polite" className="me-auto text-sm">
-              {error ? <span className="text-destructive">{error}</span> : null}
-              {saved && !error && !dirty ? (
-                <span className="text-muted-foreground">Profile saved.</span>
-              ) : null}
-            </span>
-            <Button disabled={!dirty || saving} loading={saving} type="submit">
-              Save changes
-            </Button>
-          </FrameFooter>
         </Frame>
       </fetcher.Form>
       </TabsPanel>
 
-      <TabsPanel value={PROFILE_TAB.security}>
+      <TabsPanel className="flex flex-col gap-6" value={PROFILE_TAB.security}>
         {/* Still deferred, and still behind its own Suspense boundary: the
             identities request starts with the loader, not when this tab is
             first opened, so switching to it lands on resolved data. */}
@@ -868,6 +1028,9 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
             {(identities) => <ConnectedAccounts identities={identities} />}
           </Await>
         </Suspense>
+
+        <PasswordCard email={email} />
+        <DangerZoneCard />
       </TabsPanel>
     </Tabs>
   )
