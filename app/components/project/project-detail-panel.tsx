@@ -28,6 +28,7 @@ import { ButtonGroup } from "@/components/ui/group"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
+import MetadataBlock from "@/components/metadata.block"
 import {
     type AttachedLicense,
     type ProjectDetail,
@@ -257,64 +258,75 @@ export function ProjectDetailPanel({
             <CardFrameHeader>
                 <CardFrameTitle render={<h2 />}>Details</CardFrameTitle>
             </CardFrameHeader>
-            <Card>
+            <div className="grid sm:grid-cols-6">
+              <Card className="sm:col-span-2">
                 <CardPanel>
-                    {project.status === "ready-for-review" && (
-                        <p
-                            role="status"
-                            className="mb-3 flex items-center gap-2 rounded-md bg-amber-500/10 px-3 py-2 text-amber-700 text-sm dark:text-amber-400"
-                        >
-                            <ShieldCheck aria-hidden="true" className="size-4 shrink-0" />
-                            In review — the project is read-only until the superadmin
-                            publishes it or returns it to draft.
-                        </p>
-                    )}
+
+              <MetadataBlock
+                label="Status"
+                value={  <StatusLabel status={project.status} />}
+                action={   <StatusActions
+                    project={project}
+                    superadmin={superadmin}
+                    fetcher={statusFetcher}
+                />} />
+              {showChecklist && <ReviewChecklist project={project} />}
+                </CardPanel>
+          </Card>
+          <Card className="sm:col-span-4">
+            <CardPanel>
+              <MetadataBlock
+                label="Classification"
+                value={classification}
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setClassifying(true)}
+                  >
+                    <Pencil aria-hidden="true" className="size-4" />
+                    Edit
+                  </Button>
+                }
+          />
+            </CardPanel>
+          </Card>
+            </div>
+        <Card className="grid sm:grid-cols-2">
+                <CardPanel>
+
                     <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
                         <div className="flex flex-col gap-1">
                             <dt className="font-medium">Status</dt>
                             <dd>
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <StatusLabel status={project.status} />
-                                    <StatusActions
-                                        project={project}
-                                        superadmin={superadmin}
-                                        fetcher={statusFetcher}
-                                    />
+
+
                                 </div>
-                                {showChecklist && <ReviewChecklist project={project} />}
-                                {project.status === "ready-for-review" && !superadmin && (
-                                    <p className="mt-1 text-muted-foreground text-xs">
-                                        Waiting for the superadmin to approve.
-                                    </p>
-                                )}
+
+
                                 {statusFetcher.data?.ok === false && statusFetcher.data.error && (
                                     <p role="alert" className="mt-1 text-destructive text-xs">
                                         {statusFetcher.data.error}
                                     </p>
                                 )}
                             </dd>
-                        </div>
+              </div>
 
-                        <div className="flex flex-col gap-1">
-                            <dt className="font-medium">Classification</dt>
-                            <dd className="flex items-center justify-between gap-2">
-                <span
-                    className={classification ? "capitalize" : "text-muted-foreground"}
-                >
-                  {classification || "Unclassified"}
-                </span>
-                                {!readOnly && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setClassifying(true)}
-                                    >
-                                        <Pencil aria-hidden="true" className="size-4" />
-                                        Classify
-                                    </Button>
-                                )}
-                            </dd>
-                        </div>
+              <MetadataBlock
+                label="Classification"
+                value={classification}
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setClassifying(true)}
+                  >
+                    <Pencil aria-hidden="true" className="size-4" />
+                    Edit
+                  </Button>
+                }
+              />
 
                         <div className="flex flex-col gap-1">
                             <dt className="font-medium">Creator</dt>
