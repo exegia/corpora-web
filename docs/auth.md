@@ -166,6 +166,134 @@ Three things cannot be set from this repo, and each is unverifiable here:
   which case the user follows a link and lands on `/auth/callback` instead. Both
   routes exist, so either template works — but only one of them makes `/verify`
   reachable.
+- **Manual linking.** The `/profile` connected-accounts card needs
+  Authentication → Providers → *Allow manual linking* (config.toml:
+  `auth.enable_manual_linking`). Off, GoTrue rejects `linkIdentity` /
+  `unlinkIdentity` and `GET /user/identities`; the card renders the mapped
+  configuration message rather than crashing, but nothing can be connected.
+
+## Account linking
+
+`/profile` renders `LinkedAccountsBlock` behind `<Await>`; the identities
+promise is the one deferred piece of that loader. All calls go through
+`lib/auth`: `listIdentities`, `linkProvider`, `unlinkProvider`.
+
+- **Linking is a full OAuth round-trip on the current session.** `linkProvider`
+  navigates the document away, so its promise settling always means failure —
+  the return leg lands on `/auth/callback?next=/profile` exactly like sign-in,
+  with the same sessionStorage stash as fallback.
+- **The email identity stays in `listIdentities`' result** but is filtered out
+  of the card: it is managed by the email field, not connect buttons. Its
+  presence is passed to the block as `hasOtherSignInMethods` (corpora-ui ≥
+  0.10.0), so the last-method guard only fires when a social identity really is
+  the last way in — an email + one-provider account can disconnect its
+  provider, while a lone social identity with no email stays guarded. Both
+  sides are pinned by tests in `app/routes/profile.test.tsx`.
+- **GoTrue enforces at-least-one-identity server-side**; the card's guard is
+  UX, not the security boundary.
+
+## Testing auth against the local stack
+
+**Test auth locally, not against the hosted project.** `bun run dev` points at
+the hosted project, so a signup there sends a real email, needs a real inbox,
+and leaves a real user behind — one that has to be cleaned out of *two* tables
+(see the cascade note below). `bun run dev:local` loads `.env.local` ahead of
+`.env` (first file wins) and points everything at `supabase start` on
+`http://127.0.0.1:54321`, where `enable_confirmations = false` means signup
+returns a session immediately and no email is involved at all.
+
+Local addresses to keep handy — none of them is the API:
+
+| What | Where |
+| --- | --- |
+| API gateway (Kong) — this is `VITE_SUPABASE_URL` | `http://127.0.0.1:54321` |
+| Studio dashboard | `http://127.0.0.1:54323` |
+| Mailpit, the local inbox that catches every local email | `http://127.0.0.1:54324` |
+
+`supabase_studio_<ref>.orb.local` is the **Studio container**, not the gateway;
+pointing the app at it fails. OrbStack per-container domains also need
+`/etc/resolver/orb.local`, which is not installed on every machine.
+
+### The standing test account
+
+`qa-linking@corpora.test` — local stack only, one email identity. Credentials
+live in `.env.local` as `QA_TEST_EMAIL` / `QA_TEST_PASSWORD`, encrypted, so they
+travel with the repo without ever sitting in git as plaintext. A `.test` address
+is deliberate: it is reserved by RFC 2606 and can never receive mail, which is
+the point — nothing local needs it to.
+
+Recreate it after `supabase db reset` (this is the whole setup; it needs no
+inbox and no confirmation step):
+
+```bash
+dotenvx run -f .env.local -- sh -c '
+  curl -X POST "$SUPABASE_URL/auth/v1/signup" \
+    -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$QA_TEST_EMAIL\",\"password\":\"$QA_TEST_PASSWORD\",\"data\":{\"name\":\"Corpora QA Test\"}}"'
+```
+
+The response carries an `access_token`, which is proof confirmations are off. If
+you get `{"msg":"Email not confirmed"}` instead, the stack is running stale
+config — restart it (below), don't go hunting for the email.
+
+### Exercising link / unlink without an OAuth round-trip
+
+`linkIdentity` hands off to the real Google consent screen, which needs real
+credentials and cannot be automated. Everything *after* the handoff can be
+tested by seeding identity rows directly, which is how the connected-accounts
+card gets covered:
+
+```bash
+docker exec supabase_db_<ref> psql -U postgres -d postgres -c "
+INSERT INTO auth.identities (id, provider_id, user_id, identity_data, provider,
+                             last_sign_in_at, created_at, updated_at)
+VALUES (gen_random_uuid(), '109876543210987654321', '<user-uuid>',
+        jsonb_build_object('sub','109876543210987654321',
+                           'email','qa-linking@corpora.test','email_verified',true),
+        'google', now(), now(), now());"
+```
+
+One seeded social identity is enough to exercise Disconnect. `toLinkedIdentities`
+filters the email identity out of the *list*, but its presence still reaches the
+block through `hasOtherSignInMethods`, so the last-method guard engages only when
+a social identity really is the only way in. Clicking Disconnect fires a real
+`DELETE /auth/v1/user/identities/{id}`, which verifies the unlink path end to
+end.
+
+To see the guard itself, test an account with **no** email identity — a
+social-only signup. There the sole provider's Disconnect is disabled and the
+card reads "This is your only way to sign in", which is correct rather than a
+bug. Note that a purely local seed cannot reach that state from the standing
+account, which always has its email identity.
+
+Seeded rows carry fake provider subjects, so they prove the app's plumbing but
+never Google's token exchange. Delete them when finished; a stale fake Google
+row will collide with a later real link attempt.
+
+### Config changes need a stack restart
+
+The auth container reads its config at boot. After editing `[auth]` in
+`../corpora-supabase/supabase/config.toml`, restart or the old value silently
+stays in force:
+
+```bash
+cd ../corpora-supabase && make stop && make start
+```
+
+`make stop` backs up and restores, so accounts survive; `make reset` uses
+`--no-backup` and does not. Confirm what actually landed by reading the
+container rather than the file: `docker exec supabase_auth_<ref> env | grep -i
+manual`. A `404 {"error_code":"manual_linking_disabled"}` from
+`/user/identities` means exactly this — the file said `true`, the container
+still said `false`.
+
+### If you must test against the hosted project
+
+Use Gmail plus-addressing (`you+corpora-qa@gmail.com`) so the mail lands in your
+own inbox and the address stays greppable later. Then clean up **both** rows:
+there is no foreign key from `public.users` to `auth.users`, so deleting the auth
+user does not cascade and leaves an orphaned profile stub behind.
 
 ## Known upstream quirk
 

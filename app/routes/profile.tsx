@@ -1,6 +1,20 @@
-import { BadgeCheckIcon, UploadIcon, XIcon } from "lucide-react"
-import { useMemo, useRef, useState } from "react"
-import { useFetcher } from "react-router"
+import { SOCIAL_PROVIDERS } from "@exegia/corpora-ui"
+import type { LinkedIdentity, SocialProvider } from "@exegia/corpora-ui"
+import {
+  BadgeCheckIcon,
+  BookMarkedIcon,
+  FolderKanbanIcon,
+  ShieldCheckIcon,
+  UploadIcon,
+  UserIcon,
+  XIcon,
+} from "lucide-react"
+import { AnimatePresence, motion } from "motion/react"
+import { Suspense, useId, useMemo, useRef, useState } from "react"
+import { Await, useFetcher, useRevalidator } from "react-router"
+import { AUTH_PROVIDERS } from "@/components/auth"
+import { BrandMark } from "@/components/brand-marks"
+import { play } from "@/lib/sounds"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,8 +41,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { AuthError, getCurrentUser } from "@/lib/auth"
+import {
+  AuthError,
+  getCurrentUser,
+  linkProvider,
+  listIdentities,
+  unlinkProvider,
+  type Identity,
+} from "@/lib/auth"
 import {
   getProfile,
   TRADITIONS,
@@ -50,6 +72,10 @@ export async function clientLoader() {
     profile,
     email: user?.email ?? "",
     emailConfirmed: user?.emailConfirmed ?? false,
+    // Deliberately not awaited: this one is a GoTrue round-trip, so only the
+    // connected-accounts card suspends while the form renders immediately.
+    // A load failure resolves to null — never presented as an empty list.
+    identities: listIdentities().catch(() => null),
   }
 }
 
@@ -183,6 +209,320 @@ function RowControl({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col justify-center">{children}</div>
 }
 
+/** Narrows a GoTrue provider string to one the block can draw an icon for. */
+function isSocialProvider(provider: string): provider is SocialProvider {
+  return provider in SOCIAL_PROVIDERS
+}
+
+/**
+ * The email/password identity is filtered out: it is managed by the email and
+ * password rows above, not by connect/disconnect buttons. Its presence still
+ * reaches the block through `hasOtherSignInMethods`, so the last-method guard
+ * only engages when a social identity really is the only way in.
+ */
+function toLinkedIdentities(identities: Identity[]): LinkedIdentity[] {
+  return identities.flatMap((identity) =>
+    isSocialProvider(identity.provider)
+      ? [
+          {
+            id: identity.identityId,
+            provider: identity.provider,
+            email: identity.email,
+          },
+        ]
+      : [],
+  )
+}
+
+/**
+ * The card shell, shared by all three states. Loading, error and loaded each
+ * render it, so the header cannot drift between them and the card does not
+ * change shape as the deferred identities resolve.
+ */
+function ConnectedAccountsFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <Frame>
+      <FrameHeader>
+        <FrameTitle>Connected accounts</FrameTitle>
+        <FrameDescription>
+          Manage the accounts you can use to sign in.
+        </FrameDescription>
+      </FrameHeader>
+      {children}
+    </Frame>
+  )
+}
+
+/**
+ * Named rather than "tab-1"/"tab-2" so the value survives being reordered, and
+ * so a future `?tab=` query param has something stable to map onto.
+ */
+const PROFILE_TAB = {
+  general: "general",
+  security: "security",
+  projects: "projects",
+  references: "references",
+} as const
+
+const LAST_METHOD_EXPLANATION =
+  "This is your only way to sign in, so it can't be disconnected."
+
+/** Matches the auth blocks' easing so the card moves like the rest of the kit. */
+const EASE = [0.22, 1, 0.36, 1] as const
+
+/** One connected identity: brand mark, provider, account, disconnect. */
+function IdentityRow({
+  identity,
+  disabled,
+  guarded,
+  guardId,
+  busy,
+  onUnlink,
+}: {
+  identity: LinkedIdentity
+  disabled: boolean
+  guarded: boolean
+  guardId: string
+  busy: boolean
+  onUnlink: () => void
+}) {
+  const { label } = SOCIAL_PROVIDERS[identity.provider]
+  return (
+    <motion.li
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5"
+      exit={{ opacity: 0, y: -4 }}
+      initial={{ opacity: 0, y: -4 }}
+      layout
+      transition={{ duration: 0.25, ease: EASE }}
+    >
+      {/* A tile rather than a bare glyph: it gives the coloured marks a
+          consistent footprint, so Google's square G and Apple's tall
+          silhouette do not make the rows look ragged. */}
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
+        <BrandMark className="size-4" provider={identity.provider} />
+      </span>
+      <div className="flex min-w-0 flex-col">
+        <span className="font-medium text-sm leading-tight">{label}</span>
+        {identity.email && (
+          <span className="truncate text-muted-foreground text-xs">
+            {identity.email}
+          </span>
+        )}
+      </div>
+      {/* Destructive-outline, not ghost: disconnecting is the one irreversible
+          thing on this card, and the colour is the only cue that says so. */}
+      <Button
+        aria-describedby={guarded ? guardId : undefined}
+        aria-label={`Disconnect ${label}`}
+        className="ml-auto"
+        disabled={disabled}
+        loading={busy}
+        onClick={onUnlink}
+        size="sm"
+        type="button"
+        variant="destructive-outline"
+      >
+        Disconnect
+      </Button>
+    </motion.li>
+  )
+}
+
+/**
+ * The sign-in identities card.
+ *
+ * Composed here rather than using `LinkedAccountsBlock`: the block's marks are
+ * single-colour `currentColor` glyphs, and Google's four-colour G cannot be
+ * produced from one by any amount of CSS. Owning the markup also buys the
+ * compact connect row and the per-row motion.
+ *
+ * The behaviour is a deliberate port of the block, not a redesign of it —
+ * the last-method guard, the `busy` gate that keeps a double-click from firing
+ * two requests, and the inline rejection message all carry over unchanged.
+ * `profile.test.tsx` covers each and must keep passing untouched.
+ *
+ * `linkProvider` navigates the document away on success, so its promise
+ * settling always means failure — hence the catch that renders the reason.
+ * After an unlink the route revalidates; the resolved card stays mounted while
+ * the fresh list loads (see docs/data-loading.md).
+ */
+function ConnectedAccounts({ identities }: { identities: Identity[] | null }) {
+  const revalidator = useRevalidator()
+  const guardId = useId()
+  const [error, setError] = useState<string | null>(null)
+  const [linking, setLinking] = useState<SocialProvider | null>(null)
+  const [unlinking, setUnlinking] = useState<string | null>(null)
+
+  if (identities === null) {
+    return (
+      <ConnectedAccountsFrame>
+        <FramePanel>
+          <p className="text-sm text-destructive">
+            We couldn't load your connected accounts. Reload the page to try
+            again.
+          </p>
+        </FramePanel>
+      </ConnectedAccountsFrame>
+    )
+  }
+
+  const linked = toLinkedIdentities(identities)
+  const connected = new Set(linked.map((identity) => identity.provider))
+  const connectable = AUTH_PROVIDERS.filter(
+    (provider) => !connected.has(provider),
+  )
+  const busy = linking !== null || unlinking !== null
+  // The backend rule, enforced here so we never fire a request that would
+  // remove the account's only way in. An off-list method — the email/password
+  // credential — keeps the account reachable, so it lifts the guard.
+  const lastMethod =
+    !identities.some((i) => i.provider === "email") && linked.length <= 1
+
+  async function connect(provider: SocialProvider) {
+    if (busy) return
+    setError(null)
+    setLinking(provider)
+    try {
+      await linkProvider(provider)
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Unable to connect account.",
+      )
+      play("error")
+    } finally {
+      setLinking(null)
+    }
+  }
+
+  async function disconnect(identityId: string) {
+    if (busy || lastMethod) return
+    setError(null)
+    setUnlinking(identityId)
+    try {
+      await unlinkProvider(identityId)
+      // The loader is the source of truth; hold the row's spinner until the
+      // refreshed list is in.
+      await revalidator.revalidate()
+      // The press itself is already audible through the button's delegated
+      // cuelume attributes; this marks the round-trip landing, which they
+      // cannot hear.
+      play("success")
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Unable to disconnect account.",
+      )
+      play("error")
+    } finally {
+      setUnlinking(null)
+    }
+  }
+
+  return (
+    <ConnectedAccountsFrame>
+      <FramePanel>
+        <motion.div
+          className="flex flex-col gap-4"
+          layout
+          transition={{ duration: 0.3, ease: EASE }}
+        >
+          {error && (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          )}
+
+          {linked.length > 0 ? (
+            <ul aria-label="Connected accounts" className="flex flex-col gap-2">
+              <AnimatePresence initial={false}>
+                {linked.map((identity) => (
+                  <IdentityRow
+                    busy={unlinking === identity.id}
+                    disabled={busy || lastMethod}
+                    guardId={guardId}
+                    guarded={lastMethod}
+                    identity={identity}
+                    key={identity.id}
+                    onUnlink={() => void disconnect(identity.id)}
+                  />
+                ))}
+              </AnimatePresence>
+            </ul>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              No sign-in methods connected yet.
+            </p>
+          )}
+
+          {lastMethod && linked.length > 0 && (
+            <p className="text-muted-foreground text-xs" id={guardId}>
+              {LAST_METHOD_EXPLANATION}
+            </p>
+          )}
+
+          {connectable.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {linked.length > 0 && (
+                <span className="text-muted-foreground text-xs">
+                  Add another way to sign in
+                </span>
+              )}
+              {/* Sized to their labels and wrapped, rather than one full-width
+                  button per provider: at this card's width a stacked pair read
+                  as a giant target for a secondary action. */}
+              <div className="flex flex-wrap gap-2">
+                {connectable.map((provider) => (
+                  <Button
+                    disabled={busy}
+                    key={provider}
+                    loading={linking === provider}
+                    onClick={() => void connect(provider)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <BrandMark className="size-4" provider={provider} />
+                    Connect {SOCIAL_PROVIDERS[provider].label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </FramePanel>
+    </ConnectedAccountsFrame>
+  )
+}
+
+/**
+ * The deferred fallback, in the same shell so the card does not re-chrome. The
+ * skeleton rows match `IdentityRow`'s height and tile, so the resolved list
+ * lands in place instead of shunting the card's height as it arrives.
+ */
+function ConnectedAccountsFallback() {
+  return (
+    <ConnectedAccountsFrame>
+      <FramePanel>
+        <div
+          aria-label="Loading connected accounts"
+          className="flex flex-col gap-2"
+          role="status"
+        >
+          {[0, 1].map((row) => (
+            <div
+              className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
+              key={row}
+            >
+              <span className="size-8 shrink-0 animate-pulse rounded-md bg-muted" />
+              <span className="h-3.5 w-28 animate-pulse rounded bg-muted" />
+            </div>
+          ))}
+        </div>
+      </FramePanel>
+    </ConnectedAccountsFrame>
+  )
+}
+
 export default function Profile({ loaderData }: Route.ComponentProps) {
   const { profile, email, emailConfirmed } = loaderData
   const fetcher = useFetcher<typeof clientAction>()
@@ -217,7 +557,34 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <Tabs
+      className="mx-auto w-full max-w-3xl gap-6"
+      defaultValue={PROFILE_TAB.general}
+    >
+      <TabsList>
+        <TabsTab value={PROFILE_TAB.general}>
+          <UserIcon aria-hidden="true" />
+          General
+        </TabsTab>
+        <TabsTab value={PROFILE_TAB.security}>
+          <ShieldCheckIcon aria-hidden="true" />
+          Sign-in and security
+        </TabsTab>
+        {/* Not built yet. Present so the shape of the page is honest about
+            what is coming, disabled so it cannot be selected — Base UI keeps
+            it focusable and marks it `aria-disabled`, which is what tells a
+            screen reader "exists, not available" rather than hiding it. */}
+        <TabsTab disabled value={PROFILE_TAB.projects}>
+          <FolderKanbanIcon aria-hidden="true" />
+          Projects
+        </TabsTab>
+        <TabsTab disabled value={PROFILE_TAB.references}>
+          <BookMarkedIcon aria-hidden="true" />
+          References
+        </TabsTab>
+      </TabsList>
+
+      <TabsPanel value={PROFILE_TAB.general}>
       <fetcher.Form method="post">
         <Frame>
           <FrameHeader>
@@ -490,6 +857,18 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
           </FrameFooter>
         </Frame>
       </fetcher.Form>
-    </div>
+      </TabsPanel>
+
+      <TabsPanel value={PROFILE_TAB.security}>
+        {/* Still deferred, and still behind its own Suspense boundary: the
+            identities request starts with the loader, not when this tab is
+            first opened, so switching to it lands on resolved data. */}
+        <Suspense fallback={<ConnectedAccountsFallback />}>
+          <Await resolve={loaderData.identities}>
+            {(identities) => <ConnectedAccounts identities={identities} />}
+          </Await>
+        </Suspense>
+      </TabsPanel>
+    </Tabs>
   )
 }

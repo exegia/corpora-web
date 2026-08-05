@@ -7,7 +7,14 @@
 // submit handler and rendering `error.message`, so every function here throws
 // an `AuthError` whose message is already fit to show a user.
 
-import { configureWeb } from "@exegia/plugin-supabase-auth/web"
+import type { Identity } from "@exegia/plugin-supabase-auth"
+import {
+  configureWeb,
+  getIdentities as webGetIdentities,
+  isAuthError as isBindingAuthError,
+  linkIdentity as webLinkIdentity,
+  unlinkIdentity as webUnlinkIdentity,
+} from "@exegia/plugin-supabase-auth/web"
 import { authActions, resolveMessage } from "@exegia/use-auth"
 import type { Provider, User } from "@supabase/supabase-js"
 import { redirect } from "react-router"
@@ -431,4 +438,76 @@ function callbackUrl(next?: string): string {
     : "/auth/callback"
   if (typeof window === "undefined") return path
   return new URL(path, window.location.origin).toString()
+}
+
+// ---- Linked identities ---------------------------------------------------
+
+export type { Identity }
+
+/** Where a link round-trip drops the user back: the page that offers it. */
+const LINK_RETURN_PATH = "/profile"
+
+/**
+ * The bindings reject with a structured error whose `kind` maps to a
+ * user-facing message; anything else gets this module's fallback phrasing.
+ */
+function toThrowableAuthError(cause: unknown, fallback: string): AuthError {
+  if (isBindingAuthError(cause)) return new AuthError(resolveMessage(cause))
+  if (cause instanceof Error && cause.message) return new AuthError(cause.message)
+  return new AuthError(fallback)
+}
+
+/**
+ * The sign-in identities attached to the current account — the email/password
+ * one included, which is how callers can tell "last social identity" apart
+ * from "last way into the account".
+ */
+export async function listIdentities(): Promise<Identity[]> {
+  ensureAuthBindings()
+  try {
+    return await webGetIdentities()
+  } catch (cause) {
+    throw toThrowableAuthError(cause, "Unable to load your connected accounts.")
+  }
+}
+
+/**
+ * Attaches a provider identity to the *current* account. Same navigation
+ * caveat as `signInWithProvider`: on success the whole document leaves for the
+ * provider and this promise never settles here — the round-trip lands on
+ * `/auth/callback`, which forwards to `/profile`. It rejects only when the
+ * redirect could not start (provider disabled, manual linking off, …).
+ *
+ * Requires "manual linking" to be enabled on the Supabase project
+ * (Authentication → Providers → Allow manual linking).
+ */
+export async function linkProvider(provider: AuthProvider): Promise<void> {
+  ensureAuthBindings()
+  // Same insurance as signInWithProvider: if the allow-list rejects
+  // `redirectTo`, GoTrue falls back to the Site URL and the `?next=` is lost.
+  stashOAuthNext(LINK_RETURN_PATH)
+  try {
+    await webLinkIdentity({
+      provider,
+      redirectTo: callbackUrl(LINK_RETURN_PATH),
+    })
+  } catch (cause) {
+    consumeOAuthNext()
+    throw toThrowableAuthError(cause, "Unable to connect that account.")
+  }
+}
+
+/**
+ * Disconnects one identity by its row key and resolves with the refreshed
+ * list. GoTrue itself refuses to remove the account's only identity; the UI
+ * guards that case up front, and this surfaces the server's message if a stale
+ * view lets one through.
+ */
+export async function unlinkProvider(identityId: string): Promise<Identity[]> {
+  ensureAuthBindings()
+  try {
+    return await webUnlinkIdentity({ identityId })
+  } catch (cause) {
+    throw toThrowableAuthError(cause, "Unable to disconnect that account.")
+  }
 }
