@@ -167,6 +167,103 @@ Three things cannot be set from this repo, and each is unverifiable here:
   routes exist, so either template works — but only one of them makes `/verify`
   reachable.
 
+## Testing auth against the local stack
+
+**Test auth locally, not against the hosted project.** `bun run dev` points at
+the hosted project, so a signup there sends a real email, needs a real inbox,
+and leaves a real user behind — one that has to be cleaned out of *two* tables
+(see the cascade note below). `bun run dev:local` loads `.env.local` ahead of
+`.env` (first file wins) and points everything at `supabase start` on
+`http://127.0.0.1:54321`, where `enable_confirmations = false` means signup
+returns a session immediately and no email is involved at all.
+
+Local addresses to keep handy — none of them is the API:
+
+| What | Where |
+| --- | --- |
+| API gateway (Kong) — this is `VITE_SUPABASE_URL` | `http://127.0.0.1:54321` |
+| Studio dashboard | `http://127.0.0.1:54323` |
+| Mailpit, the local inbox that catches every local email | `http://127.0.0.1:54324` |
+
+`supabase_studio_<ref>.orb.local` is the **Studio container**, not the gateway;
+pointing the app at it fails. OrbStack per-container domains also need
+`/etc/resolver/orb.local`, which is not installed on every machine.
+
+### The standing test account
+
+`qa-linking@corpora.test` — local stack only, one email identity. Credentials
+live in `.env.local` as `QA_TEST_EMAIL` / `QA_TEST_PASSWORD`, encrypted, so they
+travel with the repo without ever sitting in git as plaintext. A `.test` address
+is deliberate: it is reserved by RFC 2606 and can never receive mail, which is
+the point — nothing local needs it to.
+
+Recreate it after `supabase db reset` (this is the whole setup; it needs no
+inbox and no confirmation step):
+
+```bash
+dotenvx run -f .env.local -- sh -c '
+  curl -X POST "$SUPABASE_URL/auth/v1/signup" \
+    -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$QA_TEST_EMAIL\",\"password\":\"$QA_TEST_PASSWORD\",\"data\":{\"name\":\"Corpora QA Test\"}}"'
+```
+
+The response carries an `access_token`, which is proof confirmations are off. If
+you get `{"msg":"Email not confirmed"}` instead, the stack is running stale
+config — restart it (below), don't go hunting for the email.
+
+### Exercising link / unlink without an OAuth round-trip
+
+`linkIdentity` hands off to the real Google consent screen, which needs real
+credentials and cannot be automated. Everything *after* the handoff can be
+tested by seeding identity rows directly, which is how the connected-accounts
+card gets covered:
+
+```bash
+docker exec supabase_db_<ref> psql -U postgres -d postgres -c "
+INSERT INTO auth.identities (id, provider_id, user_id, identity_data, provider,
+                             last_sign_in_at, created_at, updated_at)
+VALUES (gen_random_uuid(), '109876543210987654321', '<user-uuid>',
+        jsonb_build_object('sub','109876543210987654321',
+                           'email','qa-linking@corpora.test','email_verified',true),
+        'google', now(), now(), now());"
+```
+
+Seed **two** social identities to enable Disconnect. With only one, the card
+disables it and shows "This is your only way to sign in" — the deliberate
+conservative guard described in `app/routes/profile.tsx`, which filters the
+email identity out and so ignores the password that would still keep the account
+reachable. That state is correct, not a bug. A real `DELETE
+/auth/v1/user/identities/{id}` then verifies the unlink path end to end.
+
+Seeded rows carry fake provider subjects, so they prove the app's plumbing but
+never Google's token exchange. Delete them when finished; a stale fake Google
+row will collide with a later real link attempt.
+
+### Config changes need a stack restart
+
+The auth container reads its config at boot. After editing `[auth]` in
+`../corpora-supabase/supabase/config.toml`, restart or the old value silently
+stays in force:
+
+```bash
+cd ../corpora-supabase && make stop && make start
+```
+
+`make stop` backs up and restores, so accounts survive; `make reset` uses
+`--no-backup` and does not. Confirm what actually landed by reading the
+container rather than the file: `docker exec supabase_auth_<ref> env | grep -i
+manual`. A `404 {"error_code":"manual_linking_disabled"}` from
+`/user/identities` means exactly this — the file said `true`, the container
+still said `false`.
+
+### If you must test against the hosted project
+
+Use Gmail plus-addressing (`you+corpora-qa@gmail.com`) so the mail lands in your
+own inbox and the address stays greppable later. Then clean up **both** rows:
+there is no foreign key from `public.users` to `auth.users`, so deleting the auth
+user does not cascade and leaves an orphaned profile stub behind.
+
 ## Known upstream quirk
 
 `CodeAuthBlock` keys its OTP wrapper on the error message, so after a rejected

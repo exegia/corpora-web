@@ -31,8 +31,9 @@ build/
 !.env*
 .env.keys
 !.env.example
-# Plaintext local-stack overrides for `bun run dev:local` — never committed.
-.env.local
+# .env.local carries the local-stack overrides for `bun run dev:local`. Like
+# .env it is committed *encrypted* (key: DOTENV_PRIVATE_KEY_LOCAL in .env.keys),
+# so it stays covered by `!.env*` above. Never commit it decrypted.
 # Only the CLI's scratch state. A blanket `supabase` rule silently swallowed
 # every *new* migration — the eleven already committed stayed tracked, so it
 # looked fine, while 20260719214023_remote_schema.sql and
