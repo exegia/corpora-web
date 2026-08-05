@@ -76,7 +76,13 @@ function givenIdentities(rows: Array<Record<string, unknown>>) {
   })
 }
 
-function renderProfile() {
+/**
+ * Renders /profile and opens the tab this card lives behind. The panel is not
+ * mounted until its tab is selected, so every test here needs the click — the
+ * card is genuinely absent from the DOM on the General tab, which is the
+ * behaviour, not a testing quirk.
+ */
+async function renderProfile() {
   const Stub = createRoutesStub([
     {
       path: "/profile",
@@ -87,7 +93,11 @@ function renderProfile() {
       action: profileAction as never,
     },
   ])
-  return render(<Stub initialEntries={["/profile"]} />)
+  const result = render(<Stub initialEntries={["/profile"]} />)
+  await userEvent.click(
+    await screen.findByRole("tab", { name: /sign-in and security/i }),
+  )
+  return result
 }
 
 beforeEach(() => {
@@ -105,7 +115,7 @@ beforeEach(() => {
 describe("connected accounts", () => {
   it("lists the linked social identities and offers the rest", async () => {
     givenIdentities([EMAIL_IDENTITY, GOOGLE_IDENTITY])
-    renderProfile()
+    await renderProfile()
 
     // Behind <Await>, so findBy — the card suspends while the form renders.
     expect(await screen.findByText("Google")).toBeInTheDocument()
@@ -122,7 +132,7 @@ describe("connected accounts", () => {
     // The document navigates away on success, so the call never settles; the
     // pending promise is what holds the button in its loading state.
     authApi.linkIdentity.mockReturnValue(new Promise(() => {}))
-    renderProfile()
+    await renderProfile()
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole("button", { name: "Connect Google" }))
@@ -137,7 +147,7 @@ describe("connected accounts", () => {
 
   it("disconnects an identity and revalidates the list", async () => {
     givenIdentities([GOOGLE_IDENTITY, APPLE_IDENTITY])
-    renderProfile()
+    await renderProfile()
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole("button", { name: "Disconnect Google" }))
@@ -162,7 +172,7 @@ describe("connected accounts", () => {
     // `hasOtherSignInMethods` tells the block so — the last-method guard
     // stays out of the way and the unlink goes through.
     givenIdentities([EMAIL_IDENTITY, GOOGLE_IDENTITY])
-    renderProfile()
+    await renderProfile()
     const user = userEvent.setup()
 
     const disconnect = await screen.findByRole("button", { name: "Disconnect Google" })
@@ -180,7 +190,7 @@ describe("connected accounts", () => {
     // No email identity at all: the Google row really is the only way in,
     // so the guard must still hold.
     givenIdentities([GOOGLE_IDENTITY])
-    renderProfile()
+    await renderProfile()
 
     const disconnect = await screen.findByRole("button", { name: "Disconnect Google" })
     expect(disconnect).toBeDisabled()
@@ -199,7 +209,7 @@ describe("connected accounts", () => {
         message: "fetch failed",
       },
     })
-    renderProfile()
+    await renderProfile()
 
     expect(
       await screen.findByText(/couldn't load your connected accounts/i),
@@ -228,7 +238,7 @@ describe("connected accounts", () => {
 
     // Pending: getUserIdentities never settles, so the Suspense fallback holds.
     authApi.getUserIdentities.mockReturnValue(new Promise(() => {}))
-    const pending = renderProfile()
+    const pending = await renderProfile()
     const skeleton = await screen.findByRole("status", {
       name: /loading connected accounts/i,
     })
@@ -236,7 +246,7 @@ describe("connected accounts", () => {
     pending.unmount()
 
     givenIdentities([EMAIL_IDENTITY, GOOGLE_IDENTITY])
-    const loaded = renderProfile()
+    const loaded = await renderProfile()
     expect(frameAround(await screen.findByText("Google"))).not.toBeNull()
     loaded.unmount()
 
@@ -249,7 +259,7 @@ describe("connected accounts", () => {
         message: "fetch failed",
       },
     })
-    renderProfile()
+    await renderProfile()
     const failure = await screen.findByText(/couldn't load your connected accounts/i)
     expect(frameAround(failure)).not.toBeNull()
   })
