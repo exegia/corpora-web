@@ -1,9 +1,12 @@
-import { LinkedAccountsBlock, SOCIAL_PROVIDERS } from "@exegia/corpora-ui"
+import { SOCIAL_PROVIDERS } from "@exegia/corpora-ui"
 import type { LinkedIdentity, SocialProvider } from "@exegia/corpora-ui"
 import { BadgeCheckIcon, UploadIcon, XIcon } from "lucide-react"
-import { Suspense, useMemo, useRef, useState } from "react"
+import { AnimatePresence, motion } from "motion/react"
+import { Suspense, useId, useMemo, useRef, useState } from "react"
 import { Await, useFetcher, useRevalidator } from "react-router"
 import { AUTH_PROVIDERS } from "@/components/auth"
+import { BrandMark } from "@/components/brand-marks"
+import { play } from "@/lib/sounds"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -241,34 +244,95 @@ function ConnectedAccountsFrame({ children }: { children: React.ReactNode }) {
   )
 }
 
-/**
- * `LinkedAccountsBlock` draws its own Card, which is the wrong chrome inside a
- * Frame — every other panel on this page is a `FramePanel`. The block has no
- * prop to drop it, so strip it here and let `FramePanel` own the surface:
- *
- * - the Card's border/background/radius/shadow, including its `before:` inset
- *   highlight, which would otherwise stack with FramePanel's own
- * - `card-header`, since the Frame above already renders the title. It stays in
- *   the DOM under `display: none`, so it is not announced twice — do not
- *   "fix" the apparent duplication by deleting FrameHeader
- * - `card-panel`'s padding, which FramePanel already supplies
- *
- * Keyed to `data-slot`, which the block sets on direct children of its root.
- */
-const BLOCK_AS_PANEL_CONTENT = [
-  "rounded-none border-0 bg-transparent shadow-none before:hidden",
-  "[&>[data-slot=card-header]]:hidden",
-  "[&>[data-slot=card-panel]]:p-0",
-].join(" ")
+const LAST_METHOD_EXPLANATION =
+  "This is your only way to sign in, so it can't be disconnected."
+
+/** Matches the auth blocks' easing so the card moves like the rest of the kit. */
+const EASE = [0.22, 1, 0.36, 1] as const
+
+/** One connected identity: brand mark, provider, account, disconnect. */
+function IdentityRow({
+  identity,
+  disabled,
+  guarded,
+  guardId,
+  busy,
+  onUnlink,
+}: {
+  identity: LinkedIdentity
+  disabled: boolean
+  guarded: boolean
+  guardId: string
+  busy: boolean
+  onUnlink: () => void
+}) {
+  const { label } = SOCIAL_PROVIDERS[identity.provider]
+  return (
+    <motion.li
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5"
+      exit={{ opacity: 0, y: -4 }}
+      initial={{ opacity: 0, y: -4 }}
+      layout
+      transition={{ duration: 0.25, ease: EASE }}
+    >
+      {/* A tile rather than a bare glyph: it gives the coloured marks a
+          consistent footprint, so Google's square G and Apple's tall
+          silhouette do not make the rows look ragged. */}
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
+        <BrandMark className="size-4" provider={identity.provider} />
+      </span>
+      <div className="flex min-w-0 flex-col">
+        <span className="font-medium text-sm leading-tight">{label}</span>
+        {identity.email && (
+          <span className="truncate text-muted-foreground text-xs">
+            {identity.email}
+          </span>
+        )}
+      </div>
+      {/* Destructive-outline, not ghost: disconnecting is the one irreversible
+          thing on this card, and the colour is the only cue that says so. */}
+      <Button
+        aria-describedby={guarded ? guardId : undefined}
+        aria-label={`Disconnect ${label}`}
+        className="ml-auto"
+        disabled={disabled}
+        loading={busy}
+        onClick={onUnlink}
+        size="sm"
+        type="button"
+        variant="destructive-outline"
+      >
+        Disconnect
+      </Button>
+    </motion.li>
+  )
+}
 
 /**
- * The sign-in identities card. `linkProvider` navigates the document away on
- * success, so its promise settling always means failure — the block renders
- * the rejection inline. After an unlink the route revalidates; the resolved
- * card stays mounted while the fresh list loads (see docs/data-loading.md).
+ * The sign-in identities card.
+ *
+ * Composed here rather than using `LinkedAccountsBlock`: the block's marks are
+ * single-colour `currentColor` glyphs, and Google's four-colour G cannot be
+ * produced from one by any amount of CSS. Owning the markup also buys the
+ * compact connect row and the per-row motion.
+ *
+ * The behaviour is a deliberate port of the block, not a redesign of it —
+ * the last-method guard, the `busy` gate that keeps a double-click from firing
+ * two requests, and the inline rejection message all carry over unchanged.
+ * `profile.test.tsx` covers each and must keep passing untouched.
+ *
+ * `linkProvider` navigates the document away on success, so its promise
+ * settling always means failure — hence the catch that renders the reason.
+ * After an unlink the route revalidates; the resolved card stays mounted while
+ * the fresh list loads (see docs/data-loading.md).
  */
 function ConnectedAccounts({ identities }: { identities: Identity[] | null }) {
   const revalidator = useRevalidator()
+  const guardId = useId()
+  const [error, setError] = useState<string | null>(null)
+  const [linking, setLinking] = useState<SocialProvider | null>(null)
+  const [unlinking, setUnlinking] = useState<string | null>(null)
 
   if (identities === null) {
     return (
@@ -283,35 +347,157 @@ function ConnectedAccounts({ identities }: { identities: Identity[] | null }) {
     )
   }
 
+  const linked = toLinkedIdentities(identities)
+  const connected = new Set(linked.map((identity) => identity.provider))
+  const connectable = AUTH_PROVIDERS.filter(
+    (provider) => !connected.has(provider),
+  )
+  const busy = linking !== null || unlinking !== null
+  // The backend rule, enforced here so we never fire a request that would
+  // remove the account's only way in. An off-list method — the email/password
+  // credential — keeps the account reachable, so it lifts the guard.
+  const lastMethod =
+    !identities.some((i) => i.provider === "email") && linked.length <= 1
+
+  async function connect(provider: SocialProvider) {
+    if (busy) return
+    setError(null)
+    setLinking(provider)
+    try {
+      await linkProvider(provider)
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Unable to connect account.",
+      )
+      play("error")
+    } finally {
+      setLinking(null)
+    }
+  }
+
+  async function disconnect(identityId: string) {
+    if (busy || lastMethod) return
+    setError(null)
+    setUnlinking(identityId)
+    try {
+      await unlinkProvider(identityId)
+      // The loader is the source of truth; hold the row's spinner until the
+      // refreshed list is in.
+      await revalidator.revalidate()
+      // The press itself is already audible through the button's delegated
+      // cuelume attributes; this marks the round-trip landing, which they
+      // cannot hear.
+      play("success")
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Unable to disconnect account.",
+      )
+      play("error")
+    } finally {
+      setUnlinking(null)
+    }
+  }
+
   return (
     <ConnectedAccountsFrame>
       <FramePanel>
-        <LinkedAccountsBlock
-          className={BLOCK_AS_PANEL_CONTENT}
-          identities={toLinkedIdentities(identities)}
-          hasOtherSignInMethods={identities.some((i) => i.provider === "email")}
-          providers={AUTH_PROVIDERS}
-          onLink={async (provider) => {
-            await linkProvider(provider)
-          }}
-          onUnlink={async (identityId) => {
-            await unlinkProvider(identityId)
-            // The loader is the source of truth; hold the row's spinner until
-            // the refreshed list is in.
-            await revalidator.revalidate()
-          }}
-        />
+        <motion.div
+          className="flex flex-col gap-4"
+          layout
+          transition={{ duration: 0.3, ease: EASE }}
+        >
+          {error && (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          )}
+
+          {linked.length > 0 ? (
+            <ul aria-label="Connected accounts" className="flex flex-col gap-2">
+              <AnimatePresence initial={false}>
+                {linked.map((identity) => (
+                  <IdentityRow
+                    busy={unlinking === identity.id}
+                    disabled={busy || lastMethod}
+                    guardId={guardId}
+                    guarded={lastMethod}
+                    identity={identity}
+                    key={identity.id}
+                    onUnlink={() => void disconnect(identity.id)}
+                  />
+                ))}
+              </AnimatePresence>
+            </ul>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              No sign-in methods connected yet.
+            </p>
+          )}
+
+          {lastMethod && linked.length > 0 && (
+            <p className="text-muted-foreground text-xs" id={guardId}>
+              {LAST_METHOD_EXPLANATION}
+            </p>
+          )}
+
+          {connectable.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {linked.length > 0 && (
+                <span className="text-muted-foreground text-xs">
+                  Add another way to sign in
+                </span>
+              )}
+              {/* Sized to their labels and wrapped, rather than one full-width
+                  button per provider: at this card's width a stacked pair read
+                  as a giant target for a secondary action. */}
+              <div className="flex flex-wrap gap-2">
+                {connectable.map((provider) => (
+                  <Button
+                    disabled={busy}
+                    key={provider}
+                    loading={linking === provider}
+                    onClick={() => void connect(provider)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <BrandMark className="size-4" provider={provider} />
+                    Connect {SOCIAL_PROVIDERS[provider].label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
       </FramePanel>
     </ConnectedAccountsFrame>
   )
 }
 
-/** The deferred fallback, in the same shell so the card does not re-chrome. */
+/**
+ * The deferred fallback, in the same shell so the card does not re-chrome. The
+ * skeleton rows match `IdentityRow`'s height and tile, so the resolved list
+ * lands in place instead of shunting the card's height as it arrives.
+ */
 function ConnectedAccountsFallback() {
   return (
     <ConnectedAccountsFrame>
       <FramePanel>
-        <LinkedAccountsBlock className={BLOCK_AS_PANEL_CONTENT} loading />
+        <div
+          aria-label="Loading connected accounts"
+          className="flex flex-col gap-2"
+          role="status"
+        >
+          {[0, 1].map((row) => (
+            <div
+              className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
+              key={row}
+            >
+              <span className="size-8 shrink-0 animate-pulse rounded-md bg-muted" />
+              <span className="h-3.5 w-28 animate-pulse rounded bg-muted" />
+            </div>
+          ))}
+        </div>
       </FramePanel>
     </ConnectedAccountsFrame>
   )

@@ -229,16 +229,15 @@ describe("connected accounts", () => {
     // Pending: getUserIdentities never settles, so the Suspense fallback holds.
     authApi.getUserIdentities.mockReturnValue(new Promise(() => {}))
     const pending = renderProfile()
-    const spinner = await screen.findByText(/loading connected accounts/i)
-    expect(frameAround(spinner)).not.toBeNull()
+    const skeleton = await screen.findByRole("status", {
+      name: /loading connected accounts/i,
+    })
+    expect(frameAround(skeleton)).not.toBeNull()
     pending.unmount()
 
     givenIdentities([EMAIL_IDENTITY, GOOGLE_IDENTITY])
     const loaded = renderProfile()
     expect(frameAround(await screen.findByText("Google"))).not.toBeNull()
-    // The block's own card chrome is stripped, so the Frame's panel is the
-    // only surface — an intact auth-block card would double border and radius.
-    expect(document.querySelector("[data-slot=auth-block]")).toHaveClass("border-0")
     loaded.unmount()
 
     authApi.getUserIdentities.mockResolvedValue({
