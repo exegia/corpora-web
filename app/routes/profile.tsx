@@ -16,6 +16,7 @@ import { AUTH_PROVIDERS } from "@/components/auth"
 import { BrandMark } from "@/components/brand-marks"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { play } from "@/lib/sounds"
+import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -762,44 +763,67 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
               hint="Shown in comments and mentions."
             />
             <RowControl>
-              <div className="flex items-center gap-3">
-                <Avatar className="size-10 shrink-0">
+              {/*
+                The controls sit on the avatar rather than beside it, revealed
+                on hover. `focus-within` is not decoration: opacity alone
+                leaves the buttons focusable, so without it a keyboard user
+                would tab into controls they cannot see. Both states drive the
+                same class, which is also what makes the hover path testable —
+                a synthetic hover does not produce `:hover` in the pane, but
+                a real `.focus()` does fire `:focus-within` (docs/testing.md).
+              */}
+              <div className="group/avatar relative size-20 shrink-0 rounded-full">
+                <Avatar className="size-20">
                   {draft.avatarUrl ? (
                     <AvatarImage alt="" src={draft.avatarUrl} />
                   ) : null}
-                  <AvatarFallback>{initials(draft.name, email)}</AvatarFallback>
+                  <AvatarFallback className="text-lg">
+                    {initials(draft.name, email)}
+                  </AvatarFallback>
                 </Avatar>
-                <input
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) => {
-                    void pickPhoto(event.target.files?.[0])
-                    // Same file picked twice should still fire onChange.
-                    event.target.value = ""
-                  }}
-                  ref={fileInputRef}
-                  type="file"
-                />
-                <input name="avatarUrl" type="hidden" value={draft.avatarUrl} />
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  type="button"
-                  variant="outline"
+                <div
+                  className={cn(
+                    "absolute inset-0 flex items-center justify-center gap-1 rounded-full",
+                    "bg-background/64 opacity-0 backdrop-blur-[1px]",
+                    "transition-opacity duration-150 ease-smooth-out",
+                    "group-hover/avatar:opacity-100 group-focus-within/avatar:opacity-100",
+                    "motion-reduce:transition-none",
+                  )}
                 >
-                  <UploadIcon aria-hidden="true" />
-                  Change
-                </Button>
-                {draft.avatarUrl ? (
                   <Button
-                    onClick={() => set("avatarUrl")("")}
+                    aria-label="Change profile photo"
+                    onClick={() => fileInputRef.current?.click()}
+                    size="icon-sm"
                     type="button"
                     variant="ghost"
                   >
-                    <XIcon aria-hidden="true" />
-                    Remove
+                    <UploadIcon aria-hidden="true" />
                   </Button>
-                ) : null}
+                  {draft.avatarUrl ? (
+                    <Button
+                      aria-label="Remove profile photo"
+                      onClick={() => set("avatarUrl")("")}
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <XIcon aria-hidden="true" />
+                    </Button>
+                  ) : null}
+                </div>
               </div>
+              <input
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  void pickPhoto(event.target.files?.[0])
+                  // Same file picked twice should still fire onChange.
+                  event.target.value = ""
+                }}
+                ref={fileInputRef}
+                type="file"
+              />
+              <input name="avatarUrl" type="hidden" value={draft.avatarUrl} />
               {photoError ? (
                 <span className="mt-2 text-sm text-destructive">{photoError}</span>
               ) : null}
