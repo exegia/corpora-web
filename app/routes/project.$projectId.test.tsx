@@ -569,7 +569,7 @@ describe("details panel — licences (US3)", () => {
     ).toBeInTheDocument()
     expect(screen.getAllByText(/agreed .* by ada researcher/i)).toHaveLength(2)
 
-    const row = screen.getByText("CC0 Public Domain").closest("li") as HTMLElement
+    const row = screen.getByText("CC0 Public Domain").closest("tr") as HTMLElement
     await user.click(within(row).getByRole("button", { name: "Remove" }))
     await waitFor(() =>
       expect(detachLicence).toHaveBeenCalledWith("p1", "CC0-1.0"),

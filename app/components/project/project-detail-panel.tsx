@@ -27,11 +27,9 @@ import { formatDate, formatRelativeTime } from "@/lib/format"
 import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
 import LicensePickerSection from "@/components/project/license-picker-section"
-import AlertBlock from "@/components/alert.block"
 import MetadataBlock from "@/components/metadata.block"
 import StatusBlock from "@/components/status.block"
 import {
-    type AttachedLicense,
     type ProjectDetail,
     type ProjectStatus,
     reviewIssues,
