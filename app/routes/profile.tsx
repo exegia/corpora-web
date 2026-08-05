@@ -9,7 +9,7 @@ import {
   UserIcon,
   XIcon,
 } from "lucide-react"
-import { AnimatePresence, motion } from "motion/react"
+import { AnimatePresence, motion, MotionConfig } from "motion/react"
 import { Suspense, useId, useMemo, useRef, useState } from "react"
 import { Await, useFetcher, useRevalidator } from "react-router"
 import { AUTH_PROVIDERS } from "@/components/auth"
@@ -693,6 +693,11 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
   }
 
   return (
+    /* The identity rows animate through motion/react, whose reduced-motion
+       handling is opt-in — unlike the `motion-reduce:` utilities used
+       elsewhere, it does not read the media query on its own. The upstream
+       block carried this; composing the card locally dropped it. */
+    <MotionConfig reducedMotion="user">
     <Tabs
       className="mx-auto w-full max-w-3xl gap-6"
       defaultValue={PROFILE_TAB.general}
@@ -1033,5 +1038,6 @@ export default function Profile({ loaderData }: Route.ComponentProps) {
         <DangerZoneCard />
       </TabsPanel>
     </Tabs>
+    </MotionConfig>
   )
 }
