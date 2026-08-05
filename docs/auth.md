@@ -229,12 +229,18 @@ VALUES (gen_random_uuid(), '109876543210987654321', '<user-uuid>',
         'google', now(), now(), now());"
 ```
 
-Seed **two** social identities to enable Disconnect. With only one, the card
-disables it and shows "This is your only way to sign in" — the deliberate
-conservative guard described in `app/routes/profile.tsx`, which filters the
-email identity out and so ignores the password that would still keep the account
-reachable. That state is correct, not a bug. A real `DELETE
-/auth/v1/user/identities/{id}` then verifies the unlink path end to end.
+One seeded social identity is enough to exercise Disconnect. `toLinkedIdentities`
+filters the email identity out of the *list*, but its presence still reaches the
+block through `hasOtherSignInMethods`, so the last-method guard engages only when
+a social identity really is the only way in. Clicking Disconnect fires a real
+`DELETE /auth/v1/user/identities/{id}`, which verifies the unlink path end to
+end.
+
+To see the guard itself, test an account with **no** email identity — a
+social-only signup. There the sole provider's Disconnect is disabled and the
+card reads "This is your only way to sign in", which is correct rather than a
+bug. Note that a purely local seed cannot reach that state from the standing
+account, which always has its email identity.
 
 Seeded rows carry fake provider subjects, so they prove the app's plumbing but
 never Google's token exchange. Delete them when finished; a stale fake Google
