@@ -99,7 +99,7 @@ describe("/project list", () => {
     expect(
       await screen.findByRole("link", { name: /Peshitta Study/ }),
     ).toBeInTheDocument()
-    expect(screen.getByText("draft")).toBeInTheDocument()
+    expect(screen.getByText("Draft")).toBeInTheDocument()
     // The column header carries the "updated" wording now; the cell holds the
     // relative time, with the exact timestamp on its title.
     expect(

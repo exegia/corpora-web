@@ -5,7 +5,7 @@ import { Await, Link, useLoaderData, useViewTransitionState } from "react-router
 import type { ActionFunctionArgs } from "react-router"
 import { DeleteProjectDialog } from "@/components/project/delete-project-dialog"
 import { ProjectFormDialog } from "@/components/project/project-form-dialog"
-import { Badge, type BadgeProps } from "@/components/ui/badge"
+import StatusBlock from "@/components/status.block"
 import { Button } from "@/components/ui/button"
 import {
     Empty,
@@ -29,7 +29,6 @@ import {
     DataError,
     deleteProject,
     listProjects,
-    type ProjectStatus,
     type ProjectSummary,
     updateProject,
 } from "@/lib/projects"
@@ -76,15 +75,6 @@ export async function clientAction({ request }: ActionFunctionArgs) {
         }
         return { ok: false, error: "Something went wrong. Your change was not saved." }
     }
-}
-
-/** Mirrors the status vocabulary of the detail panel's STATUS_DOT_COLORS. */
-const STATUS_BADGE_VARIANTS: Record<ProjectStatus, BadgeProps["variant"]> = {
-    draft: "secondary",
-    started: "info",
-    "ready-for-review": "warning",
-    published: "success",
-    failed: "error",
 }
 
 function ProjectRow({ project }: { project: ProjectSummary }) {
@@ -135,9 +125,7 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                 </div>
             </TableCell>
             <TableCell>
-                <Badge variant={STATUS_BADGE_VARIANTS[project.status]}>
-                    {project.status}
-                </Badge>
+                <StatusBlock status={project.status} />
             </TableCell>
             <TableCell className="text-muted-foreground text-xs">
                 <span title={project.updatedAt}>

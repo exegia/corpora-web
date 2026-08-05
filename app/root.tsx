@@ -6,6 +6,7 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router"
+import { AnchoredToastProvider, ToastProvider } from "@/components/ui/toast"
 import type { Route } from "./+types/root"
 import { THEME_INIT_SCRIPT } from "@/lib/theme"
 import "./app.css"
@@ -24,10 +25,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body className="w-full h-screen relative overflow-hidden">
-        <div className="absolute left-0 top-0 w-full h-full overflow-hidden scrollbar-none">
-        {children}
-          <ScrollRestoration />
-        </div>
+        <ToastProvider position="top-right">
+          <AnchoredToastProvider>
+            <div className="absolute left-0 top-0 w-full h-full overflow-hidden scrollbar-none">
+              {children}
+              <ScrollRestoration />
+            </div>
+          </AnchoredToastProvider>
+        </ToastProvider>
         <Scripts />
       </body>
     </html>

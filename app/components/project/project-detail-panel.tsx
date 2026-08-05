@@ -29,32 +29,13 @@ import { formatDate, formatRelativeTime } from "@/lib/format"
 import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
 import MetadataBlock from "@/components/metadata.block"
+import StatusBlock from "@/components/status.block"
 import {
     type AttachedLicense,
     type ProjectDetail,
     type ProjectStatus,
     reviewIssues,
 } from "@/lib/projects"
-
-const STATUS_DOT_COLORS: Record<ProjectStatus, string> = {
-    draft: "bg-gray-500",
-    started: "bg-blue-500",
-    "ready-for-review": "bg-amber-500",
-    published: "bg-emerald-500",
-    failed: "bg-red-500",
-}
-
-function StatusLabel({ status }: { status: ProjectStatus }) {
-    return (
-        <span className="flex items-center gap-2">
-      <span
-          aria-hidden="true"
-          className={`size-2 rounded-full ${STATUS_DOT_COLORS[status]}`}
-      />
-      <span className="truncate">{status}</span>
-    </span>
-    )
-}
 
 /**
  * The status workflow as contextual actions instead of a select: the
@@ -258,81 +239,76 @@ export function ProjectDetailPanel({
             <CardFrameHeader>
                 <CardFrameTitle render={<h2 />}>Details</CardFrameTitle>
             </CardFrameHeader>
-            <div className="grid sm:grid-cols-6">
+            <div className="grid sm:grid-cols-6 gap-x-2">
               <Card className="sm:col-span-2">
                 <CardPanel>
-
-              <MetadataBlock
-                label="Status"
-                value={  <StatusLabel status={project.status} />}
-                action={   <StatusActions
-                    project={project}
-                    superadmin={superadmin}
-                    fetcher={statusFetcher}
-                />} />
-              {showChecklist && <ReviewChecklist project={project} />}
+                  <MetadataBlock
+                    label="Status"
+                    value={<StatusBlock status={project.status} />}
+                    action={<StatusActions
+                        project={project}
+                        superadmin={superadmin}
+                        fetcher={statusFetcher}
+                    />} />
+                    {showChecklist && <ReviewChecklist project={project} />}
                 </CardPanel>
-          </Card>
-          <Card className="sm:col-span-4">
-            <CardPanel>
-              <MetadataBlock
-                label="Classification"
-                value={classification}
-                action={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setClassifying(true)}
-                  >
-                    <Pencil aria-hidden="true" className="size-4" />
-                    Edit
-                  </Button>
-                }
-          />
-            </CardPanel>
-          </Card>
+              </Card>
+              <Card className="sm:col-span-4">
+                <CardPanel className="grid sm:grid-cols-2">
+                  <MetadataBlock
+                    label="Classification"
+                    value={classification}
+                    action={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setClassifying(true)}
+                      >
+                        <Pencil aria-hidden="true" className="size-4" />
+                        Edit
+                      </Button>
+                    }
+                  />
+                  <MetadataBlock label="Creator" value={project.creator.name ?? project.creator.username} />
+             <MetadataBlock label="Organization" value={project.organization?.name}   action={
+               <Button
+                 variant="outline"
+                 size="sm"
+                 onClick={() => setClassifying(true)}
+               >
+                 <Pencil aria-hidden="true" className="size-4" />
+                 Edit
+               </Button>
+             } />
+               <MetadataBlock label="Website" value={<Button variant="link" size="sm">{project.organization?.website}</Button>}   action={
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   onClick={() => setClassifying(true)}
+                 >
+                   <Pencil aria-hidden="true" className="size-4" />
+                   Edit
+                 </Button>
+               } />
+                </CardPanel>
+              </Card>
             </div>
-        <Card className="grid sm:grid-cols-2">
-                <CardPanel>
-
-                    <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-                        <div className="flex flex-col gap-1">
-                            <dt className="font-medium">Status</dt>
-                            <dd>
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-
-
-                                </div>
-
-
-                                {statusFetcher.data?.ok === false && statusFetcher.data.error && (
-                                    <p role="alert" className="mt-1 text-destructive text-xs">
-                                        {statusFetcher.data.error}
-                                    </p>
-                                )}
-                            </dd>
-              </div>
-
-              <MetadataBlock
-                label="Classification"
-                value={classification}
-                action={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setClassifying(true)}
-                  >
-                    <Pencil aria-hidden="true" className="size-4" />
-                    Edit
-                  </Button>
-                }
-              />
-
-                        <div className="flex flex-col gap-1">
-                            <dt className="font-medium">Creator</dt>
-                            <dd>{project.creator.name ?? project.creator.username}</dd>
-                        </div>
-
+            <Card className="grid sm:grid-cols-2">
+              <CardPanel className="grid sm:grid-cols-2">
+              
+                <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <dt className="font-medium">Status</dt>
+                    <dd>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        {statusFetcher.data?.ok === false && statusFetcher.data.error && (
+                            <p role="alert" className="mt-1 text-destructive text-xs">
+                                {statusFetcher.data.error}
+                            </p>
+                        )}
+                      </div>
+                    </dd>
+                  </div>
                         <div className="flex flex-col gap-1">
                             <dt className="font-medium">Organization</dt>
                             <dd className="flex items-center justify-between gap-2">

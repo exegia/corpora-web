@@ -2,7 +2,7 @@ import React from 'react'
 
 export type MetadataProps = {
   label: string
-  value?: string | React.ReactNode
+  value?: string | React.ReactNode | null
   action?: React.ReactNode
 }
 
