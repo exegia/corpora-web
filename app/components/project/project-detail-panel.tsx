@@ -28,6 +28,7 @@ import type { Organization } from "@/lib/organizations"
 import LicensePickerSection from "@/components/project/license-picker-section"
 import MetadataBlock, { type MetadataAction } from "@/components/metadata.block"
 import StatusBlock from "@/components/status.block"
+import { cn } from "@/lib/utils"
 import {
     type ProjectDetail,
     type ProjectStatus,
@@ -181,29 +182,15 @@ export function ProjectDetailPanel({
                 </CardPanel>
               </Card>
               <Card className="sm:col-span-4">
-                <CardPanel className="grid gap-4 sm:grid-cols-2">
+                <CardPanel className="flex flex-col gap-y-4">
                   <MetadataBlock
                     label="Classification"
-                    value={
-                      classification ? (
-                        <span className="capitalize">{classification}</span>
-                      ) : (
-                        "Unclassified"
-                      )
-                    }
-                    actions={
-                      readOnly
-                        ? undefined
-                        : [
-                            {
-                              label: "Classify",
-                              icon: <Pencil aria-hidden="true" className="size-4" />,
-                              variant: "outline",
-                              size: "sm",
+                    value={<span className={cn("capitalize", classification ? "text-primary-foreground" : "italic text-muted-foreground")}>{classification ? classification : "Unclassified"}</span>}
+                    actions={{
+                              icon: <Pencil aria-hidden="true" />,
                               onClick: () => setClassifying(true),
-                            },
-                          ]
-                    }
+                              label: "Edit",
+                            }}
                   />
                   <MetadataBlock
                     label="Creator"

@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import { type ButtonProps, Button } from "@exegia/corpora-ui"
 import { Group, GroupSeparator, GroupText } from "@/components/ui/group";
 import { Label } from "@/components/ui/label";
+import { Pencil } from "lucide-react"
 
 // glassVariant is omitted along with variant: ButtonProps is a discriminated
 // union where only `variant: "glass"` accepts it, and this narrower variant
@@ -12,36 +13,41 @@ export type MetadataAction = Omit<ButtonProps, "children" | "variant" | "glassVa
 export type MetadataProps = {
   label: string
   value?: string | React.ReactNode | null
-  actions?: Array<MetadataAction>
+  actions?: Array<MetadataAction> | MetadataAction
   direction?: "row" | "column"
 }
 
-const ActionButton = ({ label, icon, variant = 'ghost', ...props }: MetadataAction) => {
-  return <Button {...props} variant={variant}>{icon}{label}</Button>
+const ActionButton = ({ label, icon, variant = 'outline', ...props }: MetadataAction) => {
+  return <>
+     <GroupSeparator />
+     <Button {...props} variant={variant}>{icon}{label}</Button>
+  </>
 }
 
 const ActionGroup = ({ actions }: { actions: Array<MetadataAction> }) => {
-  return (
-    <Group aria-label="File actions">
-      {actions.map((buttonProps, index) =>
-        <>
-          <ActionButton key={index}  {...buttonProps} variant="ghost" />
-          {actions.length > 1 && <GroupSeparator />}
-        </>
-      )}
-    </Group>
+  return actions.map((buttonProps, index) =>
+    <ActionButton key={index} {...buttonProps} />
   )
 }
 
 const MetadataBlock = ({ label, value, actions, direction = "row" }: MetadataProps) => {
 
-
   if (direction === "row") {
-    return (<Group aria-label="Domain input">
-      <GroupText render={<Label aria-label="Domain" htmlFor="domain" />}>{value}</GroupText>
-       <GroupSeparator />
-      {actions && <ActionGroup actions={actions} />}
-    </Group>)
+    return (
+      <Group aria-label="Domain input" className="w-full flex flex-row flex-1 min-h-9">
+        <GroupText className="flex-1">
+          {label}
+        </GroupText>
+        <GroupSeparator />
+        <GroupText className="flex-1 text-primary">
+          {value}
+        </GroupText>
+        {actions && Array.isArray(actions) ?
+          <ActionGroup actions={actions} /> :
+          <ActionButton {...actions} />
+        }
+      </Group>
+    )
   }
 
   return (
