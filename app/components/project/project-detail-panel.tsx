@@ -22,12 +22,11 @@ import {
     CardFrameTitle,
     CardPanel,
 } from "@/components/ui/card"
-import { ButtonGroup } from "@/components/ui/group"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
 import LicensePickerSection from "@/components/project/license-picker-section"
-import MetadataBlock from "@/components/metadata.block"
+import MetadataBlock, { type MetadataAction } from "@/components/metadata.block"
 import StatusBlock from "@/components/status.block"
 import {
     type ProjectDetail,
@@ -39,82 +38,54 @@ import {
  * The status workflow as contextual actions instead of a select: the
  * creator submits for review; the superadmin publishes or returns to draft.
  */
-function StatusActions({
-                           project,
-                           superadmin,
-                           fetcher,
-                       }: {
-    project: ProjectDetail
-    superadmin: boolean
-    fetcher: ReturnType<typeof useFetcher<{ ok: boolean; error?: string }>>
-}) {
+function statusActions(
+    project: ProjectDetail,
+    superadmin: boolean,
+    fetcher: ReturnType<typeof useFetcher<{ ok: boolean; error?: string }>>,
+): MetadataAction[] {
     const busy = fetcher.state !== "idle"
     const submit = (status: ProjectStatus) =>
         fetcher.submit({ intent: "set-status", status }, { method: "post" })
 
+    const toDraft: MetadataAction = {
+        label: "Change to draft",
+        icon: <Undo2 aria-hidden="true" className="size-4" />,
+        variant: "outline",
+        size: "sm",
+        disabled: busy,
+        onClick: () => submit("draft"),
+    }
+
     if (project.status === "ready-for-review") {
-        if (!superadmin) return null
-        return (
-            <ButtonGroup>
-                <Button size="sm" disabled={busy} onClick={() => submit("published")}>
-                    <ShieldCheck aria-hidden="true" className="size-4" />
-                    Publish
-                </Button>
-                <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => submit("draft")}
-                >
-                    <Undo2 aria-hidden="true" className="size-4" />
-                    Change to draft
-                </Button>
-            </ButtonGroup>
-        )
+        if (!superadmin) return []
+        return [
+            {
+                label: "Publish",
+                icon: <ShieldCheck aria-hidden="true" className="size-4" />,
+                size: "sm",
+                disabled: busy,
+                onClick: () => submit("published"),
+            },
+            toDraft,
+        ]
     }
 
     if (project.status === "published") {
-        if (!superadmin) return null
-        return (
-            <ButtonGroup>
-                <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => submit("draft")}
-                >
-                    <Undo2 aria-hidden="true" className="size-4" />
-                    Change to draft
-                </Button>
-            </ButtonGroup>
-        )
+        return superadmin ? [toDraft] : []
     }
 
     // Drafting (incl. legacy started/failed rows, which only return to draft).
-    return (
-        <ButtonGroup>
-            {project.status !== "draft" && (
-                <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => submit("draft")}
-                >
-                    <Undo2 aria-hidden="true" className="size-4" />
-                    Change to draft
-                </Button>
-            )}
-            <Button
-                size="sm"
-                variant="outline"
-                disabled={busy || reviewIssues(project).length > 0}
-                onClick={() => submit("ready-for-review")}
-            >
-                <Send aria-hidden="true" className="size-4" />
-                Ready for review
-            </Button>
-        </ButtonGroup>
-    )
+    return [
+        ...(project.status !== "draft" ? [toDraft] : []),
+        {
+            label: "Ready for review",
+            icon: <Send aria-hidden="true" className="size-4" />,
+            variant: "outline",
+            size: "sm",
+            disabled: busy || reviewIssues(project).length > 0,
+            onClick: () => submit("ready-for-review"),
+        },
+    ]
 }
 
 /** The three ready-for-review requirements with their pass/fail state. */
@@ -194,11 +165,8 @@ export function ProjectDetailPanel({
                   <MetadataBlock
                     label="Status"
                     value={<StatusBlock status={project.status} />}
-                    action={<StatusActions
-                        project={project}
-                        superadmin={superadmin}
-                        fetcher={statusFetcher}
-                    />} />
+                    actions={statusActions(project, superadmin, statusFetcher)}
+                  />
                     {showChecklist && <ReviewChecklist project={project} />}
                     {project.status === "ready-for-review" && !superadmin && (
                         <p className="mt-1 text-muted-foreground text-xs">
@@ -223,17 +191,18 @@ export function ProjectDetailPanel({
                         "Unclassified"
                       )
                     }
-                    action={
-                      !readOnly && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setClassifying(true)}
-                        >
-                          <Pencil aria-hidden="true" className="size-4" />
-                          Classify
-                        </Button>
-                      )
+                    actions={
+                      readOnly
+                        ? undefined
+                        : [
+                            {
+                              label: "Classify",
+                              icon: <Pencil aria-hidden="true" className="size-4" />,
+                              variant: "outline",
+                              size: "sm",
+                              onClick: () => setClassifying(true),
+                            },
+                          ]
                     }
                   />
                   <MetadataBlock
@@ -286,21 +255,22 @@ export function ProjectDetailPanel({
                           )}
                       </>
                     }
-                    action={
-                      !readOnly && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditingOrganization(true)}
-                        >
-                          {project.organization ? (
-                            <Pencil aria-hidden="true" className="size-4" />
-                          ) : (
-                            <Plus aria-hidden="true" className="size-4" />
-                          )}
-                          {project.organization ? "Change" : "Assign"}
-                        </Button>
-                      )
+                    actions={
+                      readOnly
+                        ? undefined
+                        : [
+                            {
+                              label: project.organization ? "Change" : "Assign",
+                              icon: project.organization ? (
+                                <Pencil aria-hidden="true" className="size-4" />
+                              ) : (
+                                <Plus aria-hidden="true" className="size-4" />
+                              ),
+                              variant: "outline",
+                              size: "sm",
+                              onClick: () => setEditingOrganization(true),
+                            },
+                          ]
                     }
                   />
                   <MetadataBlock
@@ -321,17 +291,6 @@ export function ProjectDetailPanel({
                           {project.organization.website}
                         </Button>
                       )
-                    }
-                  />
-                  <MetadataBlock
-                    label="Dates"
-                    value={
-                      <span className="text-muted-foreground">
-                        Created {formatDate(project.createdAt)} · updated{" "}
-                        <span title={project.updatedAt}>
-                          {formatRelativeTime(project.updatedAt)}
-                        </span>
-                      </span>
                     }
                   />
                 </CardPanel>
