@@ -1,9 +1,6 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { type ButtonProps, Button } from "@exegia/corpora-ui"
-import { Group, GroupSeparator, GroupText } from "@/components/ui/group";
-import { Label } from "@/components/ui/label";
-import { Pencil } from "lucide-react"
 
 // glassVariant is omitted along with variant: ButtonProps is a discriminated
 // union where only `variant: "glass"` accepts it, and this narrower variant
@@ -15,48 +12,86 @@ export type MetadataProps = {
   value?: string | React.ReactNode | null
   actions?: Array<MetadataAction> | MetadataAction
   direction?: "row" | "column"
+  /** Default variant for actions that don't set their own. */
+  variant?: 'default' | 'ghost' | 'outline'
+  className?: string
 }
 
-const ActionButton = ({ label, icon, variant = 'outline', ...props }: MetadataAction) => {
-  return <>
-     <GroupSeparator />
-     <Button {...props} variant={variant}>{icon}{label}</Button>
-  </>
+const ActionButton = ({ label, icon, variant = 'ghost', size = 'sm', ...props }: MetadataAction) => {
+  return <Button {...props} size={size} variant={variant}>{icon}{label}</Button>
 }
 
-const ActionGroup = ({ actions }: { actions: Array<MetadataAction> }) => {
-  return actions.map((buttonProps, index) =>
-    <ActionButton key={index} {...buttonProps} />
+/**
+ * `false` and `null` are how a conditional value ("only render the link when
+ * there is a website") arrives here — both mean "nothing to show", and neither
+ * may reach `String()`, which is where the literal "null" came from.
+ */
+function isEmpty(value: MetadataProps["value"]): boolean {
+  return value === null || value === undefined || value === false || value === ""
+}
+
+const MetadataBlock = ({
+  label,
+  value,
+  actions,
+  direction = "row",
+  variant = 'ghost',
+  className,
+}: MetadataProps) => {
+  const list = actions ? (Array.isArray(actions) ? actions : [actions]) : []
+  const content = isEmpty(value) ? (
+    <span className="text-muted-foreground italic">Not set</span>
+  ) : React.isValidElement(value) ? (
+    value
+  ) : (
+    String(value)
   )
-}
-
-const MetadataBlock = ({ label, value, actions, direction = "row" }: MetadataProps) => {
-
-  if (direction === "row") {
-    return (
-      <Group aria-label="Domain input" className="w-full flex flex-row flex-1 min-h-9">
-        <GroupText className="flex-1">
-          {label}
-        </GroupText>
-        <GroupSeparator />
-        <GroupText className="flex-1 text-primary">
-          {value}
-        </GroupText>
-        {actions && Array.isArray(actions) ?
-          <ActionGroup actions={actions} /> :
-          <ActionButton {...actions} />
-        }
-      </Group>
-    )
-  }
 
   return (
-    <div className="flex items-center justify-between gap-x-2 gap-y-0">
-    <dl className="flex text-xs flex-row flex-1 justify-between items-center">
-        <dt className="font-medium capitalize text-primary/50">{label}</dt>
-        <dd>{value ? React.isValidElement(value) ? value : String(value) : <span className="text-muted-foreground capitalize italic">no {label}</span>}</dd>
+    <div
+      className={cn(
+        // -mx-2/px-2 lets the hover tint bleed past the text without moving it.
+        // min-h-11 keeps a row with a button the same height as one without.
+        "group/meta -mx-2 flex min-h-11 gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/40",
+        direction === "row" ? "items-center" : "items-start",
+        className,
+      )}
+    >
+      <dl
+        className={cn(
+          "flex min-w-0 flex-1 gap-x-3 gap-y-0.5 text-sm",
+          direction === "row"
+            ? "flex-row items-center justify-between"
+            : "flex-col",
+        )}
+      >
+        <dt
+          className={cn(
+            "text-muted-foreground",
+            direction === "row" && "w-28 shrink-0",
+          )}
+        >
+          {label}
+        </dt>
+        <dd
+          className={cn(
+            "flex min-w-0 items-center gap-2 text-foreground",
+            direction === "row" ? "flex-1 justify-end text-right" : "w-full",
+          )}
+        >
+          {content}
+        </dd>
       </dl>
-      {actions ? actions.length > 1 ? <ActionGroup actions={actions} /> : <ActionButton variant="outline" {...actions[0]} /> : null}
+      {/*
+        The slot is reserved even with no actions: stacked rows are read as a
+        column, and an actionless row would otherwise run its value 76px further
+        right than its neighbours.
+      */}
+      <div className="flex min-w-16 shrink-0 items-center justify-end gap-1">
+        {list.map((action, index) => (
+          <ActionButton key={action.label ?? index} variant={variant} {...action} />
+        ))}
+      </div>
     </div>
   )
 }

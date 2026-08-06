@@ -178,8 +178,13 @@ export interface AttachedLicense {
   status: LicenseStatus
   family: string | null
   maintainer: string | null
-  agreedAt: string
-  agreedBy: ProjectCreator
+  /**
+   * null until the licence is agreed. The DB pairs agreed_at with
+   * agreed_by_user_id under a check constraint, so these two are null together
+   * and an attachment is pending exactly when `agreedAt === null`.
+   */
+  agreedAt: string | null
+  agreedBy: ProjectCreator | null
 }
 
 export type LicenseStatus = "active" | "retired" | "superseded"
@@ -390,14 +395,20 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
           status: license.status,
           family: license.family,
           maintainer: license.maintainer,
-          // agreed_at is nullable in the DB but paired with agreed_by_user_id;
-          // the app always attaches with agreement, so "" only appears for
-          // rows written by other clients without one.
-          agreedAt: attachment.agreed_at ?? "",
-          agreedBy: attachment.user_directory ?? UNKNOWN_CREATOR,
+          // Paired by a check constraint: agreed_at without an agreeing user
+          // (or the reverse) cannot exist, so both collapse to null together.
+          agreedAt: attachment.agreed_at,
+          agreedBy: attachment.agreed_at
+            ? (attachment.user_directory ?? UNKNOWN_CREATOR)
+            : null,
         }
       })
-      .sort((a, b) => a.agreedAt.localeCompare(b.agreedAt)),
+      // Pending first — it is the one attachment still asking for something.
+      .sort((a, b) =>
+        a.agreedAt === null || b.agreedAt === null
+          ? Number(b.agreedAt === null) - Number(a.agreedAt === null)
+          : a.agreedAt.localeCompare(b.agreedAt),
+      ),
     corpora: row.project_corpora
       .map((link) => ({
         corpusId: link.corpus_id,

@@ -178,6 +178,24 @@ export async function saveLicenceText(id: string, text: string): Promise<void> {
   }
 }
 
+/**
+ * The licence body: stored text resolves instantly, a first read downloads and
+ * stores it. Best effort — null when every source fails, so a caller can fall
+ * back to the catalog summary rather than showing an error.
+ */
+export function resolveLicenceText(
+  licence: LicenceDetail | null,
+): Promise<string | null> {
+  if (licence === null) return Promise.resolve(null)
+  if (licence.fullText !== null) return Promise.resolve(licence.fullText)
+  return fetchLicenceText(licence)
+    .then(async (fetched) => {
+      if (fetched) await saveLicenceText(licence.id, fetched)
+      return fetched
+    })
+    .catch(() => null)
+}
+
 export interface LicenceCreate extends LicenceUpdate {
   id: string
 }
@@ -295,6 +313,40 @@ export async function attachLicence(
       "unknown",
       `Could not attach the licence: ${error.message ?? "unexpected error"}`,
     )
+  }
+  await touchProject(projectId)
+}
+
+/**
+ * Record agreement on an already-attached licence (FR-012). agreed_at and
+ * agreed_by_user_id are written together — the table's check constraint
+ * rejects either one on its own.
+ */
+export async function agreeLicence(
+  projectId: string,
+  licenceId: string,
+  agreedByUserId: string,
+): Promise<void> {
+  if (!agreedByUserId.trim()) {
+    throw new DataError("validation", "An agreeing user is required.")
+  }
+  const { data, error } = await getSupabase()
+    .from("project_licences")
+    .update({
+      agreed_by_user_id: agreedByUserId,
+      agreed_at: new Date().toISOString(),
+    })
+    .eq("project_id", projectId)
+    .eq("licence_id", licenceId)
+    .select("licence_id")
+  if (error) {
+    throw new DataError(
+      "unknown",
+      `Could not record the agreement: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  if (!data || data.length === 0) {
+    throw new DataError("not-found", "This licence is not attached to the project.")
   }
   await touchProject(projectId)
 }

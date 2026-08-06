@@ -12,6 +12,7 @@ import { CorpusLinkList } from "@/components/project/corpus-link-list"
 import { CorpusSection } from "@/components/project/corpus-section"
 import { DeleteProjectDialog } from "@/components/project/delete-project-dialog"
 import { LinkCorpusDialog } from "@/components/project/link-corpus-dialog"
+import AlertBlock from "@/components/alert.block"
 import { ProjectDetailPanel } from "@/components/project/project-detail-panel"
 import { ProjectFormDialog } from "@/components/project/project-form-dialog"
 import { Button } from "@/components/ui/button"
@@ -32,7 +33,12 @@ import {
   listCorpusDocuments,
 } from "@/lib/corpus"
 import { formatDate, formatRelativeTime } from "@/lib/format"
-import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
+import {
+  agreeLicence,
+  attachLicence,
+  detachLicence,
+  listLicences,
+} from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organizations"
 import {
   assertEditable,
@@ -153,6 +159,13 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
           projectId,
           String(form.get("licenseId") ?? ""),
           // Pre-auth: the project's creator is the agreeing user (plan Constraints)
+          String(form.get("agreedByUserId") ?? ""),
+        )
+        return { ok: true, intent }
+      case "agree-license":
+        await agreeLicence(
+          projectId,
+          String(form.get("licenseId") ?? ""),
           String(form.get("agreedByUserId") ?? ""),
         )
         return { ok: true, intent }
@@ -280,7 +293,7 @@ function WorkspacePanels({
         readOnly={readOnly}
       />
 
-      
+
 
       <CorpusSection
         corpus={project.corpus}
@@ -343,7 +356,7 @@ export default function ProjectWorkspace() {
         </div>
         {!readOnly && (
           <div className="flex shrink-0 items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
               <Pencil aria-hidden="true" className="size-4" />
               Edit
             </Button>
@@ -353,6 +366,14 @@ export default function ProjectWorkspace() {
           </div>
         )}
       </header>
+
+      {readOnly && (
+        <AlertBlock
+          variant="info"
+          title="In review"
+          description="This project is locked while the superadmin reviews it. Return it to draft to make further changes."
+        />
+      )}
 
       <Suspense fallback={<PanelsSkeleton />}>
         <Await resolve={data}>

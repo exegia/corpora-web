@@ -1,13 +1,4 @@
-import {
-    CheckCircle2,
-    Circle,
-    Pencil,
-    Plus,
-    Send,
-    ShieldCheck,
-    Trash,
-    Undo2
-} from "lucide-react"
+import { CircleX, Pencil } from "lucide-react"
 import { useState } from "react"
 import { useFetcher } from "react-router"
 import { ClassifyDialog } from "@/components/project/classify-dialog"
@@ -15,6 +6,7 @@ import { ClassifyDialog } from "@/components/project/classify-dialog"
 import { OrganizationDialog } from "@/components/project/organization-dialog"
 
 import { Button } from "@exegia/corpora-ui"
+import { Badge } from "@/components/ui/badge"
 import {
     Card,
     CardFrame,
@@ -22,102 +14,13 @@ import {
     CardFrameTitle,
     CardPanel,
 } from "@/components/ui/card"
-import { formatDate, formatRelativeTime } from "@/lib/format"
 import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
 import LicensePickerSection from "@/components/project/license-picker-section"
-import MetadataBlock, { type MetadataAction } from "@/components/metadata.block"
-import StatusBlock from "@/components/status.block"
+import MetadataBlock from "@/components/metadata.block"
+import { ProjectStatusCard } from "@/components/project/project-status-card"
 import { cn } from "@/lib/utils"
-import {
-    type ProjectDetail,
-    type ProjectStatus,
-    reviewIssues,
-} from "@/lib/projects"
-
-/**
- * The status workflow as contextual actions instead of a select: the
- * creator submits for review; the superadmin publishes or returns to draft.
- */
-function statusActions(
-    project: ProjectDetail,
-    superadmin: boolean,
-    fetcher: ReturnType<typeof useFetcher<{ ok: boolean; error?: string }>>,
-): MetadataAction[] {
-    const busy = fetcher.state !== "idle"
-    const submit = (status: ProjectStatus) =>
-        fetcher.submit({ intent: "set-status", status }, { method: "post" })
-
-    const toDraft: MetadataAction = {
-        label: "Change to draft",
-        icon: <Undo2 aria-hidden="true" className="size-4" />,
-        variant: "outline",
-        size: "sm",
-        disabled: busy,
-        onClick: () => submit("draft"),
-    }
-
-    if (project.status === "ready-for-review") {
-        if (!superadmin) return []
-        return [
-            {
-                label: "Publish",
-                icon: <ShieldCheck aria-hidden="true" className="size-4" />,
-                size: "sm",
-                disabled: busy,
-                onClick: () => submit("published"),
-            },
-            toDraft,
-        ]
-    }
-
-    if (project.status === "published") {
-        return superadmin ? [toDraft] : []
-    }
-
-    // Drafting (incl. legacy started/failed rows, which only return to draft).
-    return [
-        ...(project.status !== "draft" ? [toDraft] : []),
-        {
-            label: "Ready for review",
-            icon: <Send aria-hidden="true" className="size-4" />,
-            variant: "outline",
-            size: "sm",
-            disabled: busy || reviewIssues(project).length > 0,
-            onClick: () => submit("ready-for-review"),
-        },
-    ]
-}
-
-/** The three ready-for-review requirements with their pass/fail state. */
-function ReviewChecklist({ project }: { project: ProjectDetail }) {
-    const checks = [
-        { label: "Licence attached and agreed", ok: project.licenses.length > 0 },
-        { label: "Classified (bible, book, …)", ok: project.type !== null },
-        { label: "Corpus attached", ok: project.corpus !== null },
-    ]
-    return (
-        <ul className="mt-2 flex flex-col gap-1 text-xs">
-            {checks.map((check) => (
-                <li
-                    key={check.label}
-                    className={`flex items-center gap-1.5 ${
-                        check.ok ? "text-muted-foreground" : "text-foreground"
-                    }`}
-                >
-                    {check.ok ? (
-                        <CheckCircle2 aria-hidden="true" className="size-3.5 text-emerald-600" />
-                    ) : (
-                        <Circle aria-hidden="true" className="size-3.5" />
-                    )}
-                    {check.label}
-                </li>
-            ))}
-        </ul>
-    )
-}
-
-
+import type { ProjectDetail } from "@/lib/projects"
 
 export interface ProjectDetailPanelProps {
     project: ProjectDetail
@@ -150,10 +53,6 @@ export function ProjectDetailPanel({
         .filter(Boolean)
         .join(" · ")
 
-    const issues = reviewIssues(project)
-    const showChecklist =
-        !["ready-for-review", "published"].includes(project.status) && issues.length > 0
-
   return (
       <>
         <CardFrame>
@@ -163,34 +62,30 @@ export function ProjectDetailPanel({
             <div className="grid sm:grid-cols-6 gap-x-1">
               <Card className="sm:col-span-2">
                 <CardPanel>
-                  <MetadataBlock
-                    label="Status"
-                    value={<StatusBlock status={project.status} />}
-                    actions={statusActions(project, superadmin, statusFetcher)}
+                  <ProjectStatusCard
+                    project={project}
+                    superadmin={superadmin}
+                    fetcher={statusFetcher}
                   />
-                    {showChecklist && <ReviewChecklist project={project} />}
-                    {project.status === "ready-for-review" && !superadmin && (
-                        <p className="mt-1 text-muted-foreground text-xs">
-                            Waiting for the superadmin to approve.
-                        </p>
-                    )}
-                    {statusFetcher.data?.ok === false && statusFetcher.data.error && (
-                        <p role="alert" className="mt-1 text-destructive text-xs">
-                            {statusFetcher.data.error}
-                        </p>
-                    )}
                 </CardPanel>
               </Card>
               <Card className="sm:col-span-4">
-                <CardPanel className="flex flex-col gap-y-4">
+                <CardPanel className="flex flex-col divide-y divide-border/60">
                   <MetadataBlock
                     label="Classification"
-                    value={<span className={cn("capitalize", classification ? "text-primary-foreground" : "italic text-muted-foreground")}>{classification ? classification : "Unclassified"}</span>}
-                    actions={{
-                              icon: <Pencil aria-hidden="true" />,
-                              onClick: () => setClassifying(true),
-                              label: "Edit",
-                            }}
+                    value={<span className={cn("capitalize", classification ? "" : "italic text-muted-foreground")}>{classification ? classification : "Unclassified"}</span>}
+                    actions={
+                      readOnly
+                        ? undefined
+                        : {
+                            icon: <Pencil aria-hidden="true" />,
+                            onClick: () => setClassifying(true),
+                            label: "Edit",
+                            // Three rows say "Edit"; the field has to be in the
+                            // accessible name or they are indistinguishable.
+                            "aria-label": "Edit classification",
+                          }
+                    }
                   />
                   <MetadataBlock
                     label="Creator"
@@ -202,36 +97,62 @@ export function ProjectDetailPanel({
                       <>
                         <div className="flex flex-wrap items-center gap-2">
                           {project.organization ? (
-                            <span className="min-w-0 truncate">
-                              {project.organization.name}
+                            // The name and its remove control are one chip: a
+                            // relative wrapper so the corner button can hang off
+                            // the badge, and a sibling of the link rather than a
+                            // child — a <button> inside an <a> is invalid.
+                            <span className="relative inline-flex max-w-full">
+                              <Badge
+                                size="lg"
+                                variant="outline"
+                                className="max-w-full"
+                                render={
+                                  project.organization.website ? (
+                                    <a
+                                      href={project.organization.website}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    />
+                                  ) : undefined
+                                }
+                              >
+                                <span className="truncate">
+                                  {project.organization.name}
+                                </span>
+                              </Badge>
+                              {!readOnly && (
+                                <orgClearFetcher.Form
+                                  method="post"
+                                  className="-top-1.5 -right-1.5 absolute"
+                                >
+                                  <input
+                                    type="hidden"
+                                    name="intent"
+                                    value="set-organization"
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="organizationId"
+                                    value=""
+                                  />
+                                  <button
+                                    type="submit"
+                                    aria-label="Remove"
+                                    disabled={orgClearFetcher.state !== "idle"}
+                                    className="flex rounded-full bg-background text-muted-foreground outline-none transition-colors hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-64"
+                                  >
+                                    <CircleX
+                                      aria-hidden="true"
+                                      className="size-3.5"
+                                    />
+                                  </button>
+                                </orgClearFetcher.Form>
+                              )}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">
                               No organization
                             </span>
-                          )}
-                          {!readOnly && project.organization && (
-                            <orgClearFetcher.Form method="post">
-                              <input
-                                type="hidden"
-                                name="intent"
-                                value="set-organization"
-                              />
-                              <input
-                                type="hidden"
-                                name="organizationId"
-                                value=""
-                              />
-                              <Button
-                                type="submit"
-                                size="sm"
-                                variant="ghost"
-                                disabled={orgClearFetcher.state !== "idle"}
-                              >
-                                <Trash aria-hidden="true" className="size-4" />
-                                Remove
-                              </Button>
-                            </orgClearFetcher.Form>
                           )}
                         </div>
                         {orgClearFetcher.data?.ok === false &&
@@ -247,15 +168,10 @@ export function ProjectDetailPanel({
                         ? undefined
                         : [
                             {
-                              label: project.organization ? "Change" : "Assign",
-                              icon: project.organization ? (
-                                <Pencil aria-hidden="true" className="size-4" />
-                              ) : (
-                                <Plus aria-hidden="true" className="size-4" />
-                              ),
-                              variant: "outline",
-                              size: "sm",
+                              label: "Edit",
+                              icon: <Pencil aria-hidden="true" />,
                               onClick: () => setEditingOrganization(true),
+                              "aria-label": "Edit organization",
                             },
                           ]
                     }
