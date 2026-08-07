@@ -5,6 +5,7 @@ import { Button } from "@exegia/corpora-ui"
 import { Card, CardFrame, CardFrameHeader, CardFrameTitle, CardPanel } from "@/components/ui/card"
 import ClassificationField from "@/components/project/detail/classification-field"
 import ClassifyDialog from "@/components/project/detail/classify-dialog"
+import CreatorPreview from "@/components/project/detail/creator-preview"
 import OrganizationDialog from "@/components/project/detail/organization-dialog"
 import OrganizationField from "@/components/project/detail/organization-field"
 import StatusCard from "@/components/project/detail/status-card"
@@ -37,7 +38,7 @@ export default function Panel({ project, licenseCatalog, organizations, superadm
                                 readOnly={readOnly}
                                 onEdit={() => setClassifying(true)}
                             />
-                            <Blocks.Metadata label="Creator" value={project.creator.name ?? project.creator.username} />
+                            <Blocks.Metadata label="Creator" value={<CreatorPreview creator={project.creator} />} />
                             <OrganizationField
                                 organization={project.organization}
                                 readOnly={readOnly}
@@ -60,6 +61,16 @@ export default function Panel({ project, licenseCatalog, organizations, superadm
                                             {project.organization.website}
                                         </Button>
                                     )
+                                }
+                                // The website lives on the organization record,
+                                // so there is nowhere else to add it from.
+                                addAction={
+                                    readOnly
+                                        ? undefined
+                                        : {
+                                              onClick: () => setEditingOrganization(true),
+                                              "aria-label": "Add website",
+                                          }
                                 }
                             />
                         </CardPanel>

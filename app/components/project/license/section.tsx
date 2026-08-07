@@ -19,7 +19,7 @@ export default function Section({ project, readOnly, licenseCatalog }: SectionPr
                 <CardFrameAction>
                     <CatalogSheet
                         catalog={licenseCatalog}
-                        attachedIds={project.licenses.map(license => license.id)}
+                        attached={project.licenses}
                         agreedByUserId={project.creator.id}
                         disabled={readOnly}
                     />

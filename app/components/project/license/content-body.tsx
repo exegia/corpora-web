@@ -1,9 +1,15 @@
 import { useRemarkSync } from "react-remark"
 import { Spinner } from "@/components/ui/spinner"
 import type { ContentBodyProps } from "@/components/project/license/types"
+import { cn } from "@/lib/utils"
 
-/** Split out so the Markdown hook runs only against a settled string. */
-export default function ContentBody({ loading, text }: ContentBodyProps) {
+/**
+ * Split out so the Markdown hook runs only against a settled string.
+ *
+ * Scrolling belongs to the surrounding panel — both `DialogPanel` and
+ * `DrawerPanel` wrap their children in a `ScrollArea`.
+ */
+export default function ContentBody({ loading, text, className }: ContentBodyProps) {
     // Synchronous render — the stored text carries no async remark plugins.
     const rendered = useRemarkSync(text ?? "")
 
@@ -26,7 +32,14 @@ export default function ContentBody({ loading, text }: ContentBodyProps) {
         )
     }
     return (
-        <div className="max-h-[60vh] overflow-y-auto text-sm whitespace-pre-wrap [&_a]:underline [&_a]:underline-offset-2 [&_h1]:font-semibold [&_h2]:mt-4 [&_h2]:font-semibold [&_p]:mt-2">
+        <div
+            className={cn(
+                // Licence texts are hard-wrapped at ~80 columns, so any line
+                // indented in the source becomes a <pre> that would otherwise
+                // scroll the panel sideways in a narrow drawer.
+                "text-sm break-words whitespace-pre-wrap [&_a]:underline [&_a]:underline-offset-2 [&_h1]:font-semibold [&_h2]:mt-4 [&_h2]:font-semibold [&_p]:mt-2 [&_pre]:break-words [&_pre]:whitespace-pre-wrap",
+                className
+            )}>
             {rendered}
         </div>
     )
