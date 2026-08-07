@@ -1,6 +1,6 @@
 import { Outlet } from "react-router"
-import { SoundToggle } from "@/components/sound-toggle"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { SoundToggle } from "@/components/blocks/sound-toggle"
+import { ThemeToggle } from "@/components/blocks/theme-toggle"
 import { useUISounds } from "@/lib/sounds"
 import Threads from "@/components/threads"
 
