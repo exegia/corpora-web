@@ -1,6 +1,6 @@
 ---
 name: "refactor-structure"
-description: "Reorganize a folder into the app's file/folder convention: one section per folder, one default-exported component per file, types.ts / utils.ts / index.ts barrels — with flat export * barrels instead for app/lib and other non-UI module folders. Use when asked to reorganize, restructure, split up, or clean up the files and folders under a directory, to break a large component or module file into smaller ones, or to make a folder follow the same layout as an existing one."
+description: "Reorganize a folder into the app's file/folder convention: one section per folder, one default-exported component per file, types.ts / utils.ts / index.ts barrels — with flat export * barrels instead for app/lib and other module folders, and inline-component extraction for React Router route modules. Use when asked to reorganize, restructure, split up, or clean up the files and folders under a directory, to break a large component, module, or route file into smaller ones, or to make a folder follow the same layout as an existing one."
 argument-hint: "Folder to reorganize, e.g. app/components/project"
 user-invocable: true
 disable-model-invocation: false
@@ -15,11 +15,15 @@ ambiguous.
 For a tree with several sections, delegate one folder per `folder-refactorer`
 agent (`.claude/agents/folder-refactorer.md`) rather than doing it all inline.
 
-## Components vs. modules — two of these rules only apply to UI
+## Three kinds of target
 
-Everything below is written for `app/components`. When the target is `app/lib`
-or another module folder, keep the file-size and grouping rules but **invert
-two**:
+Everything below is written for `app/components`. `app/lib` and `app/routes`
+each invert part of it — read the matching section before you start.
+
+## `app/lib` and other module folders
+
+When the target is `app/lib`, keep the file-size and grouping rules but
+**invert two**:
 
 - **Barrels stay flat** — `export * from "./queries"`, never a namespace object.
   `Projects.list()` across two dozen consumers is churn, and it defeats
@@ -40,6 +44,42 @@ keeps their import path valid — moving them only risks the mock paths), and
 `vi.mock("@/lib/<mod>")` factories that enumerate exports rather than spreading
 `importOriginal` will not be caught by typecheck. Grep for them and run those
 suites specifically.
+
+## `app/routes` — React Router only
+
+**This section applies only while the project routes with React Router**
+(`react-router` / `@react-router/dev` in `package.json`). Confirm that before
+using it; another router — or a framework with its own file conventions — makes
+different rules load-bearing, so re-derive them rather than assuming these hold.
+
+Two rules invert:
+
+- **Filenames stay.** Route paths are declared as strings in `app/routes.ts`,
+  and the names mirror their URLs (`project.$projectId.tsx`). Renaming means
+  editing the route table to gain nothing. Never touch `app/routes.ts`.
+- **"Consumers change only imports and JSX names" does not apply**, because the
+  route *is* the source — it legitimately loses hundreds of lines. What must
+  stay byte-identical instead is the route module's **exported surface**:
+  `clientLoader`, `clientAction`, `default`, and any `ErrorBoundary` / `meta`.
+  Diff it:
+
+```bash
+git show HEAD:app/routes/<r>.tsx | grep -oE '^export (default function|async function|function|const) [A-Za-z_]+' | awk '{print $NF}' | sort
+```
+
+The work is extracting inline components **out** to `app/components/<feature>/`,
+where the ordinary component rules apply. Route modules keep many exports by
+contract, so they never get a barrel and never collapse to one default export —
+their `only-export-components` lint warnings are expected.
+
+Extract only where the file is genuinely unmanageable. A 300-line route with a
+20-line single-use empty state is fine as it is; co-locating that in
+`app/components` is indirection without reuse. Check the coupling first —
+`useFetcher` is self-contained and moves cleanly, but anything reading
+`useLoaderData` or the generated `Route.*` types belongs with the route.
+
+The route's own test file is the acceptance test, and it must pass **untouched**.
+If a test needs editing to accommodate the extraction, the extraction is wrong.
 
 ## The convention
 
