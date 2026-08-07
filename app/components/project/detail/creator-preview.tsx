@@ -1,8 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { PreviewCard, PreviewCardPopup, PreviewCardTrigger } from "@/components/ui/preview-card"
 import type { CreatorPreviewProps } from "@/components/project/detail/types"
-import type { ProjectCreator } from "@/lib/projects"
-import { cn, initials } from "@/lib/utils";
+import { initials } from "@/lib/utils"
 
 /**
  * The project's creator, previewed on hover or focus.
@@ -11,7 +10,7 @@ import { cn, initials } from "@/lib/utils";
  * route already fans out five queries; an email or avatar lookup would be a
  * sixth for a hover card.
  */
-export default function CreatorPreview({ creator, readonly }: CreatorPreviewProps) {
+export default function CreatorPreview({ creator }: CreatorPreviewProps) {
     const display = creator.name ?? creator.username
 
     return (
@@ -21,9 +20,9 @@ export default function CreatorPreview({ creator, readonly }: CreatorPreviewProp
                     // A button, not a link: there is nowhere to navigate to
                     // yet, and the preview has to be reachable by keyboard.
                     <button
-                    type="button"
-                    aria-label={`About ${display}`}
-                    className={cn("max-w-full cursor-default truncate rounded-sm hover:underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring opacity-60 italic", readonly && "cursor-default")}
+                        type="button"
+                        aria-label={`About ${display}`}
+                        className="max-w-full cursor-default truncate rounded-sm italic opacity-60 decoration-dotted underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                     />
                 }>
                 {display}

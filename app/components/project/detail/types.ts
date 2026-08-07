@@ -23,8 +23,7 @@ export interface ClassificationFieldProps {
 }
 
 export interface CreatorPreviewProps {
-  creator: ProjectCreator
-  readonly: boolean
+    creator: ProjectCreator
 }
 
 export interface OrganizationFieldProps {
