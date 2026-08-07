@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createSkewTolerantFetch, JWT_ISSUED_AT_FUTURE } from "@/lib/supabase"
 
 // The module caches its client in module scope, so every case needs a fresh
 // import to re-run the env check.
@@ -58,5 +59,155 @@ describe("getSupabase env validation", () => {
     vi.stubEnv("VITE_SUPABASE_URL", "ftp://example.supabase.co")
     const getSupabase = await loadGetSupabase()
     expect(() => getSupabase()).toThrow(/must be an http\(s\) URL/)
+  })
+})
+
+describe("createSkewTolerantFetch", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function jsonResponse(status: number, body: unknown) {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
+
+  it("passes successful responses through unchanged", async () => {
+    const native = vi.fn().mockResolvedValue(jsonResponse(200, { ok: true }))
+    vi.stubGlobal("fetch", native)
+
+    const wrapped = createSkewTolerantFetch(async () => "new-token")
+    const res = await wrapped("https://example.test/rest/v1/users")
+
+    expect(res.status).toBe(200)
+    expect(native).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not retry other 401s", async () => {
+    const native = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(401, { message: "JWT expired" }))
+    vi.stubGlobal("fetch", native)
+    const refresh = vi.fn().mockResolvedValue("new-token")
+
+    const wrapped = createSkewTolerantFetch(refresh)
+    const res = await wrapped("https://example.test/rest/v1/users")
+
+    expect(res.status).toBe(401)
+    expect(refresh).not.toHaveBeenCalled()
+    expect(native).toHaveBeenCalledTimes(1)
+  })
+
+  it("refreshes once and replays on JWT issued at future", async () => {
+    const native = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(401, { message: JWT_ISSUED_AT_FUTURE }),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, [{ id: "1" }]))
+    vi.stubGlobal("fetch", native)
+    const refresh = vi.fn().mockResolvedValue("fresh-access-token")
+
+    const wrapped = createSkewTolerantFetch(refresh)
+    const res = await wrapped("https://example.test/rest/v1/user_directory", {
+      headers: {
+        Authorization: "Bearer stale",
+        apikey: "pub",
+      },
+    })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual([{ id: "1" }])
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(native).toHaveBeenCalledTimes(2)
+
+    const retryInit = native.mock.calls[1][1] as RequestInit
+    const retryHeaders = new Headers(retryInit.headers)
+    expect(retryHeaders.get("Authorization")).toBe("Bearer fresh-access-token")
+    expect(retryHeaders.get("apikey")).toBe("pub")
+  })
+
+  it("keeps replaying while the skew persists, then succeeds", async () => {
+    // The cold-start case: the refreshed token carries the same fast client
+    // clock, so the first replay fails the same way. The wrapper must not give
+    // up after a single attempt.
+    const native = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(401, { message: JWT_ISSUED_AT_FUTURE }))
+      .mockResolvedValueOnce(jsonResponse(401, { message: JWT_ISSUED_AT_FUTURE }))
+      .mockResolvedValueOnce(jsonResponse(200, [{ id: "1" }]))
+    vi.stubGlobal("fetch", native)
+    const refresh = vi.fn().mockResolvedValue("fresh-access-token")
+
+    const wrapped = createSkewTolerantFetch(refresh)
+    const res = await wrapped("https://example.test/rest/v1/user_directory")
+
+    expect(res.status).toBe(200)
+    expect(native).toHaveBeenCalledTimes(3)
+  })
+
+  it("stops replaying after the bound and surfaces the last 401", async () => {
+    const native = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(401, { message: JWT_ISSUED_AT_FUTURE }))
+    vi.stubGlobal("fetch", native)
+    const refresh = vi.fn().mockResolvedValue("fresh-access-token")
+
+    const wrapped = createSkewTolerantFetch(refresh)
+    const res = await wrapped("https://example.test/rest/v1/user_directory")
+
+    expect(res.status).toBe(401)
+    // 1 initial + MAX_SKEW_RETRIES replays.
+    expect(native).toHaveBeenCalledTimes(4)
+  })
+
+  it("returns the original 401 when refresh yields no token", async () => {
+    const native = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(401, { message: JWT_ISSUED_AT_FUTURE }))
+    vi.stubGlobal("fetch", native)
+    const refresh = vi.fn().mockResolvedValue(null)
+
+    const wrapped = createSkewTolerantFetch(refresh)
+    const res = await wrapped("https://example.test/rest/v1/users")
+
+    expect(res.status).toBe(401)
+    expect(refresh).toHaveBeenCalledTimes(1)
+    // No replay when refresh fails.
+    expect(native).toHaveBeenCalledTimes(1)
+  })
+
+  it("coalesces concurrent skew failures into one refresh", async () => {
+    let resolveRefresh!: (token: string) => void
+    const refreshDone = new Promise<string>((resolve) => {
+      resolveRefresh = resolve
+    })
+    const refresh = vi.fn().mockReturnValue(refreshDone)
+
+    const native = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(401, { message: JWT_ISSUED_AT_FUTURE }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(401, { message: JWT_ISSUED_AT_FUTURE }),
+      )
+      .mockResolvedValue(jsonResponse(200, { ok: true }))
+    vi.stubGlobal("fetch", native)
+
+    const wrapped = createSkewTolerantFetch(refresh)
+    const a = wrapped("https://example.test/a")
+    const b = wrapped("https://example.test/b")
+
+    // Both first attempts must land on the shared refresh before we release it.
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
+
+    resolveRefresh("shared-token")
+    const [resA, resB] = await Promise.all([a, b])
+    expect(resA.status).toBe(200)
+    expect(resB.status).toBe(200)
+    expect(refresh).toHaveBeenCalledTimes(1)
   })
 })
