@@ -1,8 +1,8 @@
+import { Blocks } from "@/components/blocks"
 import { FileArchive, Upload } from "lucide-react"
 import { Suspense, useRef, useState } from "react"
 import { Await, useFetcher, useLoaderData } from "react-router"
 import type { ActionFunctionArgs } from "react-router"
-import { ConfirmDeleteDialog } from "@/components/blocks/confirm-delete-dialog"
 import { Documents } from "@/components/corpus"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -139,7 +139,7 @@ function DocumentEntry({ document }: { document: CorpusDocument }) {
       <Documents.Card
         document={document}
         actions={
-          <ConfirmDeleteDialog
+          <Blocks.ConfirmDelete
             confirmLabel="Delete corpus"
             description={`This permanently deletes “${document.name}” and its version history from your library. Projects that reference it will show it as unavailable. This cannot be undone.`}
             fields={{ documentId: document.id }}

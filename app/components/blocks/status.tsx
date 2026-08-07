@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import type { ProjectStatus } from "@/lib/projects"
+import type { StatusBlockProps } from "@/components/blocks/types"
 
 const STATUS_CONFIG: Record<ProjectStatus, { label: string; dot: string }> = {
   draft: { label: "Draft", dot: "bg-gray-500" },
@@ -7,11 +8,6 @@ const STATUS_CONFIG: Record<ProjectStatus, { label: string; dot: string }> = {
   "ready-for-review": { label: "Ready for review", dot: "bg-amber-500" },
   published: { label: "Published", dot: "bg-emerald-500" },
   failed: { label: "Failed", dot: "bg-red-500" },
-}
-
-export interface StatusBlockProps {
-  status: ProjectStatus
-  className?: string
 }
 
 export default function StatusBlock({ status, className }: StatusBlockProps) {

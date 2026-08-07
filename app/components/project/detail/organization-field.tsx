@@ -1,6 +1,6 @@
+import { Blocks } from "@/components/blocks"
 import { CircleX, Pencil } from "lucide-react"
 import { useFetcher } from "react-router"
-import MetadataBlock from "@/components/blocks/metadata.block"
 import { Badge } from "@/components/ui/badge"
 import type { OrganizationFieldProps } from "@/components/project/detail/types"
 import type { ActionResult } from "@/components/project/types"
@@ -10,7 +10,7 @@ export default function OrganizationField({ organization, readOnly, onEdit }: Or
     const clearFetcher = useFetcher<ActionResult>()
 
     return (
-        <MetadataBlock
+        <Blocks.Metadata
             label="Organization"
             value={
                 <>

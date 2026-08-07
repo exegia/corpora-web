@@ -1,3 +1,4 @@
+import type { TermsDialogProps } from "@/components/blocks/types"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -28,13 +29,7 @@ import {
 export default function TermsAndConditionsDialog({
     trigger,
     onAgree,
-}: {
-    /** Element the dialog renders as its trigger — `render` needs an element,
-        not arbitrary ReactNode. */
-    trigger: React.ReactElement
-    /** Called when the reader accepts. Omit to offer only a close button. */
-    onAgree?: () => void
-}) {
+}: TermsDialogProps) {
     const [open, setOpen] = useState(false)
 
     return (

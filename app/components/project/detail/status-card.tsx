@@ -1,5 +1,5 @@
+import { Blocks } from "@/components/blocks"
 import { Button } from "@exegia/corpora-ui"
-import StatusBlock from "@/components/blocks/status.block"
 import ReviewChecklist from "@/components/project/detail/review-checklist"
 import { statusActions, statusSummary } from "@/components/project/detail/status-actions"
 import type { StatusCardProps } from "@/components/project/detail/types"
@@ -18,7 +18,7 @@ export default function StatusCard({ project, superadmin, fetcher }: StatusCardP
         <div className="flex h-full flex-col gap-4">
             <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-medium text-card-foreground">Status</span>
-                <StatusBlock status={project.status} />
+                <Blocks.Status status={project.status} />
             </div>
 
             <div className="flex flex-col gap-3">

@@ -1,3 +1,4 @@
+import type { ConfirmDeleteDialogProps } from "@/components/blocks/types"
 import { Trash2, X } from "lucide-react"
 import { useState } from "react"
 import { useFetcher } from "react-router"
@@ -22,32 +23,12 @@ import { Input } from "@/components/ui/input"
  */
 const CONFIRM_WORD = "DELETE"
 
-export interface ConfirmDeleteDialogProps {
-  title: React.ReactNode
-  description: React.ReactNode
-  /** Label for the confirming submit button, e.g. "Delete project". */
-  confirmLabel: string
-  /** Action intent, plus whatever ids that intent needs. */
-  intent: string
-  fields?: Record<string, string>
-  /** Rendered as the trigger; defaults to a destructive "Delete" button. */
-  trigger?: React.ReactElement
-  /** Trigger text. Overridden entirely when `trigger` has its own children. */
-  triggerLabel?: string
-  /**
-   * The phrase to type. Defaults to `DELETE` — scale it with the blast
-   * radius: a project is one word, an account is a sentence you cannot type
-   * by reflex.
-   */
-  confirmWord?: string
-}
-
 /**
  * Confirmation gate for irreversible deletes: the user has to type the confirm
  * phrase before the submit button enables. Owns its own fetcher so the pending
  * and error states come for free at every call site.
  */
-export function ConfirmDeleteDialog({
+export default function ConfirmDeleteDialog({
   title,
   description,
   confirmLabel,

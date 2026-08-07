@@ -5,6 +5,7 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import type * as React from "react";
+import type { AlertBlockProps, AlertVariant } from "@/components/blocks/types";
 import {
   Alert,
   AlertAction,
@@ -12,20 +13,12 @@ import {
   AlertTitle,
 } from "@/components/ui/alert";
 
-const variantIcons = {
+const variantIcons: Record<AlertVariant, React.ComponentType<{ className?: string }>> = {
   error: CircleAlertIcon,
   info: InfoIcon,
   success: CircleCheckIcon,
   warning: TriangleAlertIcon,
-} as const;
-
-export interface AlertBlockProps {
-  variant: keyof typeof variantIcons;
-  title: React.ReactNode;
-  description?: React.ReactNode;
-  actions?: React.ReactNode[] | React.ReactNode;
-  className?: string;
-}
+};
 
 export default function AlertBlock({
   variant,

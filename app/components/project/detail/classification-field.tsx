@@ -1,5 +1,5 @@
+import { Blocks } from "@/components/blocks"
 import { Pencil } from "lucide-react"
-import MetadataBlock from "@/components/blocks/metadata.block"
 import type { ClassificationFieldProps } from "@/components/project/detail/types"
 import { cn } from "@/lib/utils"
 
@@ -13,7 +13,7 @@ export default function ClassificationField({ project, readOnly, onEdit }: Class
         .join(" · ")
 
     return (
-        <MetadataBlock
+        <Blocks.Metadata
             label="Classification"
             value={
                 <span className={cn("capitalize", classification ? "" : "text-muted-foreground italic")}>

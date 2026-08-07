@@ -1,10 +1,10 @@
+import { Blocks } from "@/components/blocks"
 import { ChevronRight, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react"
 import type { ReactNode } from "react"
 import { Suspense, useState } from "react"
 import type { ActionFunctionArgs } from "react-router"
 import { Await, Link, useLoaderData, useViewTransitionState } from "react-router"
 import { Dialogs } from "@/components/project/dialogs"
-import StatusBlock from "@/components/blocks/status.block"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -103,7 +103,7 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                 </div>
             </TableCell>
             <TableCell>
-                <StatusBlock status={project.status} />
+                <Blocks.Status status={project.status} />
             </TableCell>
             <TableCell className="text-xs text-muted-foreground">
                 <span title={project.updatedAt}>{formatRelativeTime(project.updatedAt)}</span>

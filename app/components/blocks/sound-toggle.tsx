@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { getSoundPreference, play, setSoundPreference } from "@/lib/sounds"
 
 /** Mute/unmute the UI sounds; the preference persists like the theme. */
-export function SoundToggle() {
+export default function SoundToggle() {
   // Server renders the default; the effect syncs to the stored preference.
   const [enabled, setEnabledState] = useState(true)
 

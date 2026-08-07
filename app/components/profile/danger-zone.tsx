@@ -1,5 +1,5 @@
+import { Blocks } from "@/components/blocks"
 import { Button } from "@/components/ui/button"
-import { ConfirmDeleteDialog } from "@/components/blocks/confirm-delete-dialog"
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@/components/ui/frame"
 import { DELETE_ACCOUNT_PHRASE, PROFILE_INTENT } from "@/components/profile/constants"
 
@@ -25,7 +25,7 @@ export default function DangerZoneCard() {
             Your profile, projects and corpora are removed permanently.
           </span>
         </div>
-        <ConfirmDeleteDialog
+        <Blocks.ConfirmDelete
           confirmLabel="Delete this account"
           confirmWord={DELETE_ACCOUNT_PHRASE}
           description="This permanently removes your account, profile, projects and corpora. It cannot be undone."

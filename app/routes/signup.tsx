@@ -1,9 +1,9 @@
+import { Blocks } from "@/components/blocks"
 import { SignupBlock } from "@exegia/corpora-ui"
 import type { SocialProvider } from "@exegia/corpora-ui"
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router"
 import { Auth } from "@/components/auth"
-import TermsAndConditionsDialog from "@/components/blocks/terms-and-conditions-dialog"
 import { Button } from "@/components/ui/button"
 import { requireAnon, safeRedirectTo, signInWithProvider, signUpWithPassword } from "@/lib/auth"
 import type { Route } from "./+types/signup"
@@ -49,7 +49,7 @@ export default function Signup() {
             // dialog rather than a navigation: reading the terms must not
             // discard a half-filled signup form.
             termsComponent={
-                <TermsAndConditionsDialog
+                <Blocks.Terms
                     trigger={
                         <Button variant="link" type="button">
                             terms

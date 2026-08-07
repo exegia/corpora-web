@@ -9,7 +9,7 @@ import {
   setThemePreference,
 } from "@/lib/theme"
 
-export function ThemeToggle() {
+export default function ThemeToggle() {
   // Server renders light; the effect syncs to what the init script applied.
   const [resolved, setResolved] = useState<ResolvedTheme>("light")
 

@@ -1,34 +1,8 @@
 import React from "react"
 import { cn } from "@/lib/utils"
-import { Button, type ButtonProps } from "@exegia/corpora-ui"
+import ActionButton from "@/components/blocks/action-button"
+import type { MetadataProps } from "@/components/blocks/types"
 
-// glassVariant is omitted along with variant: ButtonProps is a discriminated
-// union where only `variant: "glass"` accepts it, and this narrower variant
-// set never does.
-export type MetadataAction = Omit<ButtonProps, "children" | "variant" | "glassVariant"> & {
-    label?: string
-    icon?: React.ReactNode
-    variant?: "default" | "ghost" | "outline"
-}
-
-export type MetadataProps = {
-    label: string
-    value?: string | React.ReactNode | null
-    actions?: Array<MetadataAction> | MetadataAction
-    direction?: "row" | "column"
-    /** Default variant for actions that don't set their own. */
-    variant?: "default" | "ghost" | "outline"
-    className?: string
-}
-
-const ActionButton = ({ label, icon, variant = "ghost", size = "sm", ...props }: MetadataAction) => {
-    return (
-        <Button {...props} size={size} variant={variant}>
-            {icon}
-            {label}
-        </Button>
-    )
-}
 
 /**
  * `false` and `null` are how a conditional value ("only render the link when

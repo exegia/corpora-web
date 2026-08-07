@@ -4,8 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import type { SessionUser } from "@/lib/auth"
 import { useUISounds } from "@/lib/sounds"
 import { Breadcrumb } from "../breadcrumb"
-import { SoundToggle } from "../blocks/sound-toggle"
-import { ThemeToggle } from "../blocks/theme-toggle"
+import { Blocks } from "@/components/blocks"
 
 
 export function AppLayout({ user }: { user?: SessionUser }) {
@@ -20,8 +19,8 @@ export function AppLayout({ user }: { user?: SessionUser }) {
           <Breadcrumb.Trail />
           {/* Account actions live on the sidebar's profile card, not here. */}
           <div className="ml-auto flex items-center gap-1">
-            <SoundToggle />
-            <ThemeToggle />
+            <Blocks.Sound />
+            <Blocks.Theme />
           </div>
         </header>
 

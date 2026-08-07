@@ -1,8 +1,8 @@
+import { Blocks } from "@/components/blocks"
 import { ArrowLeft, FolderX, Pencil } from "lucide-react"
 import { Suspense, useState } from "react"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Await, Link, redirect, useLoaderData, useViewTransitionState } from "react-router"
-import AlertBlock from "@/components/blocks/alert.block"
 import { Corpus } from "@/components/project/corpus"
 import { Detail } from "@/components/project/detail"
 import { Dialogs } from "@/components/project/dialogs"
@@ -318,7 +318,7 @@ export default function ProjectWorkspace() {
             </header>
 
             {readOnly && (
-                <AlertBlock
+                <Blocks.Alert
                     variant="info"
                     title="In review"
                     description="This project is locked while the superadmin reviews it. Return it to draft to make further changes."

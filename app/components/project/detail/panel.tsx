@@ -1,7 +1,7 @@
+import { Blocks } from "@/components/blocks"
 import { useState } from "react"
 import { useFetcher } from "react-router"
 import { Button } from "@exegia/corpora-ui"
-import MetadataBlock from "@/components/blocks/metadata.block"
 import { Card, CardFrame, CardFrameHeader, CardFrameTitle, CardPanel } from "@/components/ui/card"
 import ClassificationField from "@/components/project/detail/classification-field"
 import ClassifyDialog from "@/components/project/detail/classify-dialog"
@@ -37,13 +37,13 @@ export default function Panel({ project, licenseCatalog, organizations, superadm
                                 readOnly={readOnly}
                                 onEdit={() => setClassifying(true)}
                             />
-                            <MetadataBlock label="Creator" value={project.creator.name ?? project.creator.username} />
+                            <Blocks.Metadata label="Creator" value={project.creator.name ?? project.creator.username} />
                             <OrganizationField
                                 organization={project.organization}
                                 readOnly={readOnly}
                                 onEdit={() => setEditingOrganization(true)}
                             />
-                            <MetadataBlock
+                            <Blocks.Metadata
                                 label="Website"
                                 value={
                                     project.organization?.website && (
