@@ -44,6 +44,28 @@ callers read `<Corpus.Section />`. `app/components/project` is the reference.
 To reorganize a folder into this shape, use the `refactor-structure` skill and
 the `folder-refactorer` agent.
 
+## Pull requests: the title takes no emoji
+
+CI runs `make pr-guard` over the base, the branch name and the **PR title**.
+Commit *subjects* in this repo carry an emoji (`✨ feat: …`) — a PR title must
+not. The guard matches `<type>: summary` from the first character, so any
+leading emoji fails it:
+
+```
+feat: rework the licence catalog        # passes
+✨ feat: rework the licence catalog     # ::error:: PR title must read '<type>: summary'
+```
+
+`<type>` is one of `feat fix chore docs ci refactor test perf build style
+revert`, optionally `(scope)` and `!`. Branches into `release/v*` must read
+`<type>/<slug>`, lowercase; `main` only accepts `release/vX.Y.Z` matching the
+`package.json` version.
+
+**Retitling a red PR does not re-run the guard.** `.github/workflows/pr.yml`
+fires on `opened / reopened / ready_for_review / synchronize` — not `edited` —
+and re-running the job replays the original payload, stale title and all. Close
+and reopen the PR to get a fresh one.
+
 ## Conventions worth reading before you edit
 
 | Topic | File |
