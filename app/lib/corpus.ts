@@ -1,3 +1,18 @@
+import type { LucideIcon } from "lucide-react"
+import type { BookType } from "@/lib/projects"
+import {
+    Book,
+    BookA,
+    BookOpenText,
+    Feather,
+    MessageSquareText,
+    MoonStar,
+    NotebookPen,
+    Scroll,
+    ScrollText,
+    UserRound,
+} from "lucide-react"
+
 // Data-access layer for corpus documents (003): the Corpus route owns the
 // uploaded .corpus files / Hugging Face URLs and their version history;
 // projects import a document from this library. Route modules import ONLY
@@ -264,4 +279,17 @@ export async function detachCorpusFromProject(projectId: string): Promise<void> 
     throw new DataError("not-found", "This project no longer exists.")
   }
   await touchProject(projectId)
+}
+
+export const TYPE_ICONS: Record<BookType, LucideIcon> = {
+    bible: BookOpenText,
+    tanakh: ScrollText,
+    quran: MoonStar,
+    apocrypha: Scroll,
+    commentary: MessageSquareText,
+    lexicon: BookA,
+    biography: UserRound,
+    review: NotebookPen,
+    manuscript: Feather,
+    regular: Book,
 }

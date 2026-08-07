@@ -2,14 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { PreviewCard, PreviewCardPopup, PreviewCardTrigger } from "@/components/ui/preview-card"
 import type { CreatorPreviewProps } from "@/components/project/detail/types"
 import type { ProjectCreator } from "@/lib/projects"
-
-function initials(creator: ProjectCreator): string {
-    const source = creator.name?.trim() || creator.username
-    const parts = source.split(/\s+/).filter(Boolean)
-    if (parts.length === 0) return "?"
-    if (parts.length === 1) return (parts[0]?.slice(0, 2) ?? "").toUpperCase()
-    return ((parts[0]?.[0] ?? "") + (parts.at(-1)?.[0] ?? "")).toUpperCase()
-}
+import { cn, initials } from "@/lib/utils";
 
 /**
  * The project's creator, previewed on hover or focus.
@@ -18,7 +11,7 @@ function initials(creator: ProjectCreator): string {
  * route already fans out five queries; an email or avatar lookup would be a
  * sixth for a hover card.
  */
-export default function CreatorPreview({ creator }: CreatorPreviewProps) {
+export default function CreatorPreview({ creator, readonly }: CreatorPreviewProps) {
     const display = creator.name ?? creator.username
 
     return (
@@ -28,14 +21,14 @@ export default function CreatorPreview({ creator }: CreatorPreviewProps) {
                     // A button, not a link: there is nowhere to navigate to
                     // yet, and the preview has to be reachable by keyboard.
                     <button
-                        type="button"
-                        aria-label={`About ${display}`}
-                        className="max-w-full cursor-default truncate rounded-sm underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    type="button"
+                    aria-label={`About ${display}`}
+                    className={cn("max-w-full cursor-default truncate rounded-sm hover:underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring opacity-60 italic", readonly && "cursor-default")}
                     />
                 }>
                 {display}
             </PreviewCardTrigger>
-            <PreviewCardPopup className="w-auto min-w-56 items-center gap-3 text-left">
+            <PreviewCardPopup align="start" className="w-auto min-w-56 items-center gap-3 text-left">
                 <Avatar className="size-9">
                     <AvatarFallback className="text-xs">{initials(creator)}</AvatarFallback>
                 </Avatar>

@@ -1,31 +1,6 @@
-import type { LucideIcon } from "lucide-react"
-import {
-    Book,
-    BookA,
-    BookOpenText,
-    Feather,
-    MessageSquareText,
-    MoonStar,
-    NotebookPen,
-    Scroll,
-    ScrollText,
-    UserRound,
-} from "lucide-react"
-import type { TypeLabelProps } from "@/components/project/detail/types"
-import type { BookType } from "@/lib/projects"
 
-const TYPE_ICONS: Record<BookType, LucideIcon> = {
-    bible: BookOpenText,
-    tanakh: ScrollText,
-    quran: MoonStar,
-    apocrypha: Scroll,
-    commentary: MessageSquareText,
-    lexicon: BookA,
-    biography: UserRound,
-    review: NotebookPen,
-    manuscript: Feather,
-    regular: Book,
-}
+import type { TypeLabelProps } from "@/components/project/detail/types"
+import { TYPE_ICONS } from "@/lib/corpus"
 
 /** A book type with its icon, or the unclassified placeholder. */
 export default function TypeLabel({ type }: TypeLabelProps) {
