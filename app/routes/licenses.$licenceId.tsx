@@ -37,9 +37,9 @@ import {
 } from "@/components/ui/select"
 import { formatDate } from "@/lib/format"
 import {
-  fetchLicenceText,
   getLicence,
   type LicenceDetail,
+  resolveLicenceText,
   saveLicenceText,
   updateLicence,
 } from "@/lib/licenses"
@@ -58,27 +58,10 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
   ])
   return {
     licence,
-    text: licenceText(licence),
+    text: resolveLicenceText(licence),
     // Pre-auth: the session acts as the superadmin when the directory has one.
     superadmin: superadmin !== null,
   }
-}
-
-/**
- * The licence body: stored text resolves instantly, a first visit downloads
- * and stores it. Best effort — null when every source fails.
- */
-function licenceText(
-  licence: Awaited<ReturnType<typeof getLicence>>,
-): Promise<string | null> {
-  if (licence === null) return Promise.resolve(null)
-  if (licence.fullText !== null) return Promise.resolve(licence.fullText)
-  return fetchLicenceText(licence)
-    .then(async (fetched) => {
-      if (fetched) await saveLicenceText(licence.id, fetched)
-      return fetched
-    })
-    .catch(() => null)
 }
 
 export async function clientAction({ request, params }: ActionFunctionArgs) {

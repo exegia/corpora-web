@@ -7,7 +7,14 @@ import {
   detachCorpusFromProject,
   listCorpusDocuments,
 } from "@/lib/corpus"
-import { attachLicence, detachLicence, listLicences } from "@/lib/licenses"
+import {
+  agreeLicence,
+  attachLicence,
+  detachLicence,
+  getLicence,
+  listLicences,
+  resolveLicenceText,
+} from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organizations"
 import {
   assertEditable,
@@ -49,7 +56,12 @@ vi.mock("@/lib/projects", async (importOriginal) => {
 vi.mock("@/lib/licenses", () => ({
   listLicences: vi.fn(),
   attachLicence: vi.fn(),
+  agreeLicence: vi.fn(),
   detachLicence: vi.fn(),
+  // Only reached when the View dialog opens, but the module mock replaces the
+  // whole module — leaving these out makes them undefined at call time.
+  getLicence: vi.fn(),
+  resolveLicenceText: vi.fn(),
 }))
 
 vi.mock("@/lib/organizations", () => ({
@@ -383,22 +395,29 @@ describe("read-only while in review (003)", () => {
     vi.mocked(getProject).mockResolvedValue({
       ...readyDetail,
       status: "ready-for-review",
+      // Remove is gated on `!readOnly && project.organization` — without an
+      // organization here, asserting its absence would prove nothing.
+      organization: { id: "o1", name: "Peshitta Institute", website: null },
     })
   })
 
   it("hides every editing affordance and shows the review banner", async () => {
     renderRoute()
-    // Queried by text, not a bare role="status": the loading skeleton is also
-    // a status live region, and it resolves first.
-    expect(await screen.findByText(/in review/i)).toHaveAttribute(
-      "role",
-      "status",
-    )
+    // The banner is an AlertBlock, whose root carries role="alert"; the
+    // title and description are separate children, so match on text content.
+    expect(await screen.findByRole("alert")).toHaveTextContent(/in review/i)
+    // The banner is outside the Suspense boundary, so it resolves first: the
+    // panels have to be awaited before anything inside them can be asserted
+    // absent, or every queryByRole below passes for the wrong reason.
+    expect(
+      await screen.findByRole("button", { name: "Add licence" }),
+    ).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Add reference" })).toBeDisabled()
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Classify" })).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Add licence" })).toBeDisabled()
-    expect(screen.getByRole("button", { name: "Add reference" })).toBeDisabled()
+    expect(screen.queryByRole("button", { name: "Edit classification" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Edit organization" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument()
   })
 
   it("rejects mutating actions server-side via assertEditable", async () => {
@@ -428,7 +447,7 @@ describe("details panel — classification (US2)", () => {
     renderRoute()
 
     expect(await screen.findByText("Unclassified")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Classify" }))
+    await user.click(screen.getByRole("button", { name: "Edit classification" }))
 
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "bible" }))
@@ -450,7 +469,7 @@ describe("details panel — classification (US2)", () => {
     const user = userEvent.setup()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Classify" }))
+    await user.click(await screen.findByRole("button", { name: "Edit classification" }))
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "quran" }))
 
@@ -466,7 +485,7 @@ describe("details panel — classification (US2)", () => {
     const user = userEvent.setup()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Classify" }))
+    await user.click(await screen.findByRole("button", { name: "Edit classification" }))
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "bible" }))
     expect(
@@ -492,7 +511,7 @@ describe("details panel — classification (US2)", () => {
     vi.mocked(classifyProject).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Classify" }))
+    await user.click(await screen.findByRole("button", { name: "Edit classification" }))
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "review" }))
     await user.click(screen.getByLabelText("Category"))
@@ -570,14 +589,86 @@ describe("details panel — licences (US3)", () => {
     expect(
       await screen.findByText("Creative Commons Attribution 4.0"),
     ).toBeInTheDocument()
-    expect(screen.getAllByText(/agreed .* by ada researcher/i)).toHaveLength(2)
+    // The confirmation and its provenance are separate lines on the row's
+    // trailing edge, so they are asserted separately.
+    expect(screen.getAllByText("Agreed")).toHaveLength(2)
+    expect(screen.getAllByText(/by Ada Researcher$/)).toHaveLength(2)
 
     const row = screen.getByText("CC0 Public Domain").closest("li") as HTMLElement
-    await user.click(within(row).getByRole("button", { name: "Remove" }))
+    await user.click(
+      within(row).getByRole("button", { name: "Remove CC0 Public Domain" }),
+    )
     await waitFor(() =>
       expect(detachLicence).toHaveBeenCalledWith("p1", "CC0-1.0"),
     )
     expect(detachLicence).toHaveBeenCalledTimes(1)
+  })
+
+  it("leads with a pending attachment and records the agreement", async () => {
+    const user = userEvent.setup()
+    vi.mocked(agreeLicence).mockResolvedValue()
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      licenses: [
+        { ...attachedLicence, id: "CC0-1.0", title: "CC0 Public Domain" },
+        // Attached but not yet agreed — the pair is null together (FR-012).
+        { ...attachedLicence, agreedAt: null, agreedBy: null },
+      ],
+    })
+    renderRoute()
+
+    // Pending sorts ahead of agreed, whatever order the rows arrive in.
+    const titles = (await screen.findAllByText(/Creative Commons|CC0/)).map(
+      (node) => node.textContent,
+    )
+    expect(titles[0]).toContain("Creative Commons Attribution 4.0")
+
+    await user.click(screen.getByRole("button", { name: "Review & Agree" }))
+    await waitFor(() =>
+      expect(agreeLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0", "u1"),
+    )
+  })
+
+  it("hides the agreement control while the project is in review", async () => {
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      status: "ready-for-review",
+      licenses: [{ ...attachedLicence, agreedAt: null, agreedBy: null }],
+    })
+    renderRoute()
+
+    // The title proves the pending card rendered — only its controls are gone.
+    expect(
+      await screen.findByText("Creative Commons Attribution 4.0"),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Review & Agree" }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("opens the licence text in a modal from the row's View control", async () => {
+    const user = userEvent.setup()
+    const detailLicence = { ...catalogLicense, fullText: "## Section 1" }
+    vi.mocked(getLicence).mockResolvedValue(detailLicence as never)
+    vi.mocked(resolveLicenceText).mockResolvedValue(
+      "You are free to share and adapt.",
+    )
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      licenses: [attachedLicence],
+    })
+    renderRoute()
+
+    // The control is hover-revealed, never unmounted, so it stays clickable.
+    await user.click(
+      await screen.findByRole("button", {
+        name: "View Creative Commons Attribution 4.0",
+      }),
+    )
+    expect(
+      await screen.findByText("You are free to share and adapt."),
+    ).toBeInTheDocument()
+    expect(getLicence).toHaveBeenCalledWith("CC-BY-4.0")
   })
 
   it("explains an empty content catalog", async () => {
@@ -673,7 +764,7 @@ describe("details panel — organization & creator (US4)", () => {
     vi.mocked(setProjectOrganization).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Assign" }))
+    await user.click(await screen.findByRole("button", { name: "Edit organization" }))
     await user.selectOptions(
       await screen.findByLabelText("Organization"),
       "Peshitta Institute",
@@ -695,7 +786,7 @@ describe("details panel — organization & creator (US4)", () => {
     vi.mocked(setProjectOrganization).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Assign" }))
+    await user.click(await screen.findByRole("button", { name: "Edit organization" }))
     await user.click(
       await screen.findByRole("button", { name: /create a new organization/i }),
     )
@@ -710,6 +801,23 @@ describe("details panel — organization & creator (US4)", () => {
     await waitFor(() =>
       expect(setProjectOrganization).toHaveBeenCalledWith("p1", "o2"),
     )
+  })
+
+  it("links the organization badge when the organization has a website", async () => {
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      organization: {
+        id: "o1",
+        name: "Peshitta Institute",
+        website: "https://peshitta.example",
+      },
+    })
+    renderRoute()
+
+    const badge = await screen.findByRole("link", { name: "Peshitta Institute" })
+    expect(badge).toHaveAttribute("href", "https://peshitta.example")
+    // Invalid HTML otherwise: the remove control is a sibling of the link.
+    expect(badge.querySelector("button")).toBeNull()
   })
 
   it("removes the organization without deleting the project", async () => {

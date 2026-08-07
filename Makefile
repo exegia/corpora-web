@@ -44,8 +44,8 @@ help: ## List available targets
 install: ## Install dependencies
 	$(BUN) install $(INSTALL_FLAGS)
 
-serve: ## Start the React Router dev server
-	$(BUN) run dev
+dev: ## Start the React Router dev server
+	$(BUN) run dev:local
 
 build: ## Build for production
 	$(BUN) run build

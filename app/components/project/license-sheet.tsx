@@ -205,10 +205,17 @@ export function LicenseSheet({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        render={<Button size="sm" variant="outline" disabled={disabled} />}
+        render={
+          <Button
+            aria-label="Add licence"
+            size="sm"
+            variant="outline"
+            disabled={disabled}
+          />
+        }
       >
         <Plus aria-hidden="true" className="size-4" />
-        Add licence
+        Add
       </SheetTrigger>
       <SheetPopup side="right" variant="inset" showBackdrop={false}>
         <SheetHeader>

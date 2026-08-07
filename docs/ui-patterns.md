@@ -16,41 +16,71 @@ The Button also owns `[&_svg]` rules that set icon size (`size-4.5` /
 `sm:size-4`), opacity and `-mx-0.5` margins. Icons moved out of a Button into a
 plain container need those restated — see the chevron in `ProjectRow`.
 
-## Clickable rows: Card + stretched link
+## Clickable rows: coss `Table` + stretched link
 
-Rows that are themselves a link *and* carry action buttons are built as a `Card`
-rendered as the `<li>`:
+Rows that are themselves a link *and* carry action buttons are `TableRow`s in a
+`<Table variant="card">`. The table is `app/components/ui/table.tsx`, vendored
+from the `@coss` registry; the `card` variant is what gives the body its
+rounded, bordered card look instead of plain rules.
 
 ```tsx
-<Card className="group/row flex-row items-center gap-4 has-[a:focus-visible]:ring-2" render={<li />}>
-  <span aria-hidden="true">{/* icon tile */}</span>
-  <div className="flex min-w-0 flex-1 flex-col">
-    <h3>
-      {/* after: stretches the link over the whole card */}
-      <Link className="after:absolute after:inset-0 after:rounded-2xl" to={href} viewTransition>
+<TableRow className="group/row">
+  <TableCell className="w-full max-w-0">
+    {/* icon tile + title + description */}
+    <h3 className="truncate">
+      {/* after: stretches the link over the whole row */}
+      <Link
+        className="outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:inset-ring-2 focus-visible:after:inset-ring-ring"
+        to={href}
+        viewTransition
+      >
         {name}
       </Link>
     </h3>
-  </div>
-  <div className="absolute right-3 z-10 opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100">
-    {/* Edit / Delete */}
-  </div>
-</Card>
+  </TableCell>
+  <TableCell>{/* status badge */}</TableCell>
+  <TableCell>{/* relative updated time */}</TableCell>
+  <TableCell>
+    <div className="relative z-10 grid items-center justify-items-end">
+      <ChevronRight className="pointer-events-none [grid-area:1/1] group-hover/row:opacity-0" />
+      <div className="flex [grid-area:1/1] opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+        {/* Edit / Delete */}
+      </div>
+    </div>
+  </TableCell>
+</TableRow>
 ```
 
 Why not a `Button` rendered as a `Link` wrapping the row: that nests `<button>`
 inside `<a>`, which is invalid HTML and handled inconsistently by browsers.
 
-Three details that are easy to get wrong:
+Five details that are easy to get wrong:
 
-- The focus ring goes on the **card** (`has-[a:focus-visible]:ring-2`). The link
-  is only as wide as the title text, so a ring on the link hugs the text.
-- Actions need `z-10` to sit above the link's stretched overlay.
+- **`after:inset-0` resolves against `TableRow`**, which the coss table leaves
+  `relative`. That is the only reason the overlay covers the whole row instead of
+  just the title cell.
+- **The focus ring goes on the overlay, not the `<tr>`.** Cell backgrounds paint
+  *above* a row's own background and box-shadow, so `ring-2` on a `TableRow`
+  disappears under the cells. `focus-visible:after:inset-ring-2` on the link
+  rides the overlay, a positioned descendant that paints above every cell.
+- **`z-10` goes on a wrapper inside the actions cell, never on the cell itself.**
+  A positioned `<td>` paints its `bg-card` above the overlay and chops the focus
+  ring in half across that column. A positioned wrapper clears the overlay
+  without covering the row's edges.
+- **Truncation needs `w-full max-w-0` on the cell.** `w-full` hands that column
+  the slack; `max-w-0` stops auto table layout from widening the cell to fit its
+  content, which would push the table into its container's horizontal scroll.
 - Hover-revealed actions must **also** respond to `group-focus-within/row`.
   Otherwise a keyboard user hides the chevron (if it fades on focus) and gets
-  nothing in its place — the actions stay invisible and unreachable.
+  nothing in its place — the actions stay invisible and unreachable. Stacking the
+  chevron and the actions in one `[grid-area:1/1]` keeps the swap reflow-free;
+  the chevron then needs `pointer-events-none`, or it swallows clicks on the
+  buttons it is sitting on top of.
 
-Reference: `ProjectRow` in `app/routes/project.tsx`.
+`className` on `Table` lands on the inner `<table>`, not the scroll container —
+put page spacing on a wrapper element (same trap as `Input`, below).
+
+Reference: `ProjectRow` / `ProjectTable` in `app/routes/project.tsx`.
 
 ## Status badges
 
