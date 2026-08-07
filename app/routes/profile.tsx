@@ -12,8 +12,8 @@ import {
 import { AnimatePresence, motion, MotionConfig } from "motion/react"
 import { Suspense, useId, useMemo, useRef, useState } from "react"
 import { Await, useFetcher, useRevalidator } from "react-router"
-import { AUTH_PROVIDERS } from "@/components/auth"
-import { BrandMark } from "@/components/brand-marks"
+import { Auth } from "@/components/auth"
+import { Brand } from "@/components/brand-marks"
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
 import { play } from "@/lib/sounds"
 import { cn } from "@/lib/utils"
@@ -333,7 +333,7 @@ function IdentityRow({
           consistent footprint, so Google's square G and Apple's tall
           silhouette do not make the rows look ragged. */}
       <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-muted/40">
-        <BrandMark className="size-4" provider={identity.provider} />
+        <Brand.Mark className="size-4" provider={identity.provider} />
       </span>
       <div className="flex min-w-0 flex-col">
         <span className="font-medium text-sm leading-tight">{label}</span>
@@ -402,7 +402,7 @@ function ConnectedAccounts({ identities }: { identities: Identity[] | null }) {
 
   const linked = toLinkedIdentities(identities)
   const connected = new Set(linked.map((identity) => identity.provider))
-  const connectable = AUTH_PROVIDERS.filter(
+  const connectable = Auth.PROVIDERS.filter(
     (provider) => !connected.has(provider),
   )
   const busy = linking !== null || unlinking !== null
@@ -514,7 +514,7 @@ function ConnectedAccounts({ identities }: { identities: Identity[] | null }) {
                     type="button"
                     variant="outline"
                   >
-                    <BrandMark className="size-4" provider={provider} />
+                    <Brand.Mark className="size-4" provider={provider} />
                     Connect {SOCIAL_PROVIDERS[provider].label}
                   </Button>
                 ))}

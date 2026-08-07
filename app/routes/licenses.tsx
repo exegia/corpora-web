@@ -2,7 +2,7 @@ import { ChevronRight, Scale, SearchIcon } from "lucide-react"
 import { Suspense, useState } from "react"
 import { Await, Link, redirect, useLoaderData } from "react-router"
 import type { ActionFunctionArgs } from "react-router"
-import { CreateLicenseDialog } from "@/components/licenses/create-license-dialog"
+import { License } from "@/components/licenses"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -191,7 +191,7 @@ function Catalog({
             <SearchIcon aria-hidden="true" />
           </InputGroupAddon>
         </InputGroup>
-        {superadmin && <CreateLicenseDialog />}
+        {superadmin && <License.CreateDialog />}
       </div>
 
       {licences.length === 0 ? (

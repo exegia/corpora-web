@@ -2,7 +2,7 @@ import { SignupBlock } from "@exegia/corpora-ui"
 import type { SocialProvider } from "@exegia/corpora-ui"
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router"
-import { AuthLogo, AUTH_ACCENT, AUTH_PROVIDERS, SUCCESS_MORPH_MS } from "@/components/auth"
+import { Auth } from "@/components/auth"
 import TermsAndConditionsDialog from "@/components/terms-and-conditions-dialog"
 import { Button } from "@/components/ui/button"
 import { requireAnon, safeRedirectTo, signInWithProvider, signUpWithPassword } from "@/lib/auth"
@@ -24,9 +24,9 @@ export default function Signup() {
 
     return (
         <SignupBlock
-            logo={<AuthLogo />}
-            accent={AUTH_ACCENT}
-            providers={AUTH_PROVIDERS}
+            logo={<Auth.Logo />}
+            accent={Auth.ACCENT}
+            providers={Auth.PROVIDERS}
             onSubmit={async ({ name, email, password }) => {
                 const { needsConfirmation } = await signUpWithPassword({ name, email, password })
                 // With email confirmation on (the Supabase default) there is no
@@ -34,7 +34,7 @@ export default function Signup() {
                 const next = needsConfirmation
                     ? `/verify?email=${encodeURIComponent(email)}`
                     : redirectTo
-                window.setTimeout(() => navigate(next, { replace: true }), SUCCESS_MORPH_MS)
+                window.setTimeout(() => navigate(next, { replace: true }), Auth.SUCCESS_MORPH_MS)
             }}
             onProviderSelect={async (provider: SocialProvider) => {
                 // The document navigates away to the provider, so this settles

@@ -1,13 +1,9 @@
-import AppSidebar from "./component";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { default as Drawer } from "./drawer"
 
-export {
-  SidebarInset as Wrapper,
-  SidebarProvider as Provider,
-  SidebarTrigger as Trigger,
-  AppSidebar as Drawer
+export const Sidebar = {
+    Drawer,
+    Provider: SidebarProvider,
+    Trigger: SidebarTrigger,
+    Wrapper: SidebarInset,
 }

@@ -1,9 +1,9 @@
 import { Outlet } from "react-router"
-import { Provider, Drawer, Wrapper, Trigger } from "@/components/sidebar"
+import { Sidebar } from "@/components/sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { SessionUser } from "@/lib/auth"
 import { useUISounds } from "@/lib/sounds"
-import { COBreadcrumb } from "./breadcrumb"
+import { Breadcrumb } from "./breadcrumb"
 import { SoundToggle } from "./sound-toggle"
 import { ThemeToggle } from "./theme-toggle"
 
@@ -12,12 +12,12 @@ export function AppLayout({ user }: { user?: SessionUser }) {
   useUISounds()
 
   return (
-    <Provider className="p-2 h-screen">
-      <Drawer user={user} />
-      <Wrapper className="relative shadow-2xl border">
+    <Sidebar.Provider className="p-2 h-screen">
+      <Sidebar.Drawer user={user} />
+      <Sidebar.Wrapper className="relative shadow-2xl border">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <Trigger />
-          <COBreadcrumb />
+          <Sidebar.Trigger />
+          <Breadcrumb.Trail />
           {/* Account actions live on the sidebar's profile card, not here. */}
           <div className="ml-auto flex items-center gap-1">
             <SoundToggle />
@@ -32,7 +32,7 @@ export function AppLayout({ user }: { user?: SessionUser }) {
             <Outlet />
           </main>
           </ScrollArea>
-      </Wrapper>
-    </Provider>
+      </Sidebar.Wrapper>
+    </Sidebar.Provider>
   )
 }

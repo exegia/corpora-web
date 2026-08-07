@@ -1,6 +1,6 @@
 import { AuthCard, Button } from "@exegia/corpora-ui"
 import { redirect, useNavigate } from "react-router"
-import { AuthLogo, AUTH_ACCENT } from "@/components/auth"
+import { Auth } from "@/components/auth"
 import { AuthError, completeAuthRedirect } from "@/lib/auth"
 import type { Route } from "./+types/auth.callback"
 
@@ -43,8 +43,8 @@ export default function AuthCallback({ loaderData }: Route.ComponentProps) {
 
   return (
     <AuthCard
-      logo={<AuthLogo />}
-      accent={AUTH_ACCENT}
+      logo={<Auth.Logo />}
+      accent={Auth.ACCENT}
       title="We couldn't finish signing you in"
       description={loaderData.error}
     >

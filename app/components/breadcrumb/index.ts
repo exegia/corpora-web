@@ -1,3 +1,5 @@
-import COBreadcrumb from "./component";
+import { default as Trail } from "./trail"
 
-export {COBreadcrumb}
+export const Breadcrumb = {
+    Trail,
+}
