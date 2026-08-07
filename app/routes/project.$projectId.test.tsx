@@ -415,8 +415,9 @@ describe("read-only while in review (003)", () => {
     expect(screen.getByRole("button", { name: "Add reference" })).toBeDisabled()
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Edit classification" })).not.toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Edit organization" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Add classification" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Add organization" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Add website" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument()
   })
 
@@ -446,8 +447,10 @@ describe("details panel — classification (US2)", () => {
     const user = userEvent.setup()
     renderRoute()
 
-    expect(await screen.findByText("Unclassified")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Edit classification" }))
+    // Unclassified now reads as the affordance to classify.
+    await user.click(
+      await screen.findByRole("button", { name: "Add classification" }),
+    )
 
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "bible" }))
@@ -469,7 +472,7 @@ describe("details panel — classification (US2)", () => {
     const user = userEvent.setup()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Edit classification" }))
+    await user.click(await screen.findByRole("button", { name: "Add classification" }))
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "quran" }))
 
@@ -485,7 +488,7 @@ describe("details panel — classification (US2)", () => {
     const user = userEvent.setup()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Edit classification" }))
+    await user.click(await screen.findByRole("button", { name: "Add classification" }))
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "bible" }))
     expect(
@@ -511,7 +514,10 @@ describe("details panel — classification (US2)", () => {
     vi.mocked(classifyProject).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Edit classification" }))
+    // Already classified, so the value itself is the trigger.
+    await user.click(
+      await screen.findByRole("button", { name: "Edit classification" }),
+    )
     await user.click(await screen.findByLabelText("Type"))
     await user.click(await screen.findByRole("option", { name: "review" }))
     await user.click(screen.getByLabelText("Category"))
@@ -529,28 +535,83 @@ describe("details panel — classification (US2)", () => {
   })
 })
 
+describe("details panel — value-as-trigger rows", () => {
+  it("previews the creator on the value itself", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+
+    const trigger = await screen.findByRole("button", {
+      name: "About Ada Researcher",
+    })
+    await user.hover(trigger)
+    expect(await screen.findByText("@ada")).toBeInTheDocument()
+  })
+
+  // The website lives on the organization record, so its empty state has to
+  // route to the organization editor rather than a field of its own.
+  it("offers Add website and opens the organization editor", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Add website" }))
+    expect(await screen.findByLabelText("Organization")).toBeInTheDocument()
+  })
+})
+
 describe("details panel — licences (US3)", () => {
-  it("filters out non-content licences and attaches after an agreement step", async () => {
+  it("defaults to content licences and attaches after an agreement step", async () => {
     const user = userEvent.setup()
     vi.mocked(attachLicence).mockResolvedValue()
+    vi.mocked(getLicence).mockResolvedValue({} as never)
+    vi.mocked(resolveLicenceText).mockResolvedValue("# CC BY 4.0")
     renderRoute()
 
     expect(await screen.findByText(/no licences attached/i)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Add licence" }))
 
-    // GPL is software-only — it has no business in a content catalog
+    // GPL is software-only — the domain filter starts on content
     expect(
       await screen.findByText("Creative Commons Attribution 4.0"),
     ).toBeInTheDocument()
     expect(screen.queryByText("GNU GPL v3")).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole("button", { name: "Attach" }))
-    expect(attachLicence).not.toHaveBeenCalled() // agreement step first
-    await user.click(screen.getByRole("button", { name: "Agree & attach" }))
+    // Agreeing happens inside the viewer, so the licence cannot be attached
+    // without it having been shown.
+    await user.click(
+      screen.getByRole("button", {
+        name: "View Creative Commons Attribution 4.0 (CC-BY-4.0)",
+      }),
+    )
+    expect(attachLicence).not.toHaveBeenCalled()
+    await user.click(
+      await screen.findByRole("button", { name: "Agree & attach" }),
+    )
 
     await waitFor(() =>
       expect(attachLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0", "u1"),
     )
+  })
+
+  it("reveals software licences when the domain filter is widened", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Add licence" }))
+    expect(screen.queryByText("GNU GPL v3")).not.toBeInTheDocument()
+
+    // Each toggle counts what it would show, independent of what is selected:
+    // the catalog holds one content/data licence and one software-only one.
+    expect(
+      screen.getByRole("button", { name: "content, 1 licence" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "data, 1 licence" }),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole("button", { name: "software, 1 licence" }),
+    )
+    expect(await screen.findByText("GNU GPL v3")).toBeInTheDocument()
   })
 
   it("searches the catalog by title", async () => {
@@ -567,6 +628,89 @@ describe("details panel — licences (US3)", () => {
     await user.clear(search)
     await user.type(search, "does-not-exist")
     expect(await screen.findByText(/no licence matches/i)).toBeInTheDocument()
+  })
+
+  // An attached licence has a View button on the page *and* a row in the
+  // catalog drawer over it. The drawer is modal, so only one is ever in the
+  // accessibility tree — but the names still have to differ, because a
+  // querySelector-level click (or a future non-modal surface) sees both.
+  it("names the catalog's View apart from the attached row's", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      licenses: [attachedLicence],
+    })
+    vi.mocked(listLicences).mockResolvedValue([
+      catalogLicense,
+      { ...catalogLicense, id: "CC-BY-4.0-legacy", status: "retired" },
+    ])
+    renderRoute()
+
+    const onPage = "View Creative Commons Attribution 4.0"
+    // CC-BY-4.0 is attached, so its catalog row offers Remove; the retired
+    // alias is not, so that one still offers View.
+    const inCatalog = "Remove Creative Commons Attribution 4.0 (CC-BY-4.0)"
+    expect(await screen.findByRole("button", { name: onPage })).toBeVisible()
+
+    await user.click(screen.getByRole("button", { name: "Add licence" }))
+    expect(
+      await screen.findByRole("button", { name: inCatalog }),
+    ).toBeInTheDocument()
+    // The catalog collides with itself too: a retired licence keeps the title
+    // of the id that superseded it, so the id is what tells the rows apart.
+    expect(
+      screen.getByRole("button", {
+        name: "View Creative Commons Attribution 4.0 (CC-BY-4.0-legacy)",
+      }),
+    ).toBeInTheDocument()
+
+    // A string `name` is a whole-accessible-name match, so this does not also
+    // pick up the catalog's longer label.
+    expect(screen.queryByRole("button", { name: onPage })).not.toBeInTheDocument()
+  })
+
+  // Attached and agreed are separate states — the DB pairs agreed_at with
+  // agreed_by, and `agreeLicence` can settle an older attachment on its own.
+  it("marks only agreed catalog rows as Agreed and detaches from the row", async () => {
+    const user = userEvent.setup()
+    vi.mocked(detachLicence).mockResolvedValue()
+    vi.mocked(listLicences).mockResolvedValue([
+      catalogLicense,
+      { ...catalogLicense, id: "CC0-1.0", title: "CC0 Public Domain" },
+    ])
+    vi.mocked(getProject).mockResolvedValue({
+      ...detail,
+      licenses: [
+        attachedLicence,
+        // Attached, never agreed — the pair is null together (FR-012).
+        {
+          ...attachedLicence,
+          id: "CC0-1.0",
+          title: "CC0 Public Domain",
+          agreedAt: null,
+          agreedBy: null,
+        },
+      ],
+    })
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Add licence" }))
+    const remove = await screen.findByRole("button", {
+      name: "Remove Creative Commons Attribution 4.0 (CC-BY-4.0)",
+    })
+    const agreedRow = remove.closest("li") as HTMLElement
+    const pendingRow = screen
+      .getByRole("button", { name: "Remove CC0 Public Domain (CC0-1.0)" })
+      .closest("li") as HTMLElement
+
+    expect(within(agreedRow).getByText("Agreed")).toBeInTheDocument()
+    expect(within(pendingRow).queryByText("Agreed")).not.toBeInTheDocument()
+
+    await user.click(remove)
+    await waitFor(() =>
+      expect(detachLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0"),
+    )
+    expect(detachLicence).toHaveBeenCalledTimes(1)
   })
 
   it("lists attached licences with agreement info and detaches one row only", async () => {
@@ -671,15 +815,31 @@ describe("details panel — licences (US3)", () => {
     expect(getLicence).toHaveBeenCalledWith("CC-BY-4.0")
   })
 
-  it("explains an empty content catalog", async () => {
+  it("explains an unseeded catalog", async () => {
     const user = userEvent.setup()
-    vi.mocked(listLicences).mockResolvedValue([softwareLicense])
+    vi.mocked(listLicences).mockResolvedValue([])
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Add licence" }))
     expect(
       await screen.findByText(/catalog has not been seeded/i),
     ).toBeInTheDocument()
+  })
+
+  // A stocked catalog that the filter empties is a different situation from an
+  // unseeded one — the fix is a toggle, not a migration.
+  it("distinguishes a filtered-empty catalog from an unseeded one", async () => {
+    const user = userEvent.setup()
+    vi.mocked(listLicences).mockResolvedValue([softwareLicense])
+    renderRoute()
+
+    await user.click(await screen.findByRole("button", { name: "Add licence" }))
+    expect(
+      await screen.findByText(/no licence matches this filter/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(/catalog has not been seeded/i),
+    ).not.toBeInTheDocument()
   })
 })
 
@@ -764,10 +924,11 @@ describe("details panel — organization & creator (US4)", () => {
     vi.mocked(setProjectOrganization).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Edit organization" }))
-    await user.selectOptions(
-      await screen.findByLabelText("Organization"),
-      "Peshitta Institute",
+    await user.click(await screen.findByRole("button", { name: "Add organization" }))
+    // A coss Select, not a native <select>: open the popup and pick the option.
+    await user.click(await screen.findByLabelText("Organization"))
+    await user.click(
+      await screen.findByRole("option", { name: "Peshitta Institute" }),
     )
     await user.click(screen.getByRole("button", { name: "Save" }))
 
@@ -786,7 +947,7 @@ describe("details panel — organization & creator (US4)", () => {
     vi.mocked(setProjectOrganization).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Edit organization" }))
+    await user.click(await screen.findByRole("button", { name: "Add organization" }))
     await user.click(
       await screen.findByRole("button", { name: /create a new organization/i }),
     )
@@ -803,7 +964,9 @@ describe("details panel — organization & creator (US4)", () => {
     )
   })
 
-  it("links the organization badge when the organization has a website", async () => {
+  // The badge used to link out to the website. It now opens the organization
+  // editor — the URL has its own row, so the link was the redundant one.
+  it("opens the organization editor from the badge and links the website row", async () => {
     vi.mocked(getProject).mockResolvedValue({
       ...detail,
       organization: {
@@ -814,9 +977,12 @@ describe("details panel — organization & creator (US4)", () => {
     })
     renderRoute()
 
-    const badge = await screen.findByRole("link", { name: "Peshitta Institute" })
-    expect(badge).toHaveAttribute("href", "https://peshitta.example")
-    // Invalid HTML otherwise: the remove control is a sibling of the link.
+    expect(
+      await screen.findByRole("link", { name: "https://peshitta.example" }),
+    ).toHaveAttribute("href", "https://peshitta.example")
+
+    const badge = screen.getByRole("button", { name: "Edit organization" })
+    // Invalid HTML otherwise: the remove control is a sibling of the badge.
     expect(badge.querySelector("button")).toBeNull()
   })
 

@@ -36,7 +36,11 @@ export interface AgreedRowProps {
 
 export interface CatalogSheetProps {
     catalog: CatalogLicence[]
-    attachedIds: string[]
+    /**
+     * The project's attachments, not just their ids — the rows show whether
+     * each one has been agreed, which an id list cannot express.
+     */
+    attached: AttachedLicense[]
     /** Agreeing user — the project's creator until corpora-auth ships (FR-012). */
     agreedByUserId: string
     disabled?: boolean
@@ -44,12 +48,22 @@ export interface CatalogSheetProps {
 
 export interface CatalogRowProps {
     licence: CatalogLicence
-    attached: boolean
-    agreedByUserId: string
+    /** The project's attachment of this licence, when it has one. */
+    attachment: AttachedLicense | undefined
+    onView: (licence: CatalogLicence) => void
 }
 
-export interface PreviewProps {
-    licence: CatalogLicence
+export interface ContentDrawerProps {
+    /**
+     * Kept mounted through the closing animation, so this stays set for a beat
+     * after `open` flips to false.
+     */
+    licence: CatalogLicence | null
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    attached: boolean
+    /** Agreeing user — the project's creator until corpora-auth ships (FR-012). */
+    agreedByUserId: string
 }
 
 export interface ContentViewerProps {
@@ -62,4 +76,5 @@ export interface ContentViewerProps {
 export interface ContentBodyProps {
     loading: boolean
     text: string | null
+    className?: string
 }

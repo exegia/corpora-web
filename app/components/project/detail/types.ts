@@ -3,7 +3,7 @@ import type { useFetcher } from "react-router"
 import type { ActionResult } from "@/components/project/types"
 import type { CatalogLicence } from "@/lib/licenses"
 import type { Organization } from "@/lib/organizations"
-import type { BookType, CategoryType, LanguageType, ProjectDetail } from "@/lib/projects"
+import type { BookType, CategoryType, LanguageType, ProjectCreator, ProjectDetail } from "@/lib/projects"
 
 export type StatusFetcher = ReturnType<typeof useFetcher<ActionResult>>
 
@@ -20,6 +20,10 @@ export interface ClassificationFieldProps {
     project: ProjectDetail
     readOnly: boolean
     onEdit: () => void
+}
+
+export interface CreatorPreviewProps {
+    creator: ProjectCreator
 }
 
 export interface OrganizationFieldProps {

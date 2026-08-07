@@ -1,11 +1,11 @@
 import { Blocks } from "@/components/blocks"
-import { CircleX, Pencil } from "lucide-react"
+import { CircleX } from "lucide-react"
 import { useFetcher } from "react-router"
 import { Badge } from "@/components/ui/badge"
 import type { OrganizationFieldProps } from "@/components/project/detail/types"
 import type { ActionResult } from "@/components/project/types"
 
-/** The organization chip, its inline clear control, and the edit affordance. */
+/** The organization chip and its inline clear control. */
 export default function OrganizationField({ organization, readOnly, onEdit }: OrganizationFieldProps) {
     const clearFetcher = useFetcher<ActionResult>()
 
@@ -13,22 +13,28 @@ export default function OrganizationField({ organization, readOnly, onEdit }: Or
         <Blocks.Metadata
             label="Organization"
             value={
-                <>
-                    <div className="flex flex-wrap items-center gap-2">
-                        {organization ? (
-                            // The name and its remove control are one chip: a
-                            // relative wrapper so the corner button can hang off
-                            // the badge, and a sibling of the link rather than a
-                            // child — a <button> inside an <a> is invalid.
+                organization && (
+                    <>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {/*
+                                The name and its remove control are one chip: a
+                                relative wrapper so the corner button can hang
+                                off the badge, and a sibling of it rather than a
+                                child — a <button> inside a <button> is invalid.
+                            */}
                             <span className="relative inline-flex max-w-full">
                                 <Badge
                                     size="lg"
                                     variant="outline"
                                     className="max-w-full"
                                     render={
-                                        organization.website ? (
-                                            <a href={organization.website} target="_blank" rel="noreferrer" />
-                                        ) : undefined
+                                        // The badge opens the organization
+                                        // editor; the website URL has its own
+                                        // row below, so nothing is lost by
+                                        // dropping the link here.
+                                        readOnly ? undefined : (
+                                            <button type="button" aria-label="Edit organization" onClick={onEdit} />
+                                        )
                                     }>
                                     <span className="truncate">{organization.name}</span>
                                 </Badge>
@@ -46,29 +52,16 @@ export default function OrganizationField({ organization, readOnly, onEdit }: Or
                                     </clearFetcher.Form>
                                 )}
                             </span>
-                        ) : (
-                            <span className="text-muted-foreground">No organization</span>
+                        </div>
+                        {clearFetcher.data?.ok === false && clearFetcher.data.error && (
+                            <p role="alert" className="text-xs text-destructive">
+                                {clearFetcher.data.error}
+                            </p>
                         )}
-                    </div>
-                    {clearFetcher.data?.ok === false && clearFetcher.data.error && (
-                        <p role="alert" className="text-xs text-destructive">
-                            {clearFetcher.data.error}
-                        </p>
-                    )}
-                </>
+                    </>
+                )
             }
-            actions={
-                readOnly
-                    ? undefined
-                    : [
-                          {
-                              label: "Edit",
-                              icon: <Pencil aria-hidden="true" />,
-                              onClick: onEdit,
-                              "aria-label": "Edit organization",
-                          },
-                      ]
-            }
+            addAction={readOnly ? undefined : { onClick: onEdit, "aria-label": "Add organization" }}
         />
     )
 }

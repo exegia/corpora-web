@@ -11,10 +11,25 @@ export type MetadataAction = Omit<ButtonProps, "children" | "variant" | "glassVa
     variant?: "default" | "ghost" | "outline"
 }
 
+/** A trigger carried by the value itself, in place of a trailing action button. */
+export type MetadataValueAction = Omit<ButtonProps, "children" | "variant" | "glassVariant" | "size">
+
 export type MetadataProps = {
     label: string
     value?: string | React.ReactNode | null
     actions?: Array<MetadataAction> | MetadataAction
+    /**
+     * Makes a present value the row's own trigger. Opt-in per row: a value that
+     * already contains a link or a button of its own cannot become one without
+     * nesting interactive content, so those rows pass their own markup instead.
+     */
+    valueAction?: MetadataValueAction
+    /**
+     * Trigger behind the “+ Add {label}” link that stands in for the empty
+     * state. Kept separate from `valueAction` because a row can be addable
+     * while its filled state is not clickable — Organization is exactly that.
+     */
+    addAction?: MetadataValueAction
     direction?: "row" | "column"
     /** Default variant for actions that don't set their own. */
     variant?: "default" | "ghost" | "outline"

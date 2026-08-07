@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -13,32 +13,16 @@ import {
 } from "@/components/ui/dialog"
 import ContentBody from "@/components/project/license/content-body"
 import type { ContentViewerProps } from "@/components/project/license/types"
-import { getLicence, resolveLicenceText } from "@/lib/licenses"
+import { useContentText } from "@/components/project/license/use-content-text"
 
 /**
- * The licence body, read-only, in a modal.
- *
- * The text is not on the project's loader — it is a per-licence read plus, on a
- * first view, a download from SPDX — so it is fetched when the dialog opens and
- * never on the way to painting the project page.
+ * The licence body, read-only, in a modal — the viewer for licences already
+ * attached to a project. The catalog's own viewer stacks as a drawer instead;
+ * both share {@link useContentText} and {@link ContentBody}.
  */
 export default function ContentViewer({ licenceId, title, trigger }: ContentViewerProps) {
     const [open, setOpen] = useState(false)
-    const [text, setText] = useState<string | null>(null)
-    const [loading, setLoading] = useState(false)
-
-    const fetchLicense = useCallback(async () => {
-        if (!open || text !== null) return
-        setLoading(true)
-        const response = await getLicence(licenceId)
-        const resolved = await resolveLicenceText(response)
-        setText(resolved)
-        setLoading(false)
-    }, [open, licenceId, text])
-
-    useEffect(() => {
-        fetchLicense().then()
-    }, [fetchLicense])
+    const { text, loading } = useContentText(licenceId, open)
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -49,7 +33,7 @@ export default function ContentViewer({ licenceId, title, trigger }: ContentView
                 </DialogHeader>
                 <DialogContent>
                     <DialogPanel>
-                        <ContentBody loading={loading} text={text} />
+                        <ContentBody loading={loading} text={text} className="max-h-[60vh]" />
                     </DialogPanel>
                 </DialogContent>
                 <DialogFooter>

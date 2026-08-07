@@ -13,11 +13,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { OrganizationDialogProps } from "@/components/project/detail/types"
 import type { ActionResult } from "@/components/project/types"
 
-const SELECT_CLASS =
-    "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+/** Empty string, not null: "no organization" is a choice the form has to post. */
+const NO_ORGANIZATION = ""
 
 /** Pick an existing organization or create one inline (FR-014, research R5). */
 export default function OrganizationDialog({ open, onOpenChange, organizations, currentId }: OrganizationDialogProps) {
@@ -25,6 +26,10 @@ export default function OrganizationDialog({ open, onOpenChange, organizations, 
     const submittedRef = useRef(false)
     const [mode, setMode] = useState<"pick" | "create">(organizations.length === 0 ? "create" : "pick")
     const busy = fetcher.state !== "idle"
+    const organizationItems = [
+        { label: "No organization", value: NO_ORGANIZATION },
+        ...organizations.map(organization => ({ label: organization.name, value: organization.id })),
+    ]
 
     useEffect(() => {
         if (open) setMode(organizations.length === 0 ? "create" : "pick")
@@ -60,19 +65,33 @@ export default function OrganizationDialog({ open, onOpenChange, organizations, 
                         />
                         {mode === "pick" ? (
                             <div className="flex flex-col gap-2">
-                                <Label htmlFor="organization-id">Organization</Label>
-                                <select
-                                    id="organization-id"
+                                <Label htmlFor="organization-id" id="organization-label">
+                                    Organization
+                                </Label>
+                                {/*
+                                    `items` up front rather than children-only:
+                                    the popup is portalled and only mounts on
+                                    open, so the trigger would have nothing to
+                                    render the current value from until then.
+                                */}
+                                <Select
+                                    items={organizationItems}
                                     name="organizationId"
-                                    defaultValue={currentId ?? ""}
-                                    className={SELECT_CLASS}>
-                                    <option value="">No organization</option>
-                                    {organizations.map(organization => (
-                                        <option key={organization.id} value={organization.id}>
-                                            {organization.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    defaultValue={currentId ?? NO_ORGANIZATION}>
+                                    <SelectTrigger
+                                        id="organization-id"
+                                        aria-labelledby="organization-label organization-id"
+                                        className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectPopup>
+                                        {organizationItems.map(item => (
+                                            <SelectItem key={item.value} value={item.value}>
+                                                {item.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectPopup>
+                                </Select>
                                 <Button
                                     type="button"
                                     variant="ghost"

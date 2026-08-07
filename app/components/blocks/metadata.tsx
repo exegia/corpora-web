@@ -1,8 +1,9 @@
+import { Plus } from "lucide-react"
 import React from "react"
+import { Button } from "@exegia/corpora-ui"
 import { cn } from "@/lib/utils"
 import ActionButton from "@/components/blocks/action-button"
 import type { MetadataProps } from "@/components/blocks/types"
-
 
 /**
  * `false` and `null` are how a conditional value ("only render the link when
@@ -13,15 +14,43 @@ function isEmpty(value: MetadataProps["value"]): boolean {
     return value === null || value === undefined || value === false || value === ""
 }
 
-const MetadataBlock = ({ label, value, actions, direction = "row", variant = "ghost", className }: MetadataProps) => {
+const MetadataBlock = ({
+    label,
+    value,
+    actions,
+    valueAction,
+    addAction,
+    direction = "row",
+    variant = "ghost",
+    className,
+}: MetadataProps) => {
     const list = actions ? (Array.isArray(actions) ? actions : [actions]) : []
-    const content = isEmpty(value) ? (
-        <span className="text-muted-foreground italic">No {label}</span>
-    ) : React.isValidElement(value) ? (
-        value
-    ) : (
-        String(value)
-    )
+    const rendered = React.isValidElement(value) ? value : String(value)
+
+    let content: React.ReactNode
+    if (isEmpty(value)) {
+        content = addAction ? (
+            // The empty state is the affordance: nothing else on the row says
+            // the field can be filled in now that the Edit buttons are gone.
+            <Button {...addAction} size="sm" variant="link" className="h-auto p-0">
+                <Plus aria-hidden="true" />
+                Add {label.toLowerCase()}
+            </Button>
+        ) : (
+            <span className="text-muted-foreground italic">No {label}</span>
+        )
+    } else if (valueAction) {
+        // No justify-between here — Button emits a hidden leading span, so it
+        // would distribute across three children and centre the label.
+        // See docs/ui-patterns.md.
+        content = (
+            <Button {...valueAction} size="sm" variant="link" className="h-auto min-w-0 p-0 text-foreground">
+                <span className="truncate">{rendered}</span>
+            </Button>
+        )
+    } else {
+        content = rendered
+    }
 
     return (
         <div
@@ -47,15 +76,18 @@ const MetadataBlock = ({ label, value, actions, direction = "row", variant = "gh
                 </dd>
             </dl>
             {/*
-        The slot is reserved even with no actions: stacked rows are read as a
-        column, and an actionless row would otherwise run its value 76px further
-        right than its neighbours.
-      */}
-            <div className="flex min-w-16 shrink-0 items-center justify-end gap-1">
-                {list.map((action, index) => (
-                    <ActionButton key={action.label ?? index} variant={variant} {...action} />
-                ))}
-            </div>
+                Only reserved when something occupies it. It used to render
+                empty so a mixed panel stayed aligned; now that a row's trigger
+                lives on its value, an always-on 64px gutter is dead space on
+                every row.
+            */}
+            {list.length > 0 && (
+                <div className="flex min-w-16 shrink-0 items-center justify-end gap-1">
+                    {list.map((action, index) => (
+                        <ActionButton key={action.label ?? index} variant={variant} {...action} />
+                    ))}
+                </div>
+            )}
         </div>
     )
 }
