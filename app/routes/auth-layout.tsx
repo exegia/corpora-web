@@ -1,6 +1,5 @@
+import { Blocks } from "@/components/blocks"
 import { Outlet } from "react-router"
-import { SoundToggle } from "@/components/sound-toggle"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { useUISounds } from "@/lib/sounds"
 import Threads from "@/components/threads"
 
@@ -29,8 +28,8 @@ export default function AuthLayout() {
             />
 
             <div className="absolute right-4 top-4 flex items-center gap-1">
-                <SoundToggle />
-                <ThemeToggle />
+                <Blocks.Sound />
+                <Blocks.Theme />
             </div>
             <div
                 className="relative flex w-full max-w-sm flex-col items-center backdrop-blur-md rounded-3xl shadow-md shadow-black/5 border border-border">

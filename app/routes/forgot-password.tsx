@@ -1,6 +1,6 @@
 import { ForgotPasswordBlock } from "@exegia/corpora-ui"
 import { useNavigate, useSearchParams } from "react-router"
-import { AuthLogo, AUTH_ACCENT } from "@/components/auth"
+import { Auth } from "@/components/auth"
 import { requireAnon, safeRedirectTo, sendPasswordReset } from "@/lib/auth"
 import type { Route } from "./+types/forgot-password"
 
@@ -17,8 +17,8 @@ export default function ForgotPassword() {
 
   return (
     <ForgotPasswordBlock
-      logo={<AuthLogo />}
-      accent={AUTH_ACCENT}
+      logo={<Auth.Logo />}
+      accent={Auth.ACCENT}
       // The block owns the "check your inbox" success state, so there is no
       // navigation here — the emailed link resumes the flow at /auth/callback.
       onSubmit={({ email }) => sendPasswordReset(email)}

@@ -36,17 +36,25 @@ Apparent styling bugs here are often structural. Check these first, in order:
 
 ## 1. Rows and cards
 
-Reference implementation: `ProjectRow` in `app/routes/project.tsx`.
+Reference implementation: `ProjectRow` / `ProjectTable` in
+`app/routes/project.tsx`.
 
-- Clickable row that also has action buttons → `Card render={<li />}` plus a
-  `Link` with `after:absolute after:inset-0`. Never a `Button`-as-link wrapping
-  the row: that nests `<button>` inside `<a>`.
-- Leading icon in a `size-10 rounded-xl` tile. Reuse the icon the route's empty
+- A list of records with shared columns → `<Table variant="card">` from
+  `@/components/ui/table` (vendored from `@coss`). Reach for `Card render={<li />}`
+  only when the rows have no common column structure.
+- Clickable row that also has action buttons → `TableRow` plus a `Link` with
+  `after:absolute after:inset-0`. Never a `Button`-as-link wrapping the row:
+  that nests `<button>` inside `<a>`.
+- Leading icon in a `size-8 rounded-lg` tile. Reuse the icon the route's empty
   state already uses, so the two agree.
-- Focus ring on the card (`has-[a:focus-visible]:ring-2`) — the link is only as
-  wide as its text.
-- Actions get `z-10`, and reveal on **both** `group-hover/row` and
-  `group-focus-within/row`. Hover-only means keyboard users can never see them.
+- Focus ring on the link's stretched overlay
+  (`focus-visible:after:inset-ring-2`) — a `ring-2` on the `<tr>` is painted over
+  by the cell backgrounds, and a ring on the link itself hugs the title text.
+- `z-10` on a wrapper **inside** the actions cell, not on the `<td>` — a
+  positioned cell covers the focus ring with its own `bg-card`.
+- Actions reveal on **both** `group-hover/row` and `group-focus-within/row`.
+  Hover-only means keyboard users can never see them.
+- Truncating cell → `w-full max-w-0` on the `TableCell`, `truncate` inside.
 - Map status → badge variant; don't hardcode one variant for every state.
 
 ## 2. Loading skeletons
@@ -56,7 +64,11 @@ Reference implementation: `ProjectRow` in `app/routes/project.tsx`.
 - Skeleton calls `useLoadingSound()`, loaded component calls `useReadySound()`.
 - `role="status"` + `aria-label="Loading <thing>"`.
 - Mirror the loaded layout exactly — same tile sizes, same gaps — or content
-  arriving will jump.
+  arriving will jump. In a table, that also means sizing each placeholder to the
+  column it stands in: an auto-layout table takes its column widths from the
+  skeleton's content, so a `w-14` badge placeholder shifts every column right of
+  it when a real `ready-for-review` badge lands. Measure both states and compare
+  row heights and column widths, don't eyeball them.
 - **Defer only the slow part.** On `/corpus` the upload controls render
   immediately and only the list suspends.
 - **Await the primary record on detail routes.** The breadcrumb reads it off

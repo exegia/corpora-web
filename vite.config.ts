@@ -1,3 +1,4 @@
+import { createRequire } from "node:module"
 import path from "node:path"
 import { reactRouter } from "@react-router/dev/vite"
 import tailwindcss from "@tailwindcss/vite"
@@ -5,6 +6,15 @@ import tailwindcss from "@tailwindcss/vite"
 // vite's own UserConfig, and the triple-slash reference no longer widens it.
 import { defineConfig } from "vitest/config"
 import devtoolsJson from "vite-plugin-devtools-json"
+
+// A git worktree has no node_modules of its own — every dep resolves up to the
+// main checkout, which sits outside vite's root. Without this, /@fs requests
+// for them 403 ("outside of Vite serving allow list"), entry.client.tsx never
+// loads, and the app renders blank with no build error to point at.
+const nodeModules = path.resolve(
+    createRequire(import.meta.url).resolve("vite/package.json"),
+    "../..",
+)
 
 export default defineConfig({
     plugins: [!process.env.VITEST && reactRouter(), tailwindcss(), devtoolsJson()],
@@ -82,6 +92,7 @@ export default defineConfig({
     },
     server: {
         open: true,
+        fs: { allow: [import.meta.dirname, nodeModules] },
         // PORT is set by launchers (e.g. the preview harness with autoPort);
         // fall back to 5173 for plain `bun run vite:dev`.
         port: process.env.PORT ? Number(process.env.PORT) : 5173,

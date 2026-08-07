@@ -13,13 +13,18 @@ Package manager is **bun**.
 ```bash
 bun run dev         # never run this yourself — use the preview/launch tooling
 bun run typecheck   # react-router typegen && tsc
-bun run test        # vitest, 134 tests
+bun run test        # vitest, 230 tests
 bun run lint        # oxlint
 ```
 
-`bun run lint` reports ~25 pre-existing `only-export-components` warnings — every
+`bun run lint` reports ~35 pre-existing `only-export-components` warnings — every
 route module exports loaders/actions alongside its component. Those are expected;
 don't "fix" them.
+
+Protected routes (`/project`, `/corpus`, `/profile`) redirect to login in the
+browser preview — reaching them needs a hand-seeded session token. For a change
+you can't preview, the route tests in `app/routes/*.test.tsx` render the real
+components and are the better evidence anyway.
 
 ## The UI library is a separate repo
 
@@ -28,6 +33,38 @@ Components come from `@exegia/corpora-ui`, whose source is the sibling checkout
 re-exports of that package. **Before restyling or forking one of them**, check
 whether the change belongs upstream — see [docs/corpora-ui.md](docs/corpora-ui.md)
 and the `extract-component` skill.
+
+## Component folders follow a fixed layout
+
+A folder under `app/components/*` is one section of UI. Inside it: one
+default-exported component per file, `types.ts` for props shared across the
+folder, `utils.ts` for helpers and type guards, and an `index.ts` barrel that
+exports a namespace object (`export const Corpus = { List, Section }`), so
+callers read `<Corpus.Section />`. `app/components/project` is the reference.
+To reorganize a folder into this shape, use the `refactor-structure` skill and
+the `folder-refactorer` agent.
+
+## Pull requests: the title takes no emoji
+
+CI runs `make pr-guard` over the base, the branch name and the **PR title**.
+Commit *subjects* in this repo carry an emoji (`✨ feat: …`) — a PR title must
+not. The guard matches `<type>: summary` from the first character, so any
+leading emoji fails it:
+
+```
+feat: rework the licence catalog        # passes
+✨ feat: rework the licence catalog     # ::error:: PR title must read '<type>: summary'
+```
+
+`<type>` is one of `feat fix chore docs ci refactor test perf build style
+revert`, optionally `(scope)` and `!`. Branches into `release/v*` must read
+`<type>/<slug>`, lowercase; `main` only accepts `release/vX.Y.Z` matching the
+`package.json` version.
+
+**Retitling a red PR does not re-run the guard.** `.github/workflows/pr.yml`
+fires on `opened / reopened / ready_for_review / synchronize` — not `edited` —
+and re-running the job replays the original payload, stale title and all. Close
+and reopen the PR to get a fresh one.
 
 ## Conventions worth reading before you edit
 

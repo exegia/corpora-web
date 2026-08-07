@@ -79,7 +79,14 @@ export function TabsPanel({
 }: TabsPrimitive.Panel.Props): React.ReactElement {
   return (
     <TabsPrimitive.Panel
-      className={cn("flex-1 outline-none", className)}
+      className={cn(
+        "flex-1 outline-none",
+        // The panel mounts on selection, so this runs per switch rather than
+        // once. `motion-reduce:` reaches it because it is a real element, not
+        // a ::view-transition pseudo — see docs/motion.md.
+        "animate-tab-panel-enter motion-reduce:animate-none",
+        className,
+      )}
       data-slot="tabs-content"
       {...props}
     />
