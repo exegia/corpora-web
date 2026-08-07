@@ -1,5 +1,5 @@
 import { Button } from "@exegia/corpora-ui"
-import StatusBlock from "@/components/status.block"
+import StatusBlock from "@/components/blocks/status.block"
 import ReviewChecklist from "@/components/project/detail/review-checklist"
 import { statusActions, statusSummary } from "@/components/project/detail/status-actions"
 import type { StatusCardProps } from "@/components/project/detail/types"

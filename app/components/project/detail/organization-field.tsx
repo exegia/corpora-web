@@ -1,6 +1,6 @@
 import { CircleX, Pencil } from "lucide-react"
 import { useFetcher } from "react-router"
-import MetadataBlock from "@/components/metadata.block"
+import MetadataBlock from "@/components/blocks/metadata.block"
 import { Badge } from "@/components/ui/badge"
 import type { OrganizationFieldProps } from "@/components/project/detail/types"
 import type { ActionResult } from "@/components/project/types"

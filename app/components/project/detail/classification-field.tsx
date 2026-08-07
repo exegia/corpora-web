@@ -1,5 +1,5 @@
 import { Pencil } from "lucide-react"
-import MetadataBlock from "@/components/metadata.block"
+import MetadataBlock from "@/components/blocks/metadata.block"
 import type { ClassificationFieldProps } from "@/components/project/detail/types"
 import { cn } from "@/lib/utils"
 
