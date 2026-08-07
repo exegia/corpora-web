@@ -13,28 +13,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import type { DirectoryUser } from "@/lib/users"
+import type { FormDialogProps } from "@/components/project/dialogs/types"
+import type { ActionResult } from "@/components/project/types"
 
-interface ActionResult {
-    ok: boolean
-    intent?: string
-    error?: string
-}
-
-export interface ProjectFormDialogProps {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    /** When set, the dialog edits this project; otherwise it creates one. */
-    project?: { id: string; name: string; description: string | null }
-    /**
-     * Seeded user directory for the required creator select (create mode only;
-     * the creator is immutable after creation — FR-015). Honor-system selection
-     * until corpora-auth ships.
-     */
-    users?: DirectoryUser[]
-}
-
-export function FormDialog({ open, onOpenChange, project, users = [] }: ProjectFormDialogProps) {
+/** Create or edit a project — the same form, switched by the `project` prop. */
+export default function FormDialog({ open, onOpenChange, project, users = [] }: FormDialogProps) {
     const fetcher = useFetcher<ActionResult>()
     const [dirty, setDirty] = useState(false)
     const submittedRef = useRef(false)

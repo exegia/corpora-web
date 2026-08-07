@@ -3,8 +3,7 @@ import type { ReactNode } from "react"
 import { Suspense, useState } from "react"
 import type { ActionFunctionArgs } from "react-router"
 import { Await, Link, useLoaderData, useViewTransitionState } from "react-router"
-import { DeleteDialog } from "@/components/project/delete-dialog"
-import { FormDialog } from "@/components/project/form-dialog"
+import { Dialogs } from "@/components/project/dialogs"
 import StatusBlock from "@/components/status.block"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -131,7 +130,7 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                         <Button aria-label="Edit" onClick={() => setEditing(true)} size="icon-sm" variant="ghost">
                             <Pencil />
                         </Button>
-                        <DeleteDialog
+                        <Dialogs.Delete
                             project={project}
                             trigger={
                                 <Button
@@ -145,7 +144,7 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                         />
                     </div>
                 </div>
-                <FormDialog
+                <Dialogs.Form
                     open={editing}
                     onOpenChange={setEditing}
                     project={{
@@ -278,7 +277,7 @@ function ProjectList({
                     ))}
                 </ProjectTable>
             )}
-            <FormDialog open={creating} onOpenChange={setCreating} users={users} />
+            <Dialogs.Form open={creating} onOpenChange={setCreating} users={users} />
         </>
     )
 }

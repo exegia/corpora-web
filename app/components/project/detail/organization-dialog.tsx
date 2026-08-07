@@ -13,21 +13,15 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { Organization } from "@/lib/organizations"
+import type { OrganizationDialogProps } from "@/components/project/detail/types"
+import type { ActionResult } from "@/components/project/types"
 
 const SELECT_CLASS =
     "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 
-export interface OrganizationDialogProps {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    organizations: Organization[]
-    currentId: string | null
-}
-
 /** Pick an existing organization or create one inline (FR-014, research R5). */
-export function Organization({ open, onOpenChange, organizations, currentId }: OrganizationDialogProps) {
-    const fetcher = useFetcher<{ ok: boolean; error?: string }>()
+export default function OrganizationDialog({ open, onOpenChange, organizations, currentId }: OrganizationDialogProps) {
+    const fetcher = useFetcher<ActionResult>()
     const submittedRef = useRef(false)
     const [mode, setMode] = useState<"pick" | "create">(organizations.length === 0 ? "create" : "pick")
     const busy = fetcher.state !== "idle"

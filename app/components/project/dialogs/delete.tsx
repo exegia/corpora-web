@@ -1,12 +1,8 @@
 import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
+import type { DeleteDialogProps } from "@/components/project/dialogs/types"
 
-export interface DeleteProjectDialogProps {
-    project: { id: string; name: string }
-    /** Rendered as the trigger; defaults to a destructive "Delete" button. */
-    trigger?: React.ReactElement
-}
-
-export function DeleteDialog({ project, trigger }: DeleteProjectDialogProps) {
+/** Destructive confirm for a project — references go, linked corpora stay. */
+export default function DeleteDialog({ project, trigger }: DeleteDialogProps) {
     return (
         <ConfirmDeleteDialog
             confirmLabel="Delete project"

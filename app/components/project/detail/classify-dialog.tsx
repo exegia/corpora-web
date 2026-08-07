@@ -1,19 +1,4 @@
-import type { LucideIcon } from "lucide-react"
-import {
-    Book,
-    BookA,
-    BookOpenText,
-    Check,
-    Feather,
-    Landmark,
-    MessageSquareText,
-    MoonStar,
-    NotebookPen,
-    Scroll,
-    ScrollText,
-    UserRound,
-    X,
-} from "lucide-react"
+import { Check, Landmark, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useFetcher } from "react-router"
 import { Button } from "@/components/ui/button"
@@ -39,6 +24,10 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"
+import IconLabel from "@/components/project/detail/icon-label"
+import TypeLabel from "@/components/project/detail/type-label"
+import type { ClassifyDialogProps } from "@/components/project/detail/types"
+import type { ActionResult } from "@/components/project/types"
 import {
     BOOK_TYPES,
     type BookType,
@@ -50,49 +39,6 @@ import {
     SCRIPTURAL_TYPES,
 } from "@/lib/projects"
 
-const TYPE_ICONS: Record<BookType, LucideIcon> = {
-    bible: BookOpenText,
-    tanakh: ScrollText,
-    quran: MoonStar,
-    apocrypha: Scroll,
-    commentary: MessageSquareText,
-    lexicon: BookA,
-    biography: UserRound,
-    review: NotebookPen,
-    manuscript: Feather,
-    regular: Book,
-}
-
-function TypeLabel({ type }: { type: BookType | "" }) {
-    if (!type) return <span className="text-muted-foreground">Unclassified</span>
-    const Icon = TYPE_ICONS[type]
-    return (
-        <span className="flex items-center gap-2">
-            <Icon aria-hidden="true" className="size-4 opacity-80" />
-            <span className="truncate capitalize">{type}</span>
-        </span>
-    )
-}
-
-function IconLabel({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
-    return (
-        <span className="flex items-center gap-2">
-            <Icon aria-hidden="true" className="size-4 opacity-80" />
-            <span className="truncate capitalize">{text}</span>
-        </span>
-    )
-}
-
-export interface ClassifyDialogProps {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    current: {
-        type: BookType | null
-        languages: LanguageType[]
-        category: CategoryType | null
-    }
-}
-
 /**
  * Type + conditional classification (FR-005..FR-009): scriptural types require
  * one or more source languages, secondary-literature types a category, the
@@ -100,8 +46,8 @@ export interface ClassifyDialogProps {
  * e.g. quran offers only arabic and english). The DB CHECK constraint remains
  * the enforcement of record.
  */
-export function Classify({ open, onOpenChange, current }: ClassifyDialogProps) {
-    const fetcher = useFetcher<{ ok: boolean; error?: string }>()
+export default function ClassifyDialog({ open, onOpenChange, current }: ClassifyDialogProps) {
+    const fetcher = useFetcher<ActionResult>()
     const submittedRef = useRef(false)
     const [type, setType] = useState<BookType | "">(current.type ?? "")
     const [languages, setLanguages] = useState<LanguageType[]>(current.languages)

@@ -2,13 +2,10 @@ import { ArrowLeft, FolderX, Pencil } from "lucide-react"
 import { Suspense, useState } from "react"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Await, Link, redirect, useLoaderData, useViewTransitionState } from "react-router"
-import { List } from "@/components/project/corpus/list"
-import { Section } from "@/components/project/corpus/section"
-import { DeleteDialog } from "@/components/project/delete-dialog"
-import { LinkPicker } from "@/components/project/corpus/link-picker"
 import AlertBlock from "@/components/alert.block"
-import { Panel } from "@/components/project/detail/panel"
-import { FormDialog } from "@/components/project/form-dialog"
+import { Corpus } from "@/components/project/corpus"
+import { Detail } from "@/components/project/detail"
+import { Dialogs } from "@/components/project/dialogs"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -249,7 +246,7 @@ function WorkspacePanels({
 
     return (
         <>
-            <Panel
+            <Detail.Panel
                 project={project}
                 licenseCatalog={licenseCatalog}
                 organizations={organizations}
@@ -257,7 +254,7 @@ function WorkspacePanels({
                 readOnly={readOnly}
             />
 
-            <Section corpus={project.corpus} commits={project.commits} documents={documents} readOnly={readOnly} />
+            <Corpus.Section corpus={project.corpus} commits={project.commits} documents={documents} readOnly={readOnly} />
 
             <div>
                 <div className="flex items-center justify-between gap-3">
@@ -267,9 +264,9 @@ function WorkspacePanels({
                             Library corpora loaded alongside this dataset.
                         </p>
                     </div>
-                    <LinkPicker options={corpusOptions} disabled={readOnly} />
+                    <Corpus.Picker options={corpusOptions} disabled={readOnly} />
                 </div>
-                <List corpora={project.corpora} readOnly={readOnly} />
+                <Corpus.List corpora={project.corpora} readOnly={readOnly} />
             </div>
         </>
     )
@@ -315,7 +312,7 @@ export default function ProjectWorkspace() {
                             <Pencil aria-hidden="true" className="size-4" />
                             Edit
                         </Button>
-                        <DeleteDialog project={{ id: project.id, name: project.name }} />
+                        <Dialogs.Delete project={{ id: project.id, name: project.name }} />
                     </div>
                 )}
             </header>
@@ -332,7 +329,7 @@ export default function ProjectWorkspace() {
                 <Await resolve={data}>{resolved => <WorkspacePanels {...resolved} />}</Await>
             </Suspense>
 
-            <FormDialog
+            <Dialogs.Form
                 open={editing}
                 onOpenChange={setEditing}
                 project={{

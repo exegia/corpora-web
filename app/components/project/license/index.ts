@@ -1,3 +1,9 @@
-export { default as ContentViewer } from "./content-viewer"
-export { default as LicensePicker } from "./picker-section"
-export { default as LicenseSheet } from "./license-sheet"
+import { default as Sheet } from "./catalog-sheet"
+import { default as Section } from "./section"
+import { default as Viewer } from "./content-viewer"
+
+export const License = {
+    Section,
+    Sheet,
+    Viewer,
+}
