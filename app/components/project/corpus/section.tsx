@@ -1,6 +1,6 @@
 import { FileArchive } from "lucide-react"
 import { useFetcher } from "react-router"
-import { CommitHistory, CorpusDocumentCard } from "@/components/corpus/corpus-document-card"
+import { Documents } from "@/components/corpus"
 import { Button } from "@/components/ui/button"
 import { Card, CardFrame, CardFrameAction, CardFrameHeader, CardFrameTitle, CardPanel } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -43,7 +43,7 @@ export default function Section({ corpus, commits, documents, readOnly }: Sectio
                         </Empty>
                     ) : (
                         <div className="flex flex-col gap-4">
-                            <CorpusDocumentCard
+                            <Documents.Card
                                 document={corpus}
                                 actions={
                                     !readOnly && (
@@ -65,7 +65,7 @@ export default function Section({ corpus, commits, documents, readOnly }: Sectio
                                     {detachFetcher.data.error}
                                 </p>
                             )}
-                            <CommitHistory commits={commits} />
+                            <Documents.History commits={commits} />
                         </div>
                     )}
                 </CardPanel>
