@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react"
 import { createRoutesStub } from "react-router"
 import { describe, expect, it } from "vitest"
-import { AppLayout } from "@/components/app-layout"
+import { AppLayout } from "@/components/layouts/app-layout"
 import Corpus from "@/routes/corpus"
 import Dashboard from "@/routes/dashboard"
 import Library from "@/routes/library"

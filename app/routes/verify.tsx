@@ -1,6 +1,6 @@
 import { CodeAuthBlock } from "@exegia/corpora-ui"
 import { useNavigate, useSearchParams } from "react-router"
-import { AuthLogo, AUTH_ACCENT, SUCCESS_MORPH_MS } from "@/components/auth"
+import { Auth } from "@/components/auth"
 import { resendSignupConfirmation, safeRedirectTo, verifySignupCode } from "@/lib/auth"
 
 /**
@@ -17,13 +17,13 @@ export default function Verify() {
 
   return (
     <CodeAuthBlock
-      logo={<AuthLogo />}
-      accent={AUTH_ACCENT}
+      logo={<Auth.Logo />}
+      accent={Auth.ACCENT}
       channel="email"
       destination={maskEmail(email)}
       onVerify={async (code) => {
         await verifySignupCode(email, code)
-        window.setTimeout(() => navigate(redirectTo, { replace: true }), SUCCESS_MORPH_MS)
+        window.setTimeout(() => navigate(redirectTo, { replace: true }), Auth.SUCCESS_MORPH_MS)
       }}
       onResend={() => resendSignupConfirmation(email)}
       onBack={() => navigate("/signup", { replace: true })}

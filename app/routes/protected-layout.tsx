@@ -1,4 +1,4 @@
-import { AppLayout } from "@/components/app-layout"
+import { AppLayout } from "@/components/layouts/app-layout"
 import { requireSession } from "@/lib/auth"
 import type { Route } from "./+types/protected-layout"
 

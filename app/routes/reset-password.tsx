@@ -13,7 +13,7 @@ import {
 } from "@exegia/corpora-ui"
 import { useId, useState } from "react"
 import { useNavigate } from "react-router"
-import { AuthLogo, AUTH_ACCENT } from "@/components/auth"
+import { Auth } from "@/components/auth"
 import { getCurrentUser, updatePassword } from "@/lib/auth"
 import type { Route } from "./+types/reset-password"
 
@@ -67,8 +67,8 @@ export default function ResetPassword({ loaderData }: Route.ComponentProps) {
   if (!loaderData.hasRecoverySession) {
     return (
       <AuthCard
-        logo={<AuthLogo />}
-        accent={AUTH_ACCENT}
+        logo={<Auth.Logo />}
+        accent={Auth.ACCENT}
         title="This link has expired"
         description="Password reset links can only be used once, and time out after an hour."
       >
@@ -84,8 +84,8 @@ export default function ResetPassword({ loaderData }: Route.ComponentProps) {
 
   return (
     <AuthCard
-      logo={<AuthLogo />}
-      accent={AUTH_ACCENT}
+      logo={<Auth.Logo />}
+      accent={Auth.ACCENT}
       title="Choose a new password"
       description="Pick something you haven't used here before"
     >

@@ -1,28 +1,13 @@
+import { Blocks } from "@/components/blocks"
 import { ChevronRight, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react"
-import { Suspense, useState } from "react"
 import type { ReactNode } from "react"
-import { Await, Link, useLoaderData, useViewTransitionState } from "react-router"
+import { Suspense, useState } from "react"
 import type { ActionFunctionArgs } from "react-router"
-import { DeleteProjectDialog } from "@/components/project/delete-project-dialog"
-import { ProjectFormDialog } from "@/components/project/project-form-dialog"
-import StatusBlock from "@/components/status.block"
+import { Await, Link, useLoaderData, useViewTransitionState } from "react-router"
+import { Dialogs } from "@/components/project/dialogs"
 import { Button } from "@/components/ui/button"
-import {
-    Empty,
-    EmptyContent,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyMedia,
-    EmptyTitle,
-} from "@/components/ui/empty"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatRelativeTime } from "@/lib/format"
 import {
     createProject,
@@ -39,9 +24,7 @@ import { listUsers } from "@/lib/users"
 export async function clientLoader() {
     // Deliberately not awaited: navigation completes immediately, and the
     // component suspends on this promise, showing the skeleton meanwhile.
-    const data = Promise.all([listProjects(), listUsers()]).then(
-        ([projects, users]) => ({ projects, users }),
-    )
+    const data = Promise.all([listProjects(), listUsers()]).then(([projects, users]) => ({ projects, users }))
     return { data }
 }
 
@@ -93,19 +76,15 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                 <div className="flex items-center gap-3">
                     <span
                         aria-hidden="true"
-                        className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover/row:text-foreground"
-                    >
+                        className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover/row:text-foreground">
                         <FolderKanban className="size-4" />
                     </span>
                     <div className="min-w-0 flex-1">
                         <h3
                             className="truncate font-medium capitalize"
                             style={{
-                                viewTransitionName: morphing
-                                    ? "project-title"
-                                    : "none",
-                            }}
-                        >
+                                viewTransitionName: morphing ? "project-title" : "none",
+                            }}>
                             {/* after: stretches the link across the whole row, so
                                 the row navigates without nesting the action
                                 buttons inside the link. It resolves against
@@ -113,24 +92,21 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                             <Link
                                 className="outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:inset-ring-2 focus-visible:after:inset-ring-ring"
                                 to={href}
-                                viewTransition
-                            >
+                                viewTransition>
                                 {project.name}
                             </Link>
                         </h3>
-                        <p className="truncate text-muted-foreground text-xs">
+                        <p className="truncate text-xs text-muted-foreground">
                             {project.description || "No description"}
                         </p>
                     </div>
                 </div>
             </TableCell>
             <TableCell>
-                <StatusBlock status={project.status} />
+                <Blocks.Status status={project.status} />
             </TableCell>
-            <TableCell className="text-muted-foreground text-xs">
-                <span title={project.updatedAt}>
-                    {formatRelativeTime(project.updatedAt)}
-                </span>
+            <TableCell className="text-xs text-muted-foreground">
+                <span title={project.updatedAt}>{formatRelativeTime(project.updatedAt)}</span>
             </TableCell>
             {/* Chevron and actions share one grid area, so the swap costs no
                 reflow and the cell is always as wide as the buttons. z-10 goes
@@ -144,37 +120,31 @@ function ProjectRow({ project }: { project: ProjectSummary }) {
                         opacity-0, and would otherwise swallow their clicks. */}
                     <ChevronRight
                         aria-hidden="true"
-                        className="pointer-events-none [grid-area:1/1] size-4 text-muted-foreground transition-[transform,opacity] group-hover/row:translate-x-0.5 group-hover/row:opacity-0 group-focus-within/row:opacity-0"
+                        className="pointer-events-none size-4 text-muted-foreground transition-[transform,opacity] [grid-area:1/1] group-focus-within/row:opacity-0 group-hover/row:translate-x-0.5 group-hover/row:opacity-0"
                     />
                     {/* Revealed by the same triggers that hide the chevron, so
                         the row's trailing edge is never blank — including
                         keyboard focus, the only way to reach these without a
                         pointer. */}
-                    <div className="flex [grid-area:1/1] items-center gap-1 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100">
-                        <Button
-                            aria-label="Edit"
-                            onClick={() => setEditing(true)}
-                            size="icon-sm"
-                            variant="ghost"
-                        >
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity [grid-area:1/1] group-focus-within/row:opacity-100 group-hover/row:opacity-100">
+                        <Button aria-label="Edit" onClick={() => setEditing(true)} size="icon-sm" variant="ghost">
                             <Pencil />
                         </Button>
-                        <DeleteProjectDialog
+                        <Dialogs.Delete
                             project={project}
                             trigger={
                                 <Button
                                     aria-label="Delete"
                                     className="text-destructive-foreground hover:bg-destructive/8"
                                     size="icon-sm"
-                                    variant="ghost"
-                                >
+                                    variant="ghost">
                                     <Trash2 />
                                 </Button>
                             }
                         />
                     </div>
                 </div>
-                <ProjectFormDialog
+                <Dialogs.Form
                     open={editing}
                     onOpenChange={setEditing}
                     project={{
@@ -214,7 +184,7 @@ function ProjectTable({ children }: { children: ReactNode }) {
 function ProjectHeader({ children }: { children?: ReactNode }) {
     return (
         <div className="flex items-center justify-between gap-3">
-            <h1 className="font-heading font-bold text-2xl">Projects</h1>
+            <h1 className="font-heading text-2xl font-bold">Projects</h1>
             {children}
         </div>
     )
@@ -264,9 +234,9 @@ function ProjectListSkeleton() {
 }
 
 function ProjectList({
-                         projects,
-                         users,
-                     }: {
+    projects,
+    users,
+}: {
     projects: ProjectSummary[]
     users: Awaited<ReturnType<typeof listUsers>>
 }) {
@@ -290,8 +260,8 @@ function ProjectList({
                         </EmptyMedia>
                         <EmptyTitle>No projects yet</EmptyTitle>
                         <EmptyDescription>
-                            A project gathers corpora and references around one research
-                            question. Create your first to get started.
+                            A project gathers corpora and references around one research question. Create your first to
+                            get started.
                         </EmptyDescription>
                     </EmptyHeader>
                     <EmptyContent>
@@ -302,12 +272,12 @@ function ProjectList({
                 </Empty>
             ) : (
                 <ProjectTable>
-                    {projects.map((project) => (
+                    {projects.map(project => (
                         <ProjectRow key={project.id} project={project} />
                     ))}
                 </ProjectTable>
             )}
-            <ProjectFormDialog open={creating} onOpenChange={setCreating} users={users} />
+            <Dialogs.Form open={creating} onOpenChange={setCreating} users={users} />
         </>
     )
 }
@@ -319,9 +289,7 @@ export default function Project() {
         <section>
             <Suspense fallback={<ProjectListSkeleton />}>
                 <Await resolve={data}>
-                    {({ projects, users }) => (
-                        <ProjectList projects={projects} users={users} />
-                    )}
+                    {({ projects, users }) => <ProjectList projects={projects} users={users} />}
                 </Await>
             </Suspense>
         </section>
