@@ -1,6 +1,6 @@
 ---
 name: "refactor-structure"
-description: "Reorganize a component folder (or a whole components tree) into the app's file/folder convention: one section per folder, one default-exported component per file, types.ts / utils.ts / index.ts barrels. Use when asked to reorganize, restructure, split up, or clean up the files and folders under a directory, to break a large component file into smaller ones, or to make a folder follow the same layout as an existing one."
+description: "Reorganize a folder into the app's file/folder convention: one section per folder, one default-exported component per file, types.ts / utils.ts / index.ts barrels — with flat export * barrels instead for app/lib and other non-UI module folders. Use when asked to reorganize, restructure, split up, or clean up the files and folders under a directory, to break a large component or module file into smaller ones, or to make a folder follow the same layout as an existing one."
 argument-hint: "Folder to reorganize, e.g. app/components/project"
 user-invocable: true
 disable-model-invocation: false
@@ -14,6 +14,32 @@ ambiguous.
 
 For a tree with several sections, delegate one folder per `folder-refactorer`
 agent (`.claude/agents/folder-refactorer.md`) rather than doing it all inline.
+
+## Components vs. modules — two of these rules only apply to UI
+
+Everything below is written for `app/components`. When the target is `app/lib`
+or another module folder, keep the file-size and grouping rules but **invert
+two**:
+
+- **Barrels stay flat** — `export * from "./queries"`, never a namespace object.
+  `Projects.list()` across two dozen consumers is churn, and it defeats
+  tree-shaking on the data layer.
+- **Many named exports per file is correct.** "One default export" tames
+  components; data modules export functions and types by design.
+
+Done right this is *better* than the component case: a flat barrel keeps
+`@/lib/projects` resolving to the same symbols, so **no consumer changes at
+all**. Prove it — diff the exported symbol list before and after:
+
+```bash
+git show HEAD:app/lib/<mod>.ts | grep -oE '^export (async function|function|class|const|interface|type) [A-Za-z_]+' | awk '{print $NF}' | sort > /tmp/before.txt
+```
+
+Two extra traps in `app/lib`: colocated `*.test.ts` files stay put (the barrel
+keeps their import path valid — moving them only risks the mock paths), and
+`vi.mock("@/lib/<mod>")` factories that enumerate exports rather than spreading
+`importOriginal` will not be caught by typecheck. Grep for them and run those
+suites specifically.
 
 ## The convention
 
