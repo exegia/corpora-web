@@ -1,4 +1,4 @@
-import { ConfirmDeleteDialog } from "@/components/confirm-delete-dialog"
+import { ConfirmDeleteDialog } from "@/components/blocks/confirm-delete-dialog"
 import type { DeleteDialogProps } from "@/components/project/dialogs/types"
 
 /** Destructive confirm for a project — references go, linked corpora stay. */
