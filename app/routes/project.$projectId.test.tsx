@@ -73,11 +73,16 @@ vi.mock("@/lib/users", () => ({
   getSuperadmin: vi.fn(),
 }))
 
-vi.mock("@/lib/corpus", () => ({
-  attachCorpusToProject: vi.fn(),
-  detachCorpusFromProject: vi.fn(),
-  listCorpusDocuments: vi.fn(),
-}))
+vi.mock("@/lib/corpus", async (importOriginal) => {
+  // Spread the original so constant exports (TYPE_ICONS) stay real.
+  const original = await importOriginal<typeof import("@/lib/corpus")>()
+  return {
+    ...original,
+    attachCorpusToProject: vi.fn(),
+    detachCorpusFromProject: vi.fn(),
+    listCorpusDocuments: vi.fn(),
+  }
+})
 
 const detail: ProjectDetail = {
   id: "p1",
@@ -995,12 +1000,16 @@ describe("details panel — organization & creator (US4)", () => {
     })
     renderRoute()
 
-    const organizationRow = (
-      await screen.findByText("Peshitta Institute")
-    ).closest("dd") as HTMLElement
+    // The organization name is the edit affordance now; clearing happens by
+    // picking "No organization" in the dialog.
     await user.click(
-      within(organizationRow).getByRole("button", { name: "Remove" }),
+      await screen.findByRole("button", { name: "Edit organization" }),
     )
+    await user.click(await screen.findByLabelText("Organization"))
+    await user.click(
+      await screen.findByRole("option", { name: "No organization" }),
+    )
+    await user.click(screen.getByRole("button", { name: "Save" }))
 
     await waitFor(() =>
       expect(setProjectOrganization).toHaveBeenCalledWith("p1", null),

@@ -19,6 +19,12 @@ export interface ImportRowProps {
     attachedId: string | null
 }
 
+export interface ReferencesProps {
+    corpora: CorpusLink[]
+    options: CorpusOption[]
+    readOnly: boolean
+}
+
 export interface ListProps {
     corpora: CorpusLink[]
     readOnly: boolean

@@ -301,6 +301,7 @@
   font-size: 0.875rem;
   line-height: 1.65;
   color: var(--foreground);
+  overflow-wrap: break-word;
 }
 
 .licence-prose > :first-child {
@@ -379,6 +380,11 @@
   border-radius: var(--radius, 0.5rem);
   background: var(--muted);
   overflow-x: auto;
+  /* Licence texts are hard-wrapped at ~80 columns, so indented lines parse as
+     code blocks; wrapped, they read on instead of sizing the page sideways
+     (same trap as components/project/license/content-body). */
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 .licence-prose pre code {

@@ -25,7 +25,7 @@ export default function List({ corpora, readOnly }: ListProps) {
     }
 
     return (
-        <ul className="divide-y">
+        <ul className="-my-3 divide-y">
             {corpora.map(link => (
                 <ListRow key={link.corpusId} link={link} readOnly={readOnly} />
             ))}

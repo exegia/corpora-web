@@ -256,18 +256,7 @@ function WorkspacePanels({
 
             <Corpus.Section corpus={project.corpus} commits={project.commits} documents={documents} readOnly={readOnly} />
 
-            <div>
-                <div className="flex items-center justify-between gap-3">
-                    <div>
-                        <h2 className="text-lg font-semibold">References</h2>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Library corpora loaded alongside this dataset.
-                        </p>
-                    </div>
-                    <Corpus.Picker options={corpusOptions} disabled={readOnly} />
-                </div>
-                <Corpus.List corpora={project.corpora} readOnly={readOnly} />
-            </div>
+            <Corpus.References corpora={project.corpora} options={corpusOptions} readOnly={readOnly} />
         </>
     )
 }

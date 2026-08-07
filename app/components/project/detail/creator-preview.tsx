@@ -1,15 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { PreviewCard, PreviewCardPopup, PreviewCardTrigger } from "@/components/ui/preview-card"
 import type { CreatorPreviewProps } from "@/components/project/detail/types"
-import type { ProjectCreator } from "@/lib/projects"
-
-function initials(creator: ProjectCreator): string {
-    const source = creator.name?.trim() || creator.username
-    const parts = source.split(/\s+/).filter(Boolean)
-    if (parts.length === 0) return "?"
-    if (parts.length === 1) return (parts[0]?.slice(0, 2) ?? "").toUpperCase()
-    return ((parts[0]?.[0] ?? "") + (parts.at(-1)?.[0] ?? "")).toUpperCase()
-}
+import { initials } from "@/lib/utils"
 
 /**
  * The project's creator, previewed on hover or focus.
@@ -30,12 +22,12 @@ export default function CreatorPreview({ creator }: CreatorPreviewProps) {
                     <button
                         type="button"
                         aria-label={`About ${display}`}
-                        className="max-w-full cursor-default truncate rounded-sm underline decoration-dotted underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="max-w-full cursor-default truncate rounded-sm italic opacity-60 decoration-dotted underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                     />
                 }>
                 {display}
             </PreviewCardTrigger>
-            <PreviewCardPopup className="w-auto min-w-56 items-center gap-3 text-left">
+            <PreviewCardPopup align="start" className="w-auto min-w-56 items-center gap-3 text-left">
                 <Avatar className="size-9">
                     <AvatarFallback className="text-xs">{initials(creator)}</AvatarFallback>
                 </Avatar>
