@@ -1,9 +1,15 @@
 import type { SessionUser } from "@/lib/auth"
 
 export interface ProfileCardProps {
-    user: SessionUser
+    user?: SessionUser
 }
 
 export interface DrawerProps {
     user?: SessionUser
+}
+
+export interface ISidebarProps {
+    header?: React.ReactNode
+    footer?: React.ReactNode
+    children?: React.ReactNode
 }

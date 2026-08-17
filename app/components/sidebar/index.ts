@@ -1,8 +1,12 @@
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { default as Drawer } from "./drawer"
+import { Sidebar as Navigation } from "./component"
+import { Header } from "./header"
+import ProfileCard from "./profile-card"
 
 export const Sidebar = {
-    Drawer,
+    Navigation,
+    Header,
+    Profile: ProfileCard,
     Provider: SidebarProvider,
     Trigger: SidebarTrigger,
     Wrapper: SidebarInset,
