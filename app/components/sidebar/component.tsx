@@ -6,45 +6,39 @@ import { useNavigate } from "react-router"
 export function Sidebar({ header, footer, children }: ISidebarProps) {
     const navigate = useNavigate()
     const handleNavigate = (node: TreeNode) => {
-        if (!node.href) return
-        navigate(node.href)
+        if (!node.id) return
+        navigate(`/${node.id}`)
     }
 
     const treeData: TreeNode[] = [
         {
             id: "dashboard",
             label: "Dashboard",
-            href: "/",
             icon: <LayoutDashboard />,
         },
         {
             id: "references",
             label: "References",
-            href: "/references",
             icon: <BookMarked />,
         },
         {
             id: "library",
             label: "Library",
-            href: "/library",
             icon: <BookOpen />,
         },
         {
             id: "project",
             label: "Project",
-            href: "/project",
             icon: <FolderKanban />,
         },
         {
             id: "corpus",
             label: "Corpus",
-            href: "/corpus",
             icon: <Database />,
         },
         {
             id: "licenses",
             label: "Licenses",
-            href: "/licenses",
             icon: <Scale />,
         },
     ]
