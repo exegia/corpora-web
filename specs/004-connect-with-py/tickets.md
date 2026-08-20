@@ -1,8 +1,13 @@
 # Upstream gap tickets for exegia/corpora-py
 
-Issue-ready — paste each into a GitHub issue as-is. Found while planning the
-corpora-web integration (specs/004-connect-with-py); file:line references are
-against corpora-py `main` as of 2026-08-20. None have been filed yet.
+Found while planning the corpora-web integration (specs/004-connect-with-py);
+file:line references are against corpora-py `main` as of 2026-08-20.
+
+**Filed 2026-08-20:**
+- Ticket 1 → [exegia/corpora-py#102](https://github.com/exegia/corpora-py/issues/102)
+- Ticket 2 → [exegia/corpora-py#103](https://github.com/exegia/corpora-py/issues/103)
+- Ticket 3 → [exegia/corpora-py#104](https://github.com/exegia/corpora-py/issues/104)
+- Ticket 4 → [exegia/corpora-py#105](https://github.com/exegia/corpora-py/issues/105)
 
 ---
 
