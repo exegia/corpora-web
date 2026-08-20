@@ -17,9 +17,9 @@ Single SPA per plan.md: modules under `app/lib/`, components under
 
 **Purpose**: Environment and dependency groundwork; no behavior change.
 
-- [ ] T001 Add `VITE_CORPORA_API_URL` to `.env.example` (documented per its naming-rule header) and to the local `.env` via dotenvx
-- [ ] T002 Add the `yaml` runtime dependency with `bun add yaml` (justified in plan.md Complexity Tracking) and confirm `bun run build` bundles it without vite `optimizeDeps` additions
-- [ ] T003 [P] New migration `supabase/migrations/<ts>_corpus_document_toc.sql`: `alter table public.corpus_documents add column if not exists description text, add column if not exists toc jsonb;` — apply to the local stack (docker exec psql + `NOTIFY pgrst, 'reload schema'`) and remote `ivaecofevxactmmupvyp` (MCP apply_migration; needs user approval), extend `app/types/database.ts`
+- [X] T001 Add `VITE_CORPORA_API_URL` to `.env.example` (documented per its naming-rule header) and to the local `.env` via dotenvx
+- [X] T002 Add the `yaml` runtime dependency with `bun add yaml` (justified in plan.md Complexity Tracking) and confirm `bun run build` bundles it without vite `optimizeDeps` additions
+- [X] T003 [P] New migration `supabase/migrations/<ts>_corpus_document_toc.sql`: `alter table public.corpus_documents add column if not exists description text, add column if not exists toc jsonb;` — apply to the local stack (docker exec psql + `NOTIFY pgrst, 'reload schema'`) and remote `ivaecofevxactmmupvyp` (MCP apply_migration; needs user approval), extend `app/types/database.ts`
 
 **Checkpoint**: typecheck/test/build green with no behavior change.
 
@@ -29,11 +29,11 @@ Single SPA per plan.md: modules under `app/lib/`, components under
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Create `app/lib/corpora-api.ts` per data-model.md: `CORPORA_API_URL`, `JobStatusMessage`, `SourceFormat`, `detectSourceFormat` (`.xml→tei` mapping — never send `xml`), `CorporaApiError` with the status→kind table, `apiFetch` attaching the Supabase bearer token when a session exists, memoized `fetchCapabilities`, `createConversion`, `getConversion`, `downloadConversion`, `validateConversion` (never throws → `"skipped"`)
-- [ ] T005 Create `app/lib/corpora-api.test.ts`: fetch mocked — error-kind mapping (413/422/429/409/404/401/403/5xx/network), bearer attached only with a session, capabilities memoization + UNKNOWN fallback, multipart field names
-- [ ] T006 [P] Create `app/lib/corpus-archive.ts` per data-model.md: shared unzip helper extracted from `app/lib/corpus-history.ts` (refactor its `unzipSync` call to use it), `readCorpusArchive` parsing `manifest.yml` + `toc.yml` with per-field degradation (nulls/[]), manifest `type` → `CorpusType` mapping with `"text"` fallback
-- [ ] T007 [P] Create `app/lib/corpus-archive.test.ts`: fixture archives built in-test with fflate — full manifest+toc parse, missing manifest, malformed toc, unreadable zip throws `DataError("validation")`; `app/lib/corpus-history.test.ts` still green after the unzip refactor
-- [ ] T008 Extend `app/lib/corpus.ts`: `CorpusDocument`/`DocumentRow`/`DOCUMENT_COLUMNS`/`toDocument`/`createCorpusDocument` gain `description` and `toc` (typed `CorpusSection[] | null`); update the `peshitta`-style fixtures and `vi.mock` factories in `app/routes/corpus.test.tsx`, `app/routes/corpus.$documentId.test.tsx`, `app/routes/project.$projectId.test.tsx`
+- [X] T004 Create `app/lib/corpora-api.ts` per data-model.md: `CORPORA_API_URL`, `JobStatusMessage`, `SourceFormat`, `detectSourceFormat` (`.xml→tei` mapping — never send `xml`), `CorporaApiError` with the status→kind table, `apiFetch` attaching the Supabase bearer token when a session exists, memoized `fetchCapabilities`, `createConversion`, `getConversion`, `downloadConversion`, `validateConversion` (never throws → `"skipped"`)
+- [X] T005 Create `app/lib/corpora-api.test.ts`: fetch mocked — error-kind mapping (413/422/429/409/404/401/403/5xx/network), bearer attached only with a session, capabilities memoization + UNKNOWN fallback, multipart field names
+- [X] T006 [P] Create `app/lib/corpus-archive.ts` per data-model.md: shared unzip helper extracted from `app/lib/corpus-history.ts` (refactor its `unzipSync` call to use it), `readCorpusArchive` parsing `manifest.yml` + `toc.yml` with per-field degradation (nulls/[]), manifest `type` → `CorpusType` mapping with `"text"` fallback
+- [X] T007 [P] Create `app/lib/corpus-archive.test.ts`: fixture archives built in-test with fflate — full manifest+toc parse, missing manifest, malformed toc, unreadable zip throws `DataError("validation")`; `app/lib/corpus-history.test.ts` still green after the unzip refactor
+- [X] T008 Extend `app/lib/corpus.ts`: `CorpusDocument`/`DocumentRow`/`DOCUMENT_COLUMNS`/`toDocument`/`createCorpusDocument` gain `description` and `toc` (typed `CorpusSection[] | null`); update the `peshitta`-style fixtures and `vi.mock` factories in `app/routes/corpus.test.tsx`, `app/routes/corpus.$documentId.test.tsx`, `app/routes/project.$projectId.test.tsx`
 
 **Checkpoint**: Seams exist and are tested; UI still runs on the simulated transport.
 

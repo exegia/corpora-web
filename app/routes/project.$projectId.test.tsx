@@ -192,6 +192,8 @@ beforeEach(() => {
     words: null,
     status: null,
     convertedAt: null,
+    description: null,
+    toc: null,
   }
   vi.mocked(listCorpusDocuments).mockResolvedValue([
     {

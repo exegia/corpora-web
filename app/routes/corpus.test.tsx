@@ -104,6 +104,8 @@ function doc(overrides: Partial<CorpusDocument> = {}): CorpusDocument {
     words: null,
     status: null,
     convertedAt: null,
+    description: null,
+    toc: null,
     commits: [],
     ...overrides,
   }
@@ -134,6 +136,8 @@ const septuagint = doc({
   docsCount: 53,
   status: "converted",
   convertedAt: "2026-07-28T00:00:00Z",
+  description: null,
+  toc: null,
 })
 
 function renderRoute() {

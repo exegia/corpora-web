@@ -25,6 +25,7 @@ import {
   touchProject,
 } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
+import type { Json } from "@/types/database"
 
 export const CORPUS_BUCKET = "project-corpora"
 
@@ -62,6 +63,17 @@ export interface CorpusDocument {
   words: number | null
   status: "converted" | "uploaded" | null
   convertedAt: string | null
+  /** Manifest description, captured from the archive at conversion time. */
+  description: string | null
+  /** toc.yml section rows captured at conversion time (see corpus-archive). */
+  toc: CorpusSection[] | null
+}
+
+/** One toc.yml section row (mirrors corpus-archive's CorpusSection). */
+export interface CorpusSection {
+  title: string
+  nodes: number | null
+  words: number | null
 }
 
 interface CommitRow {
@@ -91,12 +103,14 @@ interface DocumentRow {
   words: number | null
   status: "converted" | "uploaded" | null
   converted_at: string | null
+  description: string | null
+  toc: CorpusSection[] | null
   corpus_commits: CommitRow[]
 }
 
 const DOCUMENT_COLUMNS = `id, name, source, path, filename, uploaded_at,
   corpus_type, source_format, licence, language, size_bytes, docs_count,
-  nodes, words, status, converted_at,
+  nodes, words, status, converted_at, description, toc,
   corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at )`
 
 function toCommit(row: CommitRow): CorpusCommit {
@@ -129,6 +143,8 @@ function toDocument(row: DocumentRow): CorpusDocument {
     words: row.words ?? null,
     status: row.status ?? null,
     convertedAt: row.converted_at ?? null,
+    description: row.description ?? null,
+    toc: row.toc ?? null,
     commits: (row.corpus_commits ?? [])
       .map(toCommit)
       .sort((a, b) => (b.committedAt ?? "").localeCompare(a.committedAt ?? "")),
@@ -231,6 +247,8 @@ export interface CorpusMetadataInput {
   words?: number | null
   status?: "converted" | "uploaded" | null
   convertedAt?: string | null
+  description?: string | null
+  toc?: CorpusSection[] | null
 }
 
 /** Record a corpus document with the history extracted from its archive. */
@@ -266,10 +284,14 @@ export async function createCorpusDocument(input: {
       words: input.words ?? null,
       status: input.status ?? null,
       converted_at: input.convertedAt ?? null,
+      description: input.description ?? null,
+      // Structurally Json (plain title/nodes/words objects); the generated
+      // Json type just can't see through the interface.
+      toc: (input.toc ?? null) as unknown as Json,
     })
     .select(`id, name, source, path, filename, uploaded_at,
       corpus_type, source_format, licence, language, size_bytes, docs_count,
-      nodes, words, status, converted_at`)
+      nodes, words, status, converted_at, description, toc`)
     .single()
   if (error || !data) {
     throw new DataError(

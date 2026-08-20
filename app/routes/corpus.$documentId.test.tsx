@@ -36,6 +36,8 @@ const summa: CorpusDocument = {
   words: 1_135_799,
   status: "converted",
   convertedAt: "2026-08-08T13:14:00Z",
+  description: null,
+  toc: null,
   commits: [],
 }
 
