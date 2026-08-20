@@ -16,7 +16,7 @@ export default function AuthLayout() {
     useUISounds()
 
     return (
-        <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden select-none">
+        <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden select-none dark:bg-black!">
             {/* Ambient wash behind the card; purely decorative. */}
 
             <Threads
@@ -24,15 +24,14 @@ export default function AuthLayout() {
                 amplitude={2.1}
                 distance={0.8}
                 enableMouseInteraction
-                className="absolute! inset-0 w-full h-screen m-0"
+                className="absolute! inset-0 m-0 h-screen w-full"
             />
 
-            <div className="absolute right-4 top-4 flex items-center gap-1">
+            <div className="absolute top-4 right-4 flex items-center gap-1">
                 <Blocks.Sound />
                 <Blocks.Theme />
             </div>
-            <div
-                className="relative flex w-full max-w-sm flex-col items-center backdrop-blur-md rounded-3xl shadow-md shadow-black/5 border border-border">
+            <div className="relative flex w-full max-w-sm flex-col items-center rounded-3xl border border-border shadow-md shadow-black/5 backdrop-blur-md">
                 <Outlet />
             </div>
         </div>

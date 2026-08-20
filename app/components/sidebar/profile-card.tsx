@@ -1,7 +1,8 @@
-import { ProfileCardBlock, type ProfileCardItem } from "@exegia/corpora-ui"
+import { ProfileCardBlock, Skeleton, type ProfileCardItem } from "@exegia/corpora-ui"
 import { LogOutIcon, UserIcon } from "lucide-react"
 import { useFetcher, useNavigate } from "react-router"
 import type { ProfileCardProps } from "@/components/sidebar/types"
+import { Suspense } from "react"
 
 /** The account card pinned under the navigation. */
 export default function ProfileCard({ user }: ProfileCardProps) {
@@ -29,16 +30,23 @@ export default function ProfileCard({ user }: ProfileCardProps) {
         },
     ]
 
+    const renderFallback = () => <Skeleton />
+
     return (
-        <ProfileCardBlock
-            align="start"
-            items={menu}
-            side="top"
-            user={{
-                name: user.name ?? user.email,
-                username: user.email,
-                avatar: user.avatarUrl ?? undefined,
-            }}
-        />
+        <Suspense fallback={renderFallback()}>
+            {user && (
+                <ProfileCardBlock
+                    align="start"
+                    items={menu}
+                    className="w-full! flex-1"
+                    side="top"
+                    user={{
+                        name: user.name ?? user.email,
+                        username: user.email,
+                        avatar: user.avatarUrl ?? undefined,
+                    }}
+                />
+            )}
+        </Suspense>
     )
 }
