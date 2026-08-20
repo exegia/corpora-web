@@ -1,6 +1,11 @@
 import { useLocation, useMatches } from "react-router"
 import type { Crumb } from "@/components/breadcrumb/types"
-import { isLicenceDetailData, isProjectDetailData, SECTION_LABELS } from "@/components/breadcrumb/utils"
+import {
+    isCorpusDetailData,
+    isLicenceDetailData,
+    isProjectDetailData,
+    SECTION_LABELS,
+} from "@/components/breadcrumb/utils"
 
 /**
  * The trail for the current route.
@@ -26,6 +31,12 @@ export function useCrumbs(): Crumb[] {
         const detail = matches.find(match => isProjectDetailData(match.loaderData))
         const project = detail && isProjectDetailData(detail.loaderData) ? detail.loaderData.project : null
         crumbs.push({ label: project?.name ?? "Project", href: pathname })
+    }
+
+    if (section === "corpus" && segments.length > 1) {
+        const detail = matches.find(match => isCorpusDetailData(match.loaderData))
+        const document = detail && isCorpusDetailData(detail.loaderData) ? detail.loaderData.document : null
+        crumbs.push({ label: document?.name ?? "Corpus", href: pathname })
     }
 
     if (section === "licenses" && segments.length > 1) {

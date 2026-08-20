@@ -1,4 +1,4 @@
-import { type RouteConfig, index, layout, prefix, route } from "@react-router/dev/routes"
+import { type RouteConfig, layout, route } from "@react-router/dev/routes"
 
 export default [
     // Auth screens: their own chrome, no sidebar. `/login`, `/signup` and
@@ -28,6 +28,7 @@ export default [
         route("project", "routes/project.tsx"),
         route("project/:projectId", "routes/project.$projectId.tsx"),
         route("corpus", "routes/corpus.tsx"),
+        route("corpus/:documentId", "routes/corpus.$documentId.tsx"),
         route("licenses", "routes/licenses.tsx"),
         route("licenses/:licenceId", "routes/licenses.$licenceId.tsx"),
         route("profile", "routes/profile.tsx"),
