@@ -70,7 +70,9 @@ describe("routes", () => {
       "Project",
       "Corpus",
     ]) {
-      expect(screen.getByRole("link", { name: label })).toBeInTheDocument()
+      // The modernized layout renders navigation as a tree of buttons
+      // (corpora-ui Tree), not anchor links.
+      expect(screen.getByRole("treeitem", { name: label })).toBeInTheDocument()
     }
   })
 })
