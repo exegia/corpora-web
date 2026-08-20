@@ -75,6 +75,7 @@ and reopen the PR to get a fresh one.
 | View transitions and reduced motion | [docs/motion.md](docs/motion.md) |
 | Test gotchas specific to this app | [docs/testing.md](docs/testing.md) |
 | Working with the upstream component library | [docs/corpora-ui.md](docs/corpora-ui.md) |
+| The corpora-py conversion service: contract, poll-only transport (polling advances the job — never build WS-first), error taxonomy | [specs/004-connect-with-py/contracts/corpora-api.md](specs/004-connect-with-py/contracts/corpora-api.md) |
 | Auth screens, route guards, and the not-yet-wired Supabase seam | [docs/auth.md](docs/auth.md) |
 
 ## Two invariants that will bite

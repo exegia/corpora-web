@@ -92,6 +92,15 @@ lost. **Alternatives**: WS with poll fallback (the example client's approach —
 adds a failure mode we cannot win on this deployment); WS only (broken by
 design here).
 
+> **Live finding (2026-08-20, post-implementation):** a real converted
+> archive's `toc.yml` is a *file index* (uid/version/`files:` list of .npy/.tf
+> entries), **not** a section table of contents — section titles/counts exist
+> only in the compiled dataset (`levels.json`/`.cfm`), which only the server
+> can read. `extractSections` therefore returns `[]` for real archives and
+> the detail Overview shows its honest empty state until corpora-py#103
+> (`GET /convert/{job_id}/index`) lands. Manifest fields also arrive as empty
+> strings unless supplied at conversion time; per-field degradation covers it.
+
 ### R2 — Authentic metadata: client-side archive parsing
 **Decision**: After download, read `manifest.yml` + `toc.yml` from the archive
 in the browser (fflate unzip already in the bundle; `yaml` parser added) and

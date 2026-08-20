@@ -51,7 +51,7 @@ Single SPA per plan.md: modules under `app/lib/`, components under
 - [X] T012 [US1] Update the `convert-document` action in `app/routes/corpus.tsx` to parse/pass the new fields (description, toc, commits) into `createCorpusDocument`; keep `{ok, intent, documentId}` envelope
 - [X] T013 [US1] Update `app/routes/corpus.test.tsx` conversion tests: scripted `runConversion` mock emits contract-shaped entries; assert `convert-document` called with archive-derived fields and real commits; pill/drawer text assertions updated for real log lines
 - [X] T014 [US1] Remove `uploadConversionSource` from `app/lib/corpus.ts` if no caller remains (and from the route-test mock factories); `bun run typecheck && bun run test`
-- [ ] T015 [US1] Preview verification against the live service per quickstart.md: convert a small `.tei`/`.xml` fixture, confirm the 3-line server log sequence in the drawer, the persisted row's metadata/history, and the stored `.corpus` in the `project-corpora` bucket
+- [X] T015 [US1] Preview verification against the live service per quickstart.md: convert a small `.tei`/`.xml` fixture, confirm the 3-line server log sequence in the drawer, the persisted row's metadata/history, and the stored `.corpus` in the `project-corpora` bucket
 
 **Checkpoint**: MVP — real conversions land authentic corpora; ship-ready alone.
 
@@ -85,9 +85,9 @@ Single SPA per plan.md: modules under `app/lib/`, components under
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T022 [P] Docs: note the corpora-py seam + poll-only rationale in `CLAUDE.md`'s conventions table (link `specs/004-connect-with-py/contracts/corpora-api.md`) and record upstream tickets #102–#105 as adoption points (esp. #103 → thin `corpus-archive.ts` when job-result detail endpoints land)
-- [ ] T023 Gates: `bun run typecheck && bun run lint && bun run test && bun run build` (only pre-existing lint warnings); confirm no live network in tests (grep for unmocked `corpora-api` imports in test setup)
-- [ ] T024 Final live pass per quickstart.md smoke tests + failure drills; update `.remember`/memory feature-state note
+- [X] T022 [P] Docs: note the corpora-py seam + poll-only rationale in `CLAUDE.md`'s conventions table (link `specs/004-connect-with-py/contracts/corpora-api.md`) and record upstream tickets #102–#105 as adoption points (esp. #103 → thin `corpus-archive.ts` when job-result detail endpoints land)
+- [X] T023 Gates: `bun run typecheck && bun run lint && bun run test && bun run build` (only pre-existing lint warnings); confirm no live network in tests (grep for unmocked `corpora-api` imports in test setup)
+- [X] T024 Final live pass per quickstart.md smoke tests + failure drills; update `.remember`/memory feature-state note
 
 ## Dependencies
 
