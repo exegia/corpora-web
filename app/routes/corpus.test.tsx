@@ -6,20 +6,29 @@ import {
   createCorpusDocument,
   deleteCorpusDocument,
   listCorpusDocuments,
+  uploadConversionSource,
   uploadCorpusFile,
 } from "@/lib/corpus"
 import type { CorpusDocument } from "@/lib/corpus"
-import {
-  extractCorpusHistory,
-  fetchHuggingFaceHistory,
-} from "@/lib/corpus-history"
+import { runConversion } from "@/lib/corpus-convert"
+import type { ConversionEntry, ConversionLog } from "@/lib/corpus-convert"
+import { extractCorpusHistory } from "@/lib/corpus-history"
 import CorpusRoute, { clientAction, clientLoader } from "@/routes/corpus"
 
 vi.mock("@/lib/corpus", () => ({
   listCorpusDocuments: vi.fn(),
   createCorpusDocument: vi.fn(),
   deleteCorpusDocument: vi.fn(),
+  getCorpusDocument: vi.fn(),
   uploadCorpusFile: vi.fn(),
+  uploadConversionSource: vi.fn(),
+}))
+
+// Only the transport is scripted; the pure derivations stay real so the
+// drawer renders exactly what a real run would.
+vi.mock("@/lib/corpus-convert", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/corpus-convert")>()),
+  runConversion: vi.fn(),
 }))
 
 vi.mock("@/lib/corpus-history", () => ({
@@ -27,13 +36,80 @@ vi.mock("@/lib/corpus-history", () => ({
   fetchHuggingFaceHistory: vi.fn(),
 }))
 
-const peshitta: CorpusDocument = {
-  id: "d1",
-  name: "peshitta",
-  source: "upload",
-  path: "d1/peshitta.corpus",
-  filename: "peshitta.corpus",
-  uploadedAt: "2026-07-10T00:00:00Z",
+type Outcome = "queued" | "ready" | "error"
+
+/** Instant scripted transport walking the entry to the given outcome. */
+function scriptConversion(outcome: Outcome) {
+  vi.mocked(runConversion).mockImplementation(async (initial, onChange) => {
+    let entry = initial
+    const emit = (patch: Partial<ConversionEntry>, log?: ConversionLog) => {
+      entry = {
+        ...entry,
+        ...patch,
+        logs: log ? [...entry.logs, log] : entry.logs,
+      }
+      onChange(entry)
+    }
+    emit(
+      { status: "uploading" },
+      { step: "receive", text: `> ${entry.name}`, tone: "info" },
+    )
+    emit({ jobId: "j1" })
+    emit(
+      { status: "queued" },
+      { step: "validate", text: "> Parsing nodes…", tone: "info" },
+    )
+    if (outcome === "queued") return entry
+    emit(
+      { status: "converting" },
+      { step: "convert", text: "> Building dataset…", tone: "info" },
+    )
+    if (outcome === "error") {
+      emit(
+        { status: "error", error: "IndexError — job j1", finishedAt: Date.now() },
+        { step: "convert", text: "✗ IndexError — job j1", tone: "error" },
+      )
+      return entry
+    }
+    emit({ status: "validating", validation: { status: "running" } })
+    emit(
+      {
+        status: "ready",
+        finishedAt: Date.now(),
+        validation: { status: "valid" },
+        corpusName: entry.name.replace(/\.[^.]+$/, ".corpus"),
+        corpusSize: entry.size,
+      },
+      { step: "index", text: "✓ Index built — corpus ready", tone: "success" },
+    )
+    return entry
+  })
+}
+
+function doc(overrides: Partial<CorpusDocument> = {}): CorpusDocument {
+  return {
+    id: "d1",
+    name: "peshitta",
+    source: "upload",
+    path: "d1/peshitta.corpus",
+    filename: "peshitta.corpus",
+    uploadedAt: "2026-07-10T00:00:00Z",
+    corpusType: null,
+    sourceFormat: null,
+    licence: null,
+    language: null,
+    sizeBytes: null,
+    docsCount: null,
+    nodes: null,
+    words: null,
+    status: null,
+    convertedAt: null,
+    commits: [],
+    ...overrides,
+  }
+}
+
+const peshitta = doc({
   commits: [
     {
       id: "cm1",
@@ -45,7 +121,20 @@ const peshitta: CorpusDocument = {
       committedAt: "2026-07-01T00:00:00Z",
     },
   ],
-}
+})
+
+const septuagint = doc({
+  id: "d2",
+  name: "septuagint",
+  corpusType: "text",
+  sourceFormat: "text-fabric",
+  licence: "CC BY-SA 4.0",
+  language: "Greek",
+  sizeBytes: 42_100_000,
+  docsCount: 53,
+  status: "converted",
+  convertedAt: "2026-07-28T00:00:00Z",
+})
 
 function renderRoute() {
   const Stub = createRoutesStub([
@@ -63,15 +152,27 @@ function renderRoute() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(listCorpusDocuments).mockResolvedValue([peshitta])
+  vi.mocked(listCorpusDocuments).mockResolvedValue([peshitta, septuagint])
 })
 
 describe("/corpus library", () => {
-  it("lists documents with their version history", async () => {
+  it("lists documents in the table with their metadata", async () => {
     renderRoute()
     expect(await screen.findByText("peshitta")).toBeInTheDocument()
-    expect(screen.getByText("Initial import")).toBeInTheDocument()
-    expect(screen.getByText(/ada · .* · main @ a1b2c3d/i)).toBeInTheDocument()
+    expect(screen.getByText("septuagint")).toBeInTheDocument()
+    // Converted metadata renders; legacy rows degrade to fallbacks.
+    expect(screen.getByText("text-fabric · CC BY-SA 4.0")).toBeInTheDocument()
+    expect(screen.getByText(".corpus · No licence")).toBeInTheDocument()
+    expect(screen.getByText("Text")).toBeInTheDocument()
+    expect(screen.getByText("Greek")).toBeInTheDocument()
+    expect(screen.getByText("40.1 MB")).toBeInTheDocument()
+    expect(screen.getByText("2 corpuses")).toBeInTheDocument()
+  })
+
+  it("links each row to its detail page", async () => {
+    renderRoute()
+    const link = await screen.findByRole("link", { name: "septuagint" })
+    expect(link).toHaveAttribute("href", "/corpus/d2")
   })
 
   it("shows the empty state when nothing is uploaded", async () => {
@@ -80,6 +181,50 @@ describe("/corpus library", () => {
     expect(
       await screen.findByText("The corpus library is empty"),
     ).toBeInTheDocument()
+  })
+
+  it("filters rows by the search query", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+
+    await user.type(await screen.findByLabelText("Search corpuses"), "sept")
+    expect(screen.getByText("septuagint")).toBeInTheDocument()
+    expect(screen.queryByText("peshitta")).not.toBeInTheDocument()
+    expect(screen.getByText("1 corpus")).toBeInTheDocument()
+  })
+
+  it("shows a no-results message when filters exclude everything", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+
+    await user.type(
+      await screen.findByLabelText("Search corpuses"),
+      "does-not-exist",
+    )
+    expect(
+      screen.getByText("No corpuses match the current filters."),
+    ).toBeInTheDocument()
+  })
+
+  it("paginates past six documents", async () => {
+    vi.mocked(listCorpusDocuments).mockResolvedValue(
+      Array.from({ length: 8 }, (_, i) =>
+        doc({ id: `p${i}`, name: `corpus-${i}` }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderRoute()
+
+    expect(await screen.findByText("corpus-0")).toBeInTheDocument()
+    expect(screen.getByText("Showing 1–6 of 8 corpuses")).toBeInTheDocument()
+    expect(screen.queryByText("corpus-7")).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Prev" })).toBeDisabled()
+
+    await user.click(screen.getByRole("button", { name: "Next" }))
+    expect(screen.getByText("corpus-7")).toBeInTheDocument()
+    expect(screen.queryByText("corpus-0")).not.toBeInTheDocument()
+    expect(screen.getByText("Showing 7–8 of 8 corpuses")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled()
   })
 
   it("uploads a .corpus file and records its extracted history", async () => {
@@ -96,10 +241,7 @@ describe("/corpus library", () => {
     ]
     vi.mocked(extractCorpusHistory).mockResolvedValue(commits)
     vi.mocked(uploadCorpusFile).mockResolvedValue("d9/genesis.corpus")
-    vi.mocked(createCorpusDocument).mockResolvedValue({
-      ...peshitta,
-      id: "d9",
-    })
+    vi.mocked(createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
     renderRoute()
 
     const input = await screen.findByLabelText("Upload .corpus file")
@@ -119,61 +261,92 @@ describe("/corpus library", () => {
     )
   })
 
-  it("registers a Hugging Face corpus with its Hub commit history", async () => {
+  it("shows the running pill and the drawer while a conversion is in flight", async () => {
     const user = userEvent.setup()
-    const commits = [
-      {
-        sha: "e628166",
-        message: "Convert dataset to Parquet",
-        authorName: "albertvillanova",
-        authorEmail: null,
-        branch: "main",
-        committedAt: "2024-01-04T12:09:45.000Z",
-      },
-    ]
-    vi.mocked(fetchHuggingFaceHistory).mockResolvedValue(commits)
-    vi.mocked(createCorpusDocument).mockResolvedValue(peshitta)
+    scriptConversion("queued")
+    vi.mocked(uploadConversionSource).mockResolvedValue("conversions/x/s.xml")
     renderRoute()
 
-    const input = await screen.findByLabelText("Hugging Face URL")
-    await user.type(input, "https://huggingface.co/datasets/x/onkelos")
-    await user.click(screen.getByRole("button", { name: "Add" }))
+    const input = await screen.findByLabelText("Convert source file")
+    await user.upload(
+      input,
+      new File(["<xml/>"], "summa.xml", { type: "text/xml" }),
+    )
 
-    await waitFor(() =>
-      expect(fetchHuggingFaceHistory).toHaveBeenCalledWith(
-        "https://huggingface.co/datasets/x/onkelos",
-      ),
-    )
-    await waitFor(() =>
-      expect(createCorpusDocument).toHaveBeenCalledWith({
-        name: "x/onkelos",
-        source: "huggingface",
-        path: "https://huggingface.co/datasets/x/onkelos",
-        filename: null,
-        commits,
-      }),
-    )
+    // The drawer opens itself; Base UI marks the page behind it aria-hidden,
+    // so assertions here go by text, never by role (and never a bare
+    // role="status" — the active step's Spinner is one).
+    expect(
+      (await screen.findAllByText("Converting")).length,
+    ).toBeGreaterThan(0)
+    expect(screen.getByText("summa.xml · Step 2 of 4")).toBeInTheDocument()
+    expect(screen.getByText("Validating text-fabric")).toBeInTheDocument()
+    expect(screen.getByText("In progress")).toBeInTheDocument()
+    expect(screen.getByText("> Parsing nodes…")).toBeInTheDocument()
+    // The pill in the (aria-hidden) header behind the drawer.
+    expect(document.body.textContent).toContain("Converting summa.xml")
+    expect(document.body.textContent).toContain("Step 2 of 4")
   })
 
-  it("still registers when the Hub history is unavailable", async () => {
+  it("persists a finished conversion and links to the new corpus", async () => {
     const user = userEvent.setup()
-    vi.mocked(fetchHuggingFaceHistory).mockResolvedValue(null)
-    vi.mocked(createCorpusDocument).mockResolvedValue(peshitta)
+    scriptConversion("ready")
+    vi.mocked(uploadConversionSource).mockResolvedValue("conversions/x/s.xml")
+    vi.mocked(createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
     renderRoute()
 
-    const input = await screen.findByLabelText("Hugging Face URL")
-    await user.type(input, "https://huggingface.co/datasets/x/private")
-    await user.click(screen.getByRole("button", { name: "Add" }))
+    const input = await screen.findByLabelText("Convert source file")
+    await user.upload(
+      input,
+      new File(["<xml/>"], "summa.xml", { type: "text/xml" }),
+    )
 
     await waitFor(() =>
       expect(createCorpusDocument).toHaveBeenCalledWith(
-        expect.objectContaining({ commits: [] }),
+        expect.objectContaining({
+          name: "summa",
+          source: "upload",
+          path: "conversions/x/s.xml",
+          filename: "summa.xml",
+          sourceFormat: "text-fabric",
+          corpusType: "text",
+          status: "converted",
+        }),
       ),
     )
+    expect(await screen.findByText("Conversion complete")).toBeInTheDocument()
+    // The file card's link inside the drawer targets the persisted row.
+    const link = await screen.findByRole("link", { name: "View corpus" })
+    expect(link).toHaveAttribute("href", "/corpus/d9")
+    expect(document.body.textContent).toContain("summa.xml converted")
+  })
+
+  it("marks the failed step and reruns the pipeline on Retry", async () => {
+    const user = userEvent.setup()
+    scriptConversion("error")
+    vi.mocked(uploadConversionSource).mockResolvedValue("conversions/x/f.xml")
+    renderRoute()
+
+    const input = await screen.findByLabelText("Convert source file")
+    await user.upload(
+      input,
+      new File(["<xml/>"], "summa-fail.xml", { type: "text/xml" }),
+    )
+
+    expect(await screen.findByText("Conversion failed")).toBeInTheDocument()
+    expect(screen.getByText("✗ IndexError — job j1")).toBeInTheDocument()
+    expect(
+      screen.getByText("Conversion failed. See the failed step above."),
+    ).toBeInTheDocument()
+    expect(createCorpusDocument).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole("button", { name: "Retry" }))
+    await waitFor(() => expect(runConversion).toHaveBeenCalledTimes(2))
   })
 
   it("deletes a document after a confirmation step", async () => {
     const user = userEvent.setup()
+    vi.mocked(listCorpusDocuments).mockResolvedValue([peshitta])
     vi.mocked(deleteCorpusDocument).mockResolvedValue()
     renderRoute()
 
@@ -192,6 +365,7 @@ describe("/corpus library", () => {
 
   it("refuses to delete a document until DELETE is typed exactly", async () => {
     const user = userEvent.setup()
+    vi.mocked(listCorpusDocuments).mockResolvedValue([peshitta])
     vi.mocked(deleteCorpusDocument).mockResolvedValue()
     renderRoute()
 

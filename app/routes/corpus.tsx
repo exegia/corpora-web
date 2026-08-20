@@ -1,11 +1,19 @@
-import { Blocks } from "@/components/blocks"
-import { FileArchive, Upload } from "lucide-react"
+import { FileArchive, RefreshCw, Upload } from "lucide-react"
 import { Suspense, useRef, useState } from "react"
 import { Await, useFetcher, useLoaderData } from "react-router"
 import type { ActionFunctionArgs } from "react-router"
-import { Documents } from "@/components/corpus"
+import { Convert } from "@/components/corpus/convert"
+import { useConversion } from "@/components/corpus/convert/use-conversion"
+import { List } from "@/components/corpus/list"
+import type { CorpusFilters } from "@/components/corpus/list/types"
+import {
+  collectLanguages,
+  DEFAULT_FILTERS,
+  filterDocuments,
+  PAGE_SIZE,
+  paginate,
+} from "@/components/corpus/list/utils"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import {
   Empty,
   EmptyDescription,
@@ -13,21 +21,17 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
 import {
   createCorpusDocument,
   deleteCorpusDocument,
   listCorpusDocuments,
   uploadCorpusFile,
 } from "@/lib/corpus"
-import type { CorpusCommitInput, CorpusDocument } from "@/lib/corpus"
-import {
-  extractCorpusHistory,
-  fetchHuggingFaceHistory,
-} from "@/lib/corpus-history"
+import type { CorpusCommitInput, CorpusDocument, CorpusType } from "@/lib/corpus"
+import { extractCorpusHistory } from "@/lib/corpus-history"
+import { useFileUpload } from "@/hooks/use-file-upload"
 import { type CorpusSource, DataError } from "@/lib/projects"
-import { useLoadingSound, useReadySound } from "@/lib/sounds"
+import { useReadySound } from "@/lib/sounds"
 
 export async function clientLoader() {
   // Deliberately not awaited (see routes/project.tsx): navigation completes
@@ -64,6 +68,33 @@ export async function clientAction({ request }: ActionFunctionArgs) {
           commits: parseCommits(String(form.get("commits") ?? "[]")),
         })
         return { ok: true, intent }
+      case "convert-document": {
+        // The terminal write of a successful conversion (use-conversion):
+        // the only place conversion metadata enters the database.
+        const number = (name: string) => {
+          const value = Number(form.get(name))
+          return Number.isFinite(value) && value > 0 ? value : null
+        }
+        const created = await createCorpusDocument({
+          name: String(form.get("name") ?? ""),
+          source: "upload",
+          path: String(form.get("path") ?? ""),
+          filename: String(form.get("filename") ?? "") || null,
+          corpusType:
+            (String(form.get("corpusType") ?? "") as CorpusType) || null,
+          sourceFormat: String(form.get("sourceFormat") ?? "") || null,
+          licence: String(form.get("licence") ?? "") || null,
+          language: String(form.get("language") ?? "") || null,
+          sizeBytes: number("sizeBytes"),
+          docsCount: number("docsCount"),
+          nodes: number("nodes"),
+          words: number("words"),
+          status: "converted",
+          convertedAt: String(form.get("convertedAt") ?? "") || null,
+          commits: [],
+        })
+        return { ok: true, intent, documentId: created.id }
+      }
       case "delete-document":
         await deleteCorpusDocument(String(form.get("documentId") ?? ""))
         return { ok: true, intent }
@@ -78,35 +109,13 @@ export async function clientAction({ request }: ActionFunctionArgs) {
   }
 }
 
-function DocumentListSkeleton() {
-  useLoadingSound()
-
-  return (
-    <div aria-busy="true" aria-label="Loading corpus documents" role="status">
-      <ul className="flex flex-col gap-6">
-        {Array.from({ length: 3 }, (_, i) => (
-          <Card className="gap-4 p-6" key={i} render={<li />}>
-            <div className="flex items-center gap-3">
-              <Skeleton className="size-9 shrink-0 rounded-lg" />
-              <div className="flex flex-1 flex-col gap-2">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-              <Skeleton className="h-8 w-16 shrink-0" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-2/3" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-          </Card>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
 function DocumentList({ documents }: { documents: CorpusDocument[] }) {
   useReadySound()
+  // Filter and page state lives here, under <Await>: the resolved component
+  // stays mounted across revalidations, so a conversion landing a new row
+  // never resets the filters.
+  const [filters, setFilters] = useState<CorpusFilters>(DEFAULT_FILTERS)
+  const [page, setPage] = useState(1)
 
   if (documents.length === 0) {
     return (
@@ -117,59 +126,75 @@ function DocumentList({ documents }: { documents: CorpusDocument[] }) {
           </EmptyMedia>
           <EmptyTitle>The corpus library is empty</EmptyTitle>
           <EmptyDescription>
-            Upload your first .corpus document or add a Hugging Face corpus.
+            Upload a .corpus document or convert a source file to get started.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
     )
   }
 
-  return (
-    <ul className="flex flex-col gap-6">
-      {documents.map((document) => (
-        <DocumentEntry key={document.id} document={document} />
-      ))}
-    </ul>
-  )
-}
+  const filtered = filterDocuments(documents, filters)
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const current = Math.min(page, pageCount)
+  const visible = paginate(filtered, current)
 
-function DocumentEntry({ document }: { document: CorpusDocument }) {
   return (
-    <li className="flex flex-col gap-3">
-      <Documents.Card
-        document={document}
-        actions={
-          <Blocks.ConfirmDelete
-            confirmLabel="Delete corpus"
-            description={`This permanently deletes “${document.name}” and its version history from your library. Projects that reference it will show it as unavailable. This cannot be undone.`}
-            fields={{ documentId: document.id }}
-            intent="delete-document"
-            title={`Delete “${document.name}”?`}
-            trigger={<Button size="sm" type="button" variant="ghost" />}
-          />
-        }
+    <div className="flex flex-col gap-4">
+      <List.Toolbar
+        filters={filters}
+        languages={collectLanguages(documents)}
+        onFiltersChange={(next) => {
+          setFilters(next)
+          setPage(1)
+        }}
+        total={filtered.length}
       />
-      <div className="ps-1">
-        <Documents.History commits={document.commits} />
-      </div>
-    </li>
+      {filtered.length === 0 ? (
+        <p className="py-10 text-center text-muted-foreground text-sm">
+          No corpuses match the current filters.
+        </p>
+      ) : (
+        <>
+          <List.Table documents={visible} />
+          <List.Footer
+            end={(current - 1) * PAGE_SIZE + visible.length}
+            onPageChange={setPage}
+            page={current}
+            pageCount={pageCount}
+            start={(current - 1) * PAGE_SIZE + 1}
+            total={filtered.length}
+          />
+        </>
+      )}
+    </div>
   )
 }
 
 /**
- * The corpus library (003): upload .corpus documents — book, bible,
- * commentary, lexicon — or register Hugging Face corpora. Uploads carry the
- * version history read from the archive's nested .git; projects import their
- * corpus from here.
+ * The corpus library (003): upload .corpus documents or convert source files
+ * (text-fabric XML, TEI) into them. Uploads carry the version history read
+ * from the archive's nested .git; projects import their corpus from here.
  */
 export default function Corpus() {
   const { documents } = useLoaderData<typeof clientLoader>()
   const attachFetcher = useFetcher<{ ok: boolean; error?: string }>()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [hfUrl, setHfUrl] = useState("")
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const busy = uploading || attachFetcher.state !== "idle"
+
+  const conversion = useConversion()
+  const [, convertPicker] = useFileUpload({
+    accept: ".xml,.tei",
+    onFilesAdded: (added) => {
+      const file = added[0]?.file
+      if (file instanceof File) {
+        setUploadError(null)
+        conversion.start(file)
+      }
+    },
+    onError: (errors) => setUploadError(errors[0] ?? null),
+  })
 
   async function handleFile(file: File) {
     setUploading(true)
@@ -201,90 +226,81 @@ export default function Corpus() {
     }
   }
 
-  async function handleHuggingFace(url: string) {
-    setUploading(true)
-    setUploadError(null)
-    try {
-      // Best effort — a private or unreachable repo still registers, just
-      // without a version history.
-      const history = await fetchHuggingFaceHistory(url)
-      attachFetcher.submit(
-        {
-          intent: "create-document",
-          name: url.split("/").filter(Boolean).slice(-2).join("/"),
-          source: "huggingface",
-          path: url,
-          filename: "",
-          commits: JSON.stringify(history ?? []),
-        },
-        { method: "post" },
-      )
-      setHfUrl("")
-    } finally {
-      setUploading(false)
-    }
-  }
-
   const actionError =
     attachFetcher.data?.ok === false ? attachFetcher.data.error : null
 
   return (
     <section className="flex flex-col gap-6">
-      <header>
-        <h1 className="font-heading text-2xl font-bold">Corpus</h1>
-        <p className="text-muted-foreground mt-2">
-          The documents your projects publish — upload a .corpus file or point
-          to a corpus on Hugging Face. Projects import their corpus from this
-          library.
-        </p>
-      </header>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".corpus"
-          className="sr-only"
-          aria-label="Upload .corpus file"
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0]
-            if (file) void handleFile(file)
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload /> {uploading ? "Uploading…" : "Upload .corpus"}
-        </Button>
-        <span className="text-muted-foreground text-sm">or</span>
-        <form
-          className="flex flex-1 items-center gap-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void handleHuggingFace(hfUrl)
-          }}
-        >
-          <Input
-            aria-label="Hugging Face URL"
-            placeholder="https://huggingface.co/datasets/…"
-            value={hfUrl}
-            onChange={(event) => setHfUrl(event.currentTarget.value)}
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-bold">Corpus</h1>
+          <p className="text-muted-foreground mt-2">
+            The documents your projects publish — upload a .corpus file or
+            convert a source document. Projects import their corpus from this
+            library.
+          </p>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          {conversion.entry && (
+            <Convert.StatusPill
+              documentId={conversion.documentId}
+              entry={conversion.entry}
+              onOpen={conversion.openDrawer}
+            />
+          )}
+          <input
+            {...convertPicker.getInputProps({
+              "aria-label": "Convert source file",
+            })}
+            className="sr-only"
           />
-          <Button type="submit" variant="outline" disabled={busy || !hfUrl.trim()}>
-            Add
+          <Button
+            type="button"
+            variant="outline"
+            disabled={conversion.running}
+            onClick={convertPicker.openFileDialog}
+          >
+            <RefreshCw /> Convert
           </Button>
-        </form>
-      </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".corpus"
+            className="sr-only"
+            aria-label="Upload .corpus file"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              if (file) void handleFile(file)
+            }}
+          />
+          <Button
+            type="button"
+            disabled={busy}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload /> {uploading ? "Uploading…" : "Upload"}
+          </Button>
+        </div>
+      </header>
+      {conversion.entry && (
+        <Convert.Drawer
+          documentId={conversion.documentId}
+          entry={conversion.entry}
+          onDismiss={conversion.dismiss}
+          onOpenChange={(open) =>
+            open ? conversion.openDrawer() : conversion.closeDrawer()
+          }
+          onRetry={conversion.retry}
+          open={conversion.drawerOpen}
+        />
+      )}
       {(uploadError || actionError) && (
         <p role="alert" className="text-destructive text-sm">
           {uploadError ?? actionError}
         </p>
       )}
 
-      <Suspense fallback={<DocumentListSkeleton />}>
+      <Suspense fallback={<List.Skeleton />}>
         <Await resolve={documents}>
           {(resolved) => <DocumentList documents={resolved} />}
         </Await>
