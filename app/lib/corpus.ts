@@ -198,25 +198,6 @@ export async function getCorpusDocument(
   return toDocument(data as unknown as DocumentRow)
 }
 
-/**
- * Upload a conversion source file (text-fabric XML, TEI, …) to the bucket;
- * returns its storage path. Distinct from uploadCorpusFile on purpose — that
- * one guards the direct-.corpus upload path.
- */
-export async function uploadConversionSource(file: File): Promise<string> {
-  const path = `conversions/${crypto.randomUUID()}/${file.name}`
-  const { error } = await getSupabase()
-    .storage.from(CORPUS_BUCKET)
-    .upload(path, file, { upsert: true })
-  if (error) {
-    throw new DataError(
-      "unavailable",
-      `Could not upload the file: ${error.message ?? "unexpected error"}`,
-    )
-  }
-  return path
-}
-
 /** Upload the .corpus file to the private bucket; returns its storage path. */
 export async function uploadCorpusFile(file: File): Promise<string> {
   if (!file.name.endsWith(".corpus")) {

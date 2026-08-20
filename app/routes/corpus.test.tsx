@@ -6,10 +6,10 @@ import {
   createCorpusDocument,
   deleteCorpusDocument,
   listCorpusDocuments,
-  uploadConversionSource,
   uploadCorpusFile,
 } from "@/lib/corpus"
 import type { CorpusDocument } from "@/lib/corpus"
+import { readCorpusArchive } from "@/lib/corpus-archive"
 import { runConversion } from "@/lib/corpus-convert"
 import type { ConversionEntry, ConversionLog } from "@/lib/corpus-convert"
 import { extractCorpusHistory } from "@/lib/corpus-history"
@@ -21,7 +21,6 @@ vi.mock("@/lib/corpus", () => ({
   deleteCorpusDocument: vi.fn(),
   getCorpusDocument: vi.fn(),
   uploadCorpusFile: vi.fn(),
-  uploadConversionSource: vi.fn(),
 }))
 
 // Only the transport is scripted; the pure derivations stay real so the
@@ -29,6 +28,10 @@ vi.mock("@/lib/corpus", () => ({
 vi.mock("@/lib/corpus-convert", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/corpus-convert")>()),
   runConversion: vi.fn(),
+}))
+
+vi.mock("@/lib/corpus-archive", () => ({
+  readCorpusArchive: vi.fn(),
 }))
 
 vi.mock("@/lib/corpus-history", () => ({
@@ -40,7 +43,7 @@ type Outcome = "queued" | "ready" | "error"
 
 /** Instant scripted transport walking the entry to the given outcome. */
 function scriptConversion(outcome: Outcome) {
-  vi.mocked(runConversion).mockImplementation(async (initial, onChange) => {
+  vi.mocked(runConversion).mockImplementation(async (_file, initial, onChange) => {
     let entry = initial
     const emit = (patch: Partial<ConversionEntry>, log?: ConversionLog) => {
       entry = {
@@ -76,11 +79,16 @@ function scriptConversion(outcome: Outcome) {
       {
         status: "ready",
         finishedAt: Date.now(),
-        validation: { status: "valid" },
+        validation: { status: "valid", stats: { max_slot: 30_102 } },
         corpusName: entry.name.replace(/\.[^.]+$/, ".corpus"),
         corpusSize: entry.size,
+        corpusBlob: new Blob(["corpus-bytes"]),
       },
-      { step: "index", text: "✓ Index built — corpus ready", tone: "success" },
+      {
+        step: "index",
+        text: "✓ Archive downloaded — corpus ready",
+        tone: "success",
+      },
     )
     return entry
   })
@@ -268,7 +276,6 @@ describe("/corpus library", () => {
   it("shows the running pill and the drawer while a conversion is in flight", async () => {
     const user = userEvent.setup()
     scriptConversion("queued")
-    vi.mocked(uploadConversionSource).mockResolvedValue("conversions/x/s.xml")
     renderRoute()
 
     const input = await screen.findByLabelText("Convert source file")
@@ -284,7 +291,7 @@ describe("/corpus library", () => {
       (await screen.findAllByText("Converting")).length,
     ).toBeGreaterThan(0)
     expect(screen.getByText("summa.xml · Step 2 of 4")).toBeInTheDocument()
-    expect(screen.getByText("Validating text-fabric")).toBeInTheDocument()
+    expect(screen.getByText("Validating source")).toBeInTheDocument()
     expect(screen.getByText("In progress")).toBeInTheDocument()
     expect(screen.getByText("> Parsing nodes…")).toBeInTheDocument()
     // The pill in the (aria-hidden) header behind the drawer.
@@ -292,10 +299,29 @@ describe("/corpus library", () => {
     expect(document.body.textContent).toContain("Step 2 of 4")
   })
 
-  it("persists a finished conversion and links to the new corpus", async () => {
+  it("persists a finished conversion with the archive's own metadata", async () => {
     const user = userEvent.setup()
     scriptConversion("ready")
-    vi.mocked(uploadConversionSource).mockResolvedValue("conversions/x/s.xml")
+    const commits = [
+      {
+        sha: "a1b2c3d",
+        message: "Initial import",
+        authorName: "Ada",
+        authorEmail: null,
+        branch: "main",
+        committedAt: "2026-08-01T00:00:00.000Z",
+      },
+    ]
+    vi.mocked(readCorpusArchive).mockResolvedValue({
+      name: "Summa Theologia",
+      description: "The Summa, converted from TEI.",
+      language: "English",
+      corpusType: "text",
+      version: "1.0",
+      sections: [{ title: "Prima Pars", nodes: 8442, words: 312004 }],
+    })
+    vi.mocked(extractCorpusHistory).mockResolvedValue(commits)
+    vi.mocked(uploadCorpusFile).mockResolvedValue("d9/summa.corpus")
     vi.mocked(createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
     renderRoute()
 
@@ -308,16 +334,24 @@ describe("/corpus library", () => {
     await waitFor(() =>
       expect(createCorpusDocument).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: "summa",
+          name: "Summa Theologia",
           source: "upload",
-          path: "conversions/x/s.xml",
-          filename: "summa.xml",
-          sourceFormat: "text-fabric",
+          path: "d9/summa.corpus",
+          filename: "summa.corpus",
+          sourceFormat: "tei",
           corpusType: "text",
+          language: "English",
+          description: "The Summa, converted from TEI.",
+          toc: [{ title: "Prima Pars", nodes: 8442, words: 312004 }],
+          nodes: 30_102,
           status: "converted",
+          commits,
         }),
       ),
     )
+    // The stored archive is the downloaded blob, renamed .corpus.
+    const stored = vi.mocked(uploadCorpusFile).mock.calls[0][0]
+    expect(stored.name).toBe("summa.corpus")
     expect(await screen.findByText("Conversion complete")).toBeInTheDocument()
     // The file card's link inside the drawer targets the persisted row.
     const link = await screen.findByRole("link", { name: "View corpus" })
@@ -328,7 +362,6 @@ describe("/corpus library", () => {
   it("marks the failed step and reruns the pipeline on Retry", async () => {
     const user = userEvent.setup()
     scriptConversion("error")
-    vi.mocked(uploadConversionSource).mockResolvedValue("conversions/x/f.xml")
     renderRoute()
 
     const input = await screen.findByLabelText("Convert source file")

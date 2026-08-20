@@ -18,6 +18,11 @@ export default function Header({ document, actions }: HeaderProps) {
         >
           {document.name}
         </h1>
+        {document.description && (
+          <p className="mt-1 break-words text-muted-foreground">
+            {document.description}
+          </p>
+        )}
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
           {format && <Badge size="sm" variant="secondary">{format}</Badge>}
           {document.status && (

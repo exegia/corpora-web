@@ -45,12 +45,12 @@ Single SPA per plan.md: modules under `app/lib/`, components under
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Rewrite `runConversion` in `app/lib/corpus-convert.ts` as the real transport per research.md R5: `createConversion` → 2 s poll loop (injectable `delay`, `signal`-aborted) → `succeeded` → `validating` (validateConversion) → `downloadConversion` → `ready` with `corpusBlob` + real `validation.stats`; server statuses/logs mapped onto the existing `ConversionEntry`; keep the public surface (`CONVERSION_STEPS`, `deriveSteps`, `deriveProgress`, `currentStep`, `createConversionEntry`, `formatBytes`) unchanged; add `corpusBlob?: Blob` to `ConversionEntry`
-- [ ] T010 [US1] Delete `fabricateStats`/`fabricateSections`/`shouldFail` from `app/lib/corpus-convert.ts`; move `detectSourceFormat` consumers to `@/lib/corpora-api`; rewrite `app/lib/corpus-convert.test.ts` against a mocked `@/lib/corpora-api` (status walk queued→running→succeeded with contract-shaped payloads, failed job carries the server error string, abort stops polling)
-- [ ] T011 [US1] Update `app/components/corpus/convert/use-conversion.ts`: `start(file)` validates `detectSourceFormat` before upload (unsupported → inline error, nothing sent); on `ready` run `readCorpusArchive(corpusBlob)` + `extractCorpusHistory(blob as File)` in parallel, `uploadCorpusFile(new File([blob], \`${name}.corpus\`))`, then submit `convert-document` with real fields (description, toc JSON, language, corpusType, nodes from stats `max_slot`, sizeBytes = archive size, real commits); drop `uploadConversionSource` from this path
-- [ ] T012 [US1] Update the `convert-document` action in `app/routes/corpus.tsx` to parse/pass the new fields (description, toc, commits) into `createCorpusDocument`; keep `{ok, intent, documentId}` envelope
-- [ ] T013 [US1] Update `app/routes/corpus.test.tsx` conversion tests: scripted `runConversion` mock emits contract-shaped entries; assert `convert-document` called with archive-derived fields and real commits; pill/drawer text assertions updated for real log lines
-- [ ] T014 [US1] Remove `uploadConversionSource` from `app/lib/corpus.ts` if no caller remains (and from the route-test mock factories); `bun run typecheck && bun run test`
+- [X] T009 [US1] Rewrite `runConversion` in `app/lib/corpus-convert.ts` as the real transport per research.md R5: `createConversion` → 2 s poll loop (injectable `delay`, `signal`-aborted) → `succeeded` → `validating` (validateConversion) → `downloadConversion` → `ready` with `corpusBlob` + real `validation.stats`; server statuses/logs mapped onto the existing `ConversionEntry`; keep the public surface (`CONVERSION_STEPS`, `deriveSteps`, `deriveProgress`, `currentStep`, `createConversionEntry`, `formatBytes`) unchanged; add `corpusBlob?: Blob` to `ConversionEntry`
+- [X] T010 [US1] Delete `fabricateStats`/`fabricateSections`/`shouldFail` from `app/lib/corpus-convert.ts`; move `detectSourceFormat` consumers to `@/lib/corpora-api`; rewrite `app/lib/corpus-convert.test.ts` against a mocked `@/lib/corpora-api` (status walk queued→running→succeeded with contract-shaped payloads, failed job carries the server error string, abort stops polling)
+- [X] T011 [US1] Update `app/components/corpus/convert/use-conversion.ts`: `start(file)` validates `detectSourceFormat` before upload (unsupported → inline error, nothing sent); on `ready` run `readCorpusArchive(corpusBlob)` + `extractCorpusHistory(blob as File)` in parallel, `uploadCorpusFile(new File([blob], \`${name}.corpus\`))`, then submit `convert-document` with real fields (description, toc JSON, language, corpusType, nodes from stats `max_slot`, sizeBytes = archive size, real commits); drop `uploadConversionSource` from this path
+- [X] T012 [US1] Update the `convert-document` action in `app/routes/corpus.tsx` to parse/pass the new fields (description, toc, commits) into `createCorpusDocument`; keep `{ok, intent, documentId}` envelope
+- [X] T013 [US1] Update `app/routes/corpus.test.tsx` conversion tests: scripted `runConversion` mock emits contract-shaped entries; assert `convert-document` called with archive-derived fields and real commits; pill/drawer text assertions updated for real log lines
+- [X] T014 [US1] Remove `uploadConversionSource` from `app/lib/corpus.ts` if no caller remains (and from the route-test mock factories); `bun run typecheck && bun run test`
 - [ ] T015 [US1] Preview verification against the live service per quickstart.md: convert a small `.tei`/`.xml` fixture, confirm the 3-line server log sequence in the drawer, the persisted row's metadata/history, and the stored `.corpus` in the `project-corpora` bucket
 
 **Checkpoint**: MVP — real conversions land authentic corpora; ship-ready alone.
@@ -63,10 +63,10 @@ Single SPA per plan.md: modules under `app/lib/`, components under
 
 ### Implementation for User Story 2
 
-- [ ] T016 [P] [US2] Map `CorporaApiError.kind` → user-facing copy in `app/components/corpus/convert/utils.ts` (unreachable, unauthorized→"sign in", too-large with the 500 MiB limit, unsupported with the format list, queue-full, job-forgotten, download-failed) and render it in the failed step's log + file-summary status
-- [ ] T017 [US2] Handle mid-flight job loss in `runConversion` (`app/lib/corpus-convert.ts`): a 404 after a prior successful poll terminates as `error` with the job-forgotten message; a 404/network error on the *first* poll retries up to 3 intervals before failing (instance fan-out tolerance per research.md); download/validate failures after `succeeded` fail the `index` step without persisting
-- [ ] T018 [US2] Extend `app/lib/corpus-convert.test.ts`: first-poll fan-out retry, mid-flight 404 → job-forgotten error, download failure → no persist; extend `app/routes/corpus.test.tsx`: each error kind renders its copy and Retry re-invokes `runConversion`
-- [ ] T019 [US2] Pre-upload guards in `use-conversion.ts`: file > 500 MiB → immediate too-large message (no request); `fetchCapabilities` consulted once per session to warm the auth posture (401 path renders sign-in copy)
+- [X] T016 [P] [US2] Map `CorporaApiError.kind` → user-facing copy in `app/components/corpus/convert/utils.ts` (unreachable, unauthorized→"sign in", too-large with the 500 MiB limit, unsupported with the format list, queue-full, job-forgotten, download-failed) and render it in the failed step's log + file-summary status
+- [X] T017 [US2] Handle mid-flight job loss in `runConversion` (`app/lib/corpus-convert.ts`): a 404 after a prior successful poll terminates as `error` with the job-forgotten message; a 404/network error on the *first* poll retries up to 3 intervals before failing (instance fan-out tolerance per research.md); download/validate failures after `succeeded` fail the `index` step without persisting
+- [X] T018 [US2] Extend `app/lib/corpus-convert.test.ts`: first-poll fan-out retry, mid-flight 404 → job-forgotten error, download failure → no persist; extend `app/routes/corpus.test.tsx`: each error kind renders its copy and Retry re-invokes `runConversion`
+- [X] T019 [US2] Pre-upload guards in `use-conversion.ts`: file > 500 MiB → immediate too-large message (no request); `fetchCapabilities` consulted once per session to warm the auth posture (401 path renders sign-in copy)
 
 **Checkpoint**: All failure drills pass in tests; honest states everywhere.
 
@@ -78,8 +78,8 @@ Single SPA per plan.md: modules under `app/lib/`, components under
 
 ### Implementation for User Story 3
 
-- [ ] T020 [P] [US3] Update `app/routes/corpus.$documentId.tsx` + `app/components/corpus/detail/overview-table.tsx`: render `document.toc ?? []`; empty state "No section data was captured for this corpus." replaces `fabricateSections(document.id)`; show `document.description` under the header when present
-- [ ] T021 [US3] Update `app/routes/corpus.$documentId.test.tsx`: toc-driven rows, legacy empty state, description rendering
+- [X] T020 [P] [US3] Update `app/routes/corpus.$documentId.tsx` + `app/components/corpus/detail/overview-table.tsx`: render `document.toc ?? []`; empty state "No section data was captured for this corpus." replaces `fabricateSections(document.id)`; show `document.description` under the header when present
+- [X] T021 [US3] Update `app/routes/corpus.$documentId.test.tsx`: toc-driven rows, legacy empty state, description rendering
 
 **Checkpoint**: No fabricated values remain anywhere (SC-003).
 

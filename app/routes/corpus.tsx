@@ -27,7 +27,13 @@ import {
   listCorpusDocuments,
   uploadCorpusFile,
 } from "@/lib/corpus"
-import type { CorpusCommitInput, CorpusDocument, CorpusType } from "@/lib/corpus"
+import type {
+  CorpusCommitInput,
+  CorpusDocument,
+  CorpusSection,
+  CorpusType,
+} from "@/lib/corpus"
+import { SUPPORTED_EXTENSIONS } from "@/lib/corpora-api"
 import { extractCorpusHistory } from "@/lib/corpus-history"
 import { useFileUpload } from "@/hooks/use-file-upload"
 import { type CorpusSource, DataError } from "@/lib/projects"
@@ -51,6 +57,20 @@ function parseCommits(raw: string): CorpusCommitInput[] {
     )
   } catch {
     return []
+  }
+}
+
+function parseToc(raw: string): CorpusSection[] | null {
+  try {
+    const parsed = JSON.parse(raw || "null")
+    if (!Array.isArray(parsed)) return null
+    const sections = parsed.filter(
+      (section): section is CorpusSection =>
+        typeof section?.title === "string",
+    )
+    return sections.length > 0 ? sections : null
+  } catch {
+    return null
   }
 }
 
@@ -83,15 +103,14 @@ export async function clientAction({ request }: ActionFunctionArgs) {
           corpusType:
             (String(form.get("corpusType") ?? "") as CorpusType) || null,
           sourceFormat: String(form.get("sourceFormat") ?? "") || null,
-          licence: String(form.get("licence") ?? "") || null,
           language: String(form.get("language") ?? "") || null,
+          description: String(form.get("description") ?? "") || null,
+          toc: parseToc(String(form.get("toc") ?? "")),
           sizeBytes: number("sizeBytes"),
-          docsCount: number("docsCount"),
           nodes: number("nodes"),
-          words: number("words"),
           status: "converted",
           convertedAt: String(form.get("convertedAt") ?? "") || null,
-          commits: [],
+          commits: parseCommits(String(form.get("commits") ?? "[]")),
         })
         return { ok: true, intent, documentId: created.id }
       }
@@ -185,7 +204,7 @@ export default function Corpus() {
 
   const conversion = useConversion()
   const [, convertPicker] = useFileUpload({
-    accept: ".xml,.tei",
+    accept: SUPPORTED_EXTENSIONS.join(","),
     onFilesAdded: (added) => {
       const file = added[0]?.file
       if (file instanceof File) {

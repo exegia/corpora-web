@@ -1,13 +1,16 @@
 import { useRef, useState } from "react"
 import { useFetcher } from "react-router"
-import { uploadConversionSource } from "@/lib/corpus"
+import { uploadCorpusFile } from "@/lib/corpus"
 import {
-  createConversionEntry,
-  fabricateStats,
-  runConversion,
-} from "@/lib/corpus-convert"
-import type { ConversionEntry } from "@/lib/corpus-convert"
-import { DataError } from "@/lib/projects"
+  detectSourceFormat,
+  fetchCapabilities,
+  MAX_UPLOAD_BYTES,
+  SUPPORTED_EXTENSIONS,
+} from "@/lib/corpora-api"
+import { readCorpusArchive } from "@/lib/corpus-archive"
+import { createConversionEntry, runConversion } from "@/lib/corpus-convert"
+import type { ConversionEntry, ConversionStepId } from "@/lib/corpus-convert"
+import { extractCorpusHistory } from "@/lib/corpus-history"
 
 export interface ConversionController {
   entry: ConversionEntry | null
@@ -23,12 +26,13 @@ export interface ConversionController {
 }
 
 /**
- * Route-local conversion state: one tracked entry driven by the simulated
- * transport in lib/corpus-convert, persisted through the route's
- * `convert-document` action once the run reaches "ready". No polling, no
- * loader involvement (docs/data-loading.md) — navigating away abandons the
- * simulated run, a documented limitation the transport seam later fixes
- * (real jobs live on the server and can be re-tracked by job id).
+ * Route-local conversion state: one tracked entry driven against the real
+ * corpora-py service (lib/corpus-convert), persisted through the route's
+ * `convert-document` action once the archive is downloaded, stored, and its
+ * manifest/toc/history read. No polling in loaders, no route re-suspension
+ * (docs/data-loading.md). Navigating away abandons tracking — the backend
+ * cannot list or resume jobs yet (corpora-py#102), so resume is deliberately
+ * out of scope.
  */
 export function useConversion(): ConversionController {
   const persistFetcher = useFetcher<{
@@ -57,60 +61,73 @@ export function useConversion(): ConversionController {
     setEntry(initial)
     setDrawerOpen(true)
 
-    let path: string
-    try {
-      path = await uploadConversionSource(file)
-    } catch (error) {
-      if (controller.signal.aborted) return
-      const message =
-        error instanceof DataError
-          ? error.message
-          : "Something went wrong while uploading the file."
-      setEntry({
-        ...initial,
-        status: "error",
-        error: message,
-        finishedAt: Date.now(),
-        logs: [
-          ...initial.logs,
-          { step: "receive", text: `✗ ${message}`, tone: "error" },
-        ],
-      })
-      return
-    }
-    if (controller.signal.aborted) return
-
     const final = await runConversion(
+      file,
       initial,
       (next) => {
         if (!controller.signal.aborted) setEntry(next)
       },
       { signal: controller.signal },
     )
-    if (controller.signal.aborted || final.status !== "ready") return
+    if (controller.signal.aborted) return
+    if (final.status !== "ready" || !final.corpusBlob) return
 
-    // Persist the terminal successful row; the revalidation this triggers
-    // refreshes the list without re-suspending it.
-    const stats = fabricateStats(file.name)
-    persistFetcher.submit(
-      {
-        intent: "convert-document",
-        name: file.name.replace(/\.[^.]+$/, ""),
-        source: "upload",
-        path,
-        filename: file.name,
-        sourceFormat: final.sourceFormat ?? "",
-        corpusType: "text",
-        licence: stats.licence,
-        language: stats.language,
-        sizeBytes: String(file.size),
-        docsCount: String(stats.docsCount),
-        nodes: String(stats.nodes),
-        words: String(stats.words),
-        convertedAt: new Date().toISOString(),
-      },
-      { method: "post" },
-    )
+    // Persist: read the archive's own metadata + nested-git history, store
+    // the .corpus in the library bucket, then create the registry row. The
+    // revalidation this triggers refreshes the list without re-suspending.
+    const fail = (step: ConversionStepId, message: string) => {
+      setEntry({
+        ...final,
+        status: "error",
+        error: message,
+        failedStep: step,
+        finishedAt: Date.now(),
+        logs: [...final.logs, { step, text: `✗ ${message}`, tone: "error" }],
+      })
+    }
+    try {
+      const blob = final.corpusBlob
+      const baseName = file.name.replace(/\.[^.]+$/, "")
+      const corpusFile = new File([blob], `${baseName}.corpus`, {
+        type: "application/zip",
+      })
+      const [info, commits] = await Promise.all([
+        readCorpusArchive(blob),
+        // History is best-effort — a corpus without a .git is still a corpus.
+        extractCorpusHistory(corpusFile).catch(() => null),
+      ])
+      if (controller.signal.aborted) return
+      const path = await uploadCorpusFile(corpusFile)
+      if (controller.signal.aborted) return
+
+      persistFetcher.submit(
+        {
+          intent: "convert-document",
+          name: info.name ?? baseName,
+          source: "upload",
+          path,
+          filename: corpusFile.name,
+          sourceFormat: final.sourceFormat ?? "",
+          corpusType: info.corpusType ?? "text",
+          language: info.language ?? "",
+          description: info.description ?? "",
+          toc: JSON.stringify(info.sections),
+          sizeBytes: String(blob.size),
+          nodes: String(final.validation?.stats?.max_slot ?? ""),
+          convertedAt: new Date().toISOString(),
+          commits: JSON.stringify(commits ?? []),
+        },
+        { method: "post" },
+      )
+    } catch (error) {
+      if (controller.signal.aborted) return
+      fail(
+        "index",
+        error instanceof Error
+          ? error.message
+          : "The converted corpus could not be stored.",
+      )
+    }
   }
 
   return {
@@ -120,7 +137,35 @@ export function useConversion(): ConversionController {
     openDrawer: () => setDrawerOpen(true),
     closeDrawer: () => setDrawerOpen(false),
     running: entry !== null && entry.finishedAt === null,
-    start: (file) => void run(file),
+    start: (file) => {
+      // Classify and size-check before anything is uploaded; a rejected file
+      // never leaves the machine.
+      const reject = (message: string) => {
+        const rejected = createConversionEntry(file)
+        setEntry({
+          ...rejected,
+          status: "error",
+          error: message,
+          failedStep: "receive",
+          finishedAt: Date.now(),
+          logs: [{ step: "receive", text: `✗ ${message}`, tone: "error" }],
+        })
+        setDrawerOpen(true)
+      }
+      if (!detectSourceFormat(file.name)) {
+        reject(
+          `Unsupported file type. Supported: ${SUPPORTED_EXTENSIONS.join(", ")}`,
+        )
+        return
+      }
+      if (file.size > MAX_UPLOAD_BYTES) {
+        reject("This file exceeds the service's 500 MiB upload limit.")
+        return
+      }
+      // Warm the capability posture (auth flag) once per session.
+      void fetchCapabilities()
+      void run(file)
+    },
     retry: () => {
       if (fileRef.current) void run(fileRef.current)
     },

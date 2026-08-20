@@ -14,7 +14,6 @@ import {
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument } from "@/lib/corpus"
-import { fabricateSections } from "@/lib/corpus-convert"
 import { DataError } from "@/lib/projects"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
@@ -124,9 +123,13 @@ export default function CorpusDetailPage() {
             </TabsTab>
           </TabsList>
           <TabsPanel value="overview">
-            <CorpusDetail.OverviewTable
-              sections={fabricateSections(document.id)}
-            />
+            {document.toc && document.toc.length > 0 ? (
+              <CorpusDetail.OverviewTable sections={document.toc} />
+            ) : (
+              <p className="py-8 text-center text-muted-foreground text-sm">
+                No section data was captured for this corpus.
+              </p>
+            )}
           </TabsPanel>
         </Tabs>
       </div>

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react"
-import type { CorpusDocument } from "@/lib/corpus"
-import type { FabricatedSection } from "@/lib/corpus-convert"
+import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 
 export interface HeaderProps {
   document: CorpusDocument
@@ -13,5 +12,5 @@ export interface DetailsCardProps {
 }
 
 export interface OverviewTableProps {
-  sections: FabricatedSection[]
+  sections: CorpusSection[]
 }
