@@ -274,31 +274,61 @@ export type Database = {
       }
       corpus_documents: {
         Row: {
+          converted_at: string | null
+          corpus_type: string | null
           created_at: string
+          docs_count: number | null
           filename: string | null
           id: string
+          language: string | null
+          licence: string | null
           name: string
+          nodes: number | null
           path: string
+          size_bytes: number | null
           source: string
+          source_format: string | null
+          status: string | null
           uploaded_at: string
+          words: number | null
         }
         Insert: {
+          converted_at?: string | null
+          corpus_type?: string | null
           created_at?: string
+          docs_count?: number | null
           filename?: string | null
           id?: string
+          language?: string | null
+          licence?: string | null
           name: string
+          nodes?: number | null
           path: string
+          size_bytes?: number | null
           source: string
+          source_format?: string | null
+          status?: string | null
           uploaded_at?: string
+          words?: number | null
         }
         Update: {
+          converted_at?: string | null
+          corpus_type?: string | null
           created_at?: string
+          docs_count?: number | null
           filename?: string | null
           id?: string
+          language?: string | null
+          licence?: string | null
           name?: string
+          nodes?: number | null
           path?: string
+          size_bytes?: number | null
           source?: string
+          source_format?: string | null
+          status?: string | null
           uploaded_at?: string
+          words?: number | null
         }
         Relationships: []
       }

@@ -38,6 +38,9 @@ export interface CorpusCommitInput {
   committedAt: string | null
 }
 
+/** Manifest "type" in the corpora-py contract (ICorpusManifest.type). */
+export type CorpusType = "text" | "web" | "parallel" | "speech" | "docs"
+
 export interface CorpusDocument {
   id: string
   name: string
@@ -47,6 +50,18 @@ export interface CorpusDocument {
   filename: string | null
   uploadedAt: string
   commits: CorpusCommit[]
+  /** Conversion metadata (corpora-py contract) — null on legacy rows. */
+  corpusType: CorpusType | null
+  /** `source_format` as sent to POST /convert ("text-fabric", "tei", …). */
+  sourceFormat: string | null
+  licence: string | null
+  language: string | null
+  sizeBytes: number | null
+  docsCount: number | null
+  nodes: number | null
+  words: number | null
+  status: "converted" | "uploaded" | null
+  convertedAt: string | null
 }
 
 interface CommitRow {
@@ -66,10 +81,22 @@ interface DocumentRow {
   path: string
   filename: string | null
   uploaded_at: string
+  corpus_type: CorpusType | null
+  source_format: string | null
+  licence: string | null
+  language: string | null
+  size_bytes: number | null
+  docs_count: number | null
+  nodes: number | null
+  words: number | null
+  status: "converted" | "uploaded" | null
+  converted_at: string | null
   corpus_commits: CommitRow[]
 }
 
 const DOCUMENT_COLUMNS = `id, name, source, path, filename, uploaded_at,
+  corpus_type, source_format, licence, language, size_bytes, docs_count,
+  nodes, words, status, converted_at,
   corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at )`
 
 function toCommit(row: CommitRow): CorpusCommit {
@@ -92,6 +119,16 @@ function toDocument(row: DocumentRow): CorpusDocument {
     path: row.path,
     filename: row.filename,
     uploadedAt: row.uploaded_at,
+    corpusType: row.corpus_type ?? null,
+    sourceFormat: row.source_format ?? null,
+    licence: row.licence ?? null,
+    language: row.language ?? null,
+    sizeBytes: row.size_bytes ?? null,
+    docsCount: row.docs_count ?? null,
+    nodes: row.nodes ?? null,
+    words: row.words ?? null,
+    status: row.status ?? null,
+    convertedAt: row.converted_at ?? null,
     commits: (row.corpus_commits ?? [])
       .map(toCommit)
       .sort((a, b) => (b.committedAt ?? "").localeCompare(a.committedAt ?? "")),
@@ -125,6 +162,45 @@ export async function listCorpusDocuments(): Promise<CorpusDocument[]> {
   return ((data ?? []) as unknown as DocumentRow[]).map(toDocument)
 }
 
+/** One corpus document with its history, or null when it no longer exists. */
+export async function getCorpusDocument(
+  id: string,
+): Promise<CorpusDocument | null> {
+  if (!id.trim()) return null
+  const { data, error } = await getSupabase()
+    .from("corpus_documents")
+    .select(DOCUMENT_COLUMNS)
+    .eq("id", id)
+    .maybeSingle()
+  if (error) {
+    throw new DataError(
+      "unknown",
+      `Could not load the corpus: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  if (!data) return null
+  return toDocument(data as unknown as DocumentRow)
+}
+
+/**
+ * Upload a conversion source file (text-fabric XML, TEI, …) to the bucket;
+ * returns its storage path. Distinct from uploadCorpusFile on purpose — that
+ * one guards the direct-.corpus upload path.
+ */
+export async function uploadConversionSource(file: File): Promise<string> {
+  const path = `conversions/${crypto.randomUUID()}/${file.name}`
+  const { error } = await getSupabase()
+    .storage.from(CORPUS_BUCKET)
+    .upload(path, file, { upsert: true })
+  if (error) {
+    throw new DataError(
+      "unavailable",
+      `Could not upload the file: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  return path
+}
+
 /** Upload the .corpus file to the private bucket; returns its storage path. */
 export async function uploadCorpusFile(file: File): Promise<string> {
   if (!file.name.endsWith(".corpus")) {
@@ -143,6 +219,20 @@ export async function uploadCorpusFile(file: File): Promise<string> {
   return path
 }
 
+/** Metadata a conversion attaches to its document (corpora-py contract). */
+export interface CorpusMetadataInput {
+  corpusType?: CorpusType | null
+  sourceFormat?: string | null
+  licence?: string | null
+  language?: string | null
+  sizeBytes?: number | null
+  docsCount?: number | null
+  nodes?: number | null
+  words?: number | null
+  status?: "converted" | "uploaded" | null
+  convertedAt?: string | null
+}
+
 /** Record a corpus document with the history extracted from its archive. */
 export async function createCorpusDocument(input: {
   name: string
@@ -150,7 +240,7 @@ export async function createCorpusDocument(input: {
   path: string
   filename: string | null
   commits: CorpusCommitInput[]
-}): Promise<CorpusDocument> {
+} & CorpusMetadataInput): Promise<CorpusDocument> {
   const name = input.name.trim()
   if (!name) {
     throw new DataError("validation", "A corpus name is required.")
@@ -166,8 +256,20 @@ export async function createCorpusDocument(input: {
       source: input.source,
       path: input.path,
       filename: input.filename,
+      corpus_type: input.corpusType ?? null,
+      source_format: input.sourceFormat ?? null,
+      licence: input.licence ?? null,
+      language: input.language ?? null,
+      size_bytes: input.sizeBytes ?? null,
+      docs_count: input.docsCount ?? null,
+      nodes: input.nodes ?? null,
+      words: input.words ?? null,
+      status: input.status ?? null,
+      converted_at: input.convertedAt ?? null,
     })
-    .select("id, name, source, path, filename, uploaded_at")
+    .select(`id, name, source, path, filename, uploaded_at,
+      corpus_type, source_format, licence, language, size_bytes, docs_count,
+      nodes, words, status, converted_at`)
     .single()
   if (error || !data) {
     throw new DataError(
