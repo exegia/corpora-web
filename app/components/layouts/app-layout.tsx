@@ -37,7 +37,7 @@ export function AppLayout({ user }: { user?: SessionUser }) {
     }
 
     return (
-        <Layout.Main variant="desktop" header={renderHeader()} panels={panels}>
+        <Layout.Main variant="web" header={renderHeader()} panels={panels}>
             <ScrollArea className="route-scroll min-h-0 flex-1" fill>
                 <main className="p-6">
                     <Outlet />
