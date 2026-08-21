@@ -26,7 +26,13 @@ export default function Header({ document, actions }: HeaderProps) {
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
           {format && <Badge size="sm" variant="secondary">{format}</Badge>}
           {document.status && (
-            <span className="flex items-center gap-1.5 text-warning-foreground capitalize">
+            <span
+              className={`flex items-center gap-1.5 capitalize ${
+                document.status === "converted"
+                  ? "text-success-foreground"
+                  : "text-warning-foreground"
+              }`}
+            >
               <span
                 aria-hidden="true"
                 className="size-1.5 rounded-full bg-current"

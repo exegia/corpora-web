@@ -1,11 +1,11 @@
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress"
-import { CONVERSION_STEPS, currentStep, deriveProgress, deriveSteps } from "@/lib/corpus-convert"
+import { CONVERSION_STEPS, currentStep, deriveProgress } from "@/lib/corpus-convert"
 import FileSummary from "./file-summary"
 import LogSteps from "./log-steps"
 import type { PanelProps } from "./types"
-import { estimateRemaining, formatElapsed, isDone } from "./utils"
+import { isDone } from "./utils"
 
 /**
  * The conversion panel: content for the app shell's right panel
@@ -16,7 +16,6 @@ export default function Panel({ entry, documentId, onClose, onRetry, onDismiss }
     const done = isDone(entry)
     const failed = entry.status === "error"
     const { index } = currentStep(entry)
-    const completed = deriveSteps(entry).filter(step => step.state === "completed").length
     const progress = deriveProgress(entry)
 
     return (

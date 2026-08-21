@@ -33,9 +33,16 @@ export default function Actions({ conversion }: ActionsProps) {
 
     return (
         <>
-            <Button variant="ghost" onClick={handleOnOpenClick}>
-                <SidebarOpen /> Open
-            </Button>
+            {/* Dev-only: toggles the shell's right panel without running a conversion. */}
+            {import.meta.env.DEV && (
+                <Button
+                    className="text-blue-600 hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    onClick={handleOnOpenClick}
+                    type="button"
+                    variant="ghost">
+                    <SidebarOpen /> Open
+                </Button>
+            )}
             <input
                 {...convertPicker.getInputProps({
                     "aria-label": "Convert source file",

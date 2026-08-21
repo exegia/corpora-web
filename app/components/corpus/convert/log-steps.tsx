@@ -2,7 +2,7 @@ import { ArrowDown, Copy } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardFrame, CardFrameAction, CardFrameHeader, CardPanel, CardFrameTitle } from "@/components/ui/card"
-import { currentStep, deriveProgress, deriveSteps } from "@/lib/corpus-convert"
+import { deriveSteps } from "@/lib/corpus-convert"
 import StepRow from "./step-row"
 import type { LogStepsProps } from "./types"
 import { CardFrameFooter } from "@exegia/corpora-ui"
@@ -20,9 +20,7 @@ export default function LogSteps({ entry }: LogStepsProps) {
     const [pinned, setPinned] = useState(true)
     const done = isDone(entry)
     const failed = entry.status === "error"
-    const { index } = currentStep(entry)
     const completed = deriveSteps(entry).filter(step => step.state === "completed").length
-    const progress = deriveProgress(entry)
 
     // biome-ignore lint: scrolling on log growth is the effect's whole point
     useEffect(() => {
@@ -80,18 +78,15 @@ export default function LogSteps({ entry }: LogStepsProps) {
                     </div>
                 </CardPanel>
             </Card>
-            {done ||
-                (failed && (
-                    <CardFrameFooter>
-                        <p className="ml-sm text-xs text-muted-foreground">
-                            {done
-                                ? `Completed in ${formatElapsed(entry)}`
-                                : failed
-                                  ? "Conversion failed. See the failed step above."
-                                  : estimateRemaining(completed)}
-                        </p>
-                    </CardFrameFooter>
-                ))}
+            <CardFrameFooter>
+                <p className="text-xs text-muted-foreground">
+                    {done
+                        ? `Completed in ${formatElapsed(entry)}`
+                        : failed
+                          ? "Conversion failed. See the failed step above."
+                          : estimateRemaining(completed)}
+                </p>
+            </CardFrameFooter>
         </CardFrame>
     )
 }
