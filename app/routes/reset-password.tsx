@@ -14,7 +14,7 @@ import {
 import { useId, useState } from "react"
 import { useNavigate } from "react-router"
 import { Auth } from "@/components/auth"
-import { getCurrentUser, updatePassword } from "@/lib/auth"
+import { DEFAULT_AUTHENTICATED_PATH, getCurrentUser, updatePassword } from "@/lib/auth"
 import type { Route } from "./+types/reset-password"
 
 /**
@@ -97,7 +97,7 @@ export default function ResetPassword({ loaderData }: Route.ComponentProps) {
           >
             <Button
               className={authAccentActionStyles}
-              onClick={() => navigate("/", { replace: true })}
+              onClick={() => navigate(DEFAULT_AUTHENTICATED_PATH, { replace: true })}
             >
               Continue to Corpora
             </Button>
