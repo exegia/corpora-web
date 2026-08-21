@@ -17,9 +17,10 @@ export function useCrumbs(): Crumb[] {
     const { pathname } = useLocation()
     const matches = useMatches()
 
-    const crumbs: Crumb[] = [{ label: "Dashboard", href: "/" }]
+    const crumbs: Crumb[] = [{ label: "Dashboard", href: "/dashboard" }]
     const segments = pathname.split("/").filter(Boolean)
-    if (segments.length === 0) return crumbs
+    // `/` only redirects to /dashboard; neither adds a crumb past the root.
+    if (segments.length === 0 || segments[0] === "dashboard") return crumbs
 
     const section = segments[0]
     crumbs.push({
