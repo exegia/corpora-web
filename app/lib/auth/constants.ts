@@ -9,4 +9,4 @@ export const AUTH_PATHS = [
 ] as const
 
 export const LOGIN_PATH = "/login"
-export const DEFAULT_AUTHENTICATED_PATH = "/"
+export const DEFAULT_AUTHENTICATED_PATH = "/dashboard"
