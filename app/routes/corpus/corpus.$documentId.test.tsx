@@ -72,7 +72,6 @@ describe("/corpus/:documentId detail", () => {
     expect(
       await screen.findByRole("heading", { name: "Summa Theologia (1200, ENG)" }),
     ).toBeInTheDocument()
-    expect(screen.getByText("XML")).toBeInTheDocument()
     expect(screen.getByText("converted")).toBeInTheDocument()
     expect(
       screen.getByText("The Summa, converted from TEI."),
@@ -81,7 +80,8 @@ describe("/corpus/:documentId detail", () => {
     expect(screen.getByText("30,102")).toBeInTheDocument()
     expect(screen.getByText("613")).toBeInTheDocument()
     expect(screen.getByText("English")).toBeInTheDocument()
-    expect(screen.getByText("text-fabric")).toBeInTheDocument()
+    // Source format shows twice: the header's format badge and the card row.
+    expect(screen.getAllByText("text-fabric")).toHaveLength(2)
     expect(
       screen.getByRole("link", { name: "CC BY-SA 4.0" }),
     ).toHaveAttribute("href", "/licenses")

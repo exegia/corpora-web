@@ -1,4 +1,4 @@
-import { Download, FileArchive } from "lucide-react"
+import { Download, FileArchive, ListTree } from "lucide-react"
 import { redirect, useLoaderData } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Blocks } from "@/components/blocks"
@@ -93,7 +93,6 @@ export default function CorpusDetailPage() {
               fields={{ documentId: document.id }}
               intent="delete-document"
               title={`Delete “${document.name}”?`}
-              trigger={<Button size="sm" type="button" variant="outline" />}
             />
             <Button
               onClick={() => exportDocument(document)}
@@ -126,9 +125,17 @@ export default function CorpusDetailPage() {
             {document.toc && document.toc.length > 0 ? (
               <CorpusDetail.OverviewTable sections={document.toc} />
             ) : (
-              <p className="py-8 text-center text-muted-foreground text-sm">
-                No section data was captured for this corpus.
-              </p>
+              <Empty className="py-10">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <ListTree />
+                  </EmptyMedia>
+                  <EmptyTitle>No sections yet</EmptyTitle>
+                  <EmptyDescription>
+                    No section data was captured for this corpus.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             )}
           </TabsPanel>
         </Tabs>

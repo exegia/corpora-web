@@ -182,8 +182,10 @@ describe("/corpus library", () => {
     expect(await screen.findByText("peshitta")).toBeInTheDocument()
     expect(screen.getByText("septuagint")).toBeInTheDocument()
     // Converted metadata renders; legacy rows degrade to fallbacks.
-    expect(screen.getByText("text-fabric · CC BY-SA 4.0")).toBeInTheDocument()
-    expect(screen.getByText(".corpus · No licence")).toBeInTheDocument()
+    expect(screen.getByText("text-fabric")).toBeInTheDocument()
+    expect(screen.getByText("CC BY-SA 4.0")).toBeInTheDocument()
+    expect(screen.getByText(".corpus")).toBeInTheDocument()
+    expect(screen.getByText("No licence")).toBeInTheDocument()
     expect(screen.getByText("Text")).toBeInTheDocument()
     expect(screen.getByText("Greek")).toBeInTheDocument()
     expect(screen.getByText("40.1 MB")).toBeInTheDocument()
