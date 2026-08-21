@@ -1,4 +1,5 @@
 import type { ConversionEntry } from "@/lib/corpus-convert"
+import type { ConversionController } from "./use-conversion"
 
 export interface StatusPillProps {
   entry: ConversionEntry
@@ -7,13 +8,17 @@ export interface StatusPillProps {
   onOpen: () => void
 }
 
-export interface DrawerProps {
+export interface PanelProps {
   entry: ConversionEntry
-  open: boolean
-  onOpenChange: (open: boolean) => void
   documentId: string | null
+  /** Collapse the shell panel without abandoning the run. */
+  onClose: () => void
   onRetry: () => void
   onDismiss: () => void
+}
+
+export interface ActionsProps {
+  conversion: ConversionController
 }
 
 export interface LogStepsProps {

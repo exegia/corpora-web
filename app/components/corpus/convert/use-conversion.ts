@@ -16,9 +16,9 @@ export interface ConversionController {
   entry: ConversionEntry | null
   /** Set once the terminal row is persisted — the "View corpus" target. */
   documentId: string | null
-  drawerOpen: boolean
-  openDrawer: () => void
-  closeDrawer: () => void
+  panelOpen: boolean
+  openPanel: () => void
+  closePanel: () => void
   running: boolean
   start: (file: File) => void
   retry: () => void
@@ -26,13 +26,14 @@ export interface ConversionController {
 }
 
 /**
- * Route-local conversion state: one tracked entry driven against the real
- * corpora-py service (lib/corpus-convert), persisted through the route's
- * `convert-document` action once the archive is downloaded, stored, and its
- * manifest/toc/history read. No polling in loaders, no route re-suspension
- * (docs/data-loading.md). Navigating away abandons tracking — the backend
- * cannot list or resume jobs yet (corpora-py#102), so resume is deliberately
- * out of scope.
+ * Layout-level conversion state: one tracked entry driven against the real
+ * corpora-py service (lib/corpus-convert), persisted through the /corpus
+ * route's `convert-document` action once the archive is downloaded, stored,
+ * and its manifest/toc/history read. No polling in loaders, no route
+ * re-suspension (docs/data-loading.md). The hook mounts in AppLayout so the
+ * run survives in-app navigation; a full reload still abandons tracking —
+ * the backend cannot list or resume jobs yet (corpora-py#102), so resume is
+ * deliberately out of scope.
  */
 export function useConversion(): ConversionController {
   const persistFetcher = useFetcher<{
@@ -42,7 +43,7 @@ export function useConversion(): ConversionController {
     error?: string
   }>()
   const [entry, setEntry] = useState<ConversionEntry | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
   const fileRef = useRef<File | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -59,7 +60,7 @@ export function useConversion(): ConversionController {
 
     const initial = createConversionEntry(file)
     setEntry(initial)
-    setDrawerOpen(true)
+    setPanelOpen(true)
 
     const final = await runConversion(
       file,
@@ -117,7 +118,7 @@ export function useConversion(): ConversionController {
           convertedAt: new Date().toISOString(),
           commits: JSON.stringify(commits ?? []),
         },
-        { method: "post" },
+        { method: "post", action: "/corpus" },
       )
     } catch (error) {
       if (controller.signal.aborted) return
@@ -133,9 +134,9 @@ export function useConversion(): ConversionController {
   return {
     entry,
     documentId,
-    drawerOpen,
-    openDrawer: () => setDrawerOpen(true),
-    closeDrawer: () => setDrawerOpen(false),
+    panelOpen,
+    openPanel: () => setPanelOpen(true),
+    closePanel: () => setPanelOpen(false),
     running: entry !== null && entry.finishedAt === null,
     start: (file) => {
       // Classify and size-check before anything is uploaded; a rejected file
@@ -150,7 +151,7 @@ export function useConversion(): ConversionController {
           finishedAt: Date.now(),
           logs: [{ step: "receive", text: `✗ ${message}`, tone: "error" }],
         })
-        setDrawerOpen(true)
+        setPanelOpen(true)
       }
       if (!detectSourceFormat(file.name)) {
         reject(
@@ -172,7 +173,7 @@ export function useConversion(): ConversionController {
     dismiss: () => {
       abortRef.current?.abort()
       setEntry(null)
-      setDrawerOpen(false)
+      setPanelOpen(false)
     },
   }
 }
