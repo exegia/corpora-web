@@ -1,6 +1,9 @@
-import { type RouteConfig, layout, route } from "@react-router/dev/routes"
+import { type RouteConfig, index, layout, route } from "@react-router/dev/routes"
 
 export default [
+    // `/` only dispatches: signed in → /dashboard, otherwise → /login.
+    index("routes/index.tsx"),
+
     // Auth screens: their own chrome, no sidebar. `/login`, `/signup` and
     // `/forgot-password` are guest-only (each guards itself with `requireAnon`);
     // `/reset-password` and `/verify` are mid-flow and stay open.
