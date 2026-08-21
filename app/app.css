@@ -67,11 +67,21 @@
   --sidebar-primary: light-dark(var(--color-neutral-800), var(--color-neutral-100));
   --sidebar-primary-foreground: light-dark(var(--color-neutral-50), var(--color-neutral-800));
   --sidebar-ring: var(--color-neutral-400);
+  --invert: var(--color-zinc-900);
+  --invert-foreground: var(--color-zinc-50);
 }
 
 .dark {
   color-scheme: dark;
   --destructive-foreground: var(--color-red-400);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-600);
+  --info: var(--color-violet-500);
+  --info-foreground: var(--color-violet-600);
+  --warning: var(--color-yellow-500);
+  --warning-foreground: var(--color-yellow-600);
+  --invert: var(--color-zinc-700);
+  --invert-foreground: var(--color-zinc-50);
 }
 
 @theme inline {
@@ -136,6 +146,8 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-invert-foreground: var(--invert-foreground);
+  --color-invert: var(--invert);
 }
 
 @layer base {
