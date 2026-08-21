@@ -1,4 +1,5 @@
 import { ChevronRight, Trash2 } from "lucide-react"
+import { createElement } from "react"
 import { Link, useViewTransitionState } from "react-router"
 import { Blocks } from "@/components/blocks"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { TableCell, TableRow } from "@/components/ui/table"
 import { formatDate } from "@/lib/format"
 import type { RowProps } from "./types"
-import { formatSize, subtitleOf, TYPE_BADGE_VARIANTS, TYPE_LABELS } from "./utils"
+import { fileIconFor, formatOf, formatSize, TYPE_BADGE_VARIANTS, TYPE_LABELS } from "./utils"
 
 /**
  * One corpus in the table — a stretched-link row (docs/ui-patterns.md): the
@@ -19,16 +20,27 @@ export default function Row({ document }: RowProps) {
   // Only the row being opened claims the shared name — a view-transition-name
   // present on two elements at once aborts the whole transition.
   const morphing = useViewTransitionState(href)
+  const fileIcon = fileIconFor(document)
 
   return (
     <TableRow className="group/row">
       <TableCell className="w-full max-w-0">
         <div className="flex items-center gap-3">
-          <Avatar className="size-8 shrink-0">
-            <AvatarFallback>
-              {document.name.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          {fileIcon ? (
+            // createElement: the icon is a looked-up component, not one
+            // defined during render (oxlint react/static-components).
+            createElement(fileIcon, {
+              className: "size-8 shrink-0",
+              size: 32,
+              title: `${formatOf(document)} file`,
+            })
+          ) : (
+            <Avatar className="size-8 shrink-0">
+              <AvatarFallback>
+                {document.name.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          )}
           <div className="min-w-0 flex-1">
             <h3
               className="truncate font-medium"
@@ -44,9 +56,24 @@ export default function Row({ document }: RowProps) {
                 {document.name}
               </Link>
             </h3>
-            <p className="truncate text-muted-foreground text-xs">
-              {subtitleOf(document)}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <Badge size="sm" variant="outline">
+                {formatOf(document)}
+              </Badge>
+              {document.licence ? (
+                <Badge size="sm" variant="secondary">
+                  {document.licence}
+                </Badge>
+              ) : (
+                <Badge
+                  className="text-muted-foreground"
+                  size="sm"
+                  variant="outline"
+                >
+                  No licence
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
       </TableCell>
