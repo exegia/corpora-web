@@ -6,7 +6,7 @@ import { SUPPORTED_EXTENSIONS } from "@/lib/corpora-api"
 import type { ActionsProps } from "./types"
 import { useCorpusUpload } from "./use-corpus-upload"
 import { useCallback } from "react"
-import { useShellPanels } from "@exegia/corpora-ui"
+import { useAppShellPanels } from "@/components/layouts/shell-panels"
 
 /**
  * The header's Convert / Upload pair: pick a source file to convert through
@@ -28,8 +28,19 @@ export default function Actions({ conversion }: ActionsProps) {
         },
     })
 
-    const { toggle } = useShellPanels()
-    const handleOnOpenClick = useCallback(() => toggle("right"), [toggle])
+    // The layout's shell instance — a local `useShellPanels()` here would be
+    // a second, disconnected one whose `openPanel` never reaches the shell.
+    const { openPanel } = useAppShellPanels()
+    const handleOnOpenClick = useCallback(
+        () =>
+            openPanel(
+                "right",
+                <div className="p-4 text-sm text-muted-foreground">
+                    Opened through <code>openPanel</code> — any component passed here replaces the panel's content.
+                </div>,
+            ),
+        [openPanel],
+    )
 
     return (
         <>

@@ -85,13 +85,6 @@ export default function Corpus() {
                 <div className="flex w-full flex-row items-center justify-between">
                     <h1 className="font-heading text-2xl font-bold">Corpus</h1>
                     <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-                        {conversion.entry && (
-                            <Convert.StatusPill
-                                documentId={conversion.documentId}
-                                entry={conversion.entry}
-                                onOpen={conversion.openPanel}
-                            />
-                        )}
                         <Convert.Actions conversion={conversion} />
                     </div>
                 </div>
@@ -100,6 +93,14 @@ export default function Corpus() {
                     import their corpus from this library.
                 </p>
             </header>
+
+            {conversion.entry && (
+                <Convert.StatusPill
+                    documentId={conversion.documentId}
+                    entry={conversion.entry}
+                    onOpen={conversion.openPanel}
+                />
+            )}
 
             <Suspense fallback={<List.Skeleton />}>
                 <Await resolve={documents}>{resolved => <List.Documents documents={resolved} />}</Await>

@@ -2,6 +2,7 @@ import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration }
 import { AnchoredToastProvider, ToastProvider } from "@/components/ui/toast"
 import type { Route } from "./+types/root"
 import { THEME_INIT_SCRIPT } from "@/lib/theme"
+import { ExegiaProvider } from "@exegia/corpora-ui"
 import "./app.css"
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -18,14 +19,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Links />
             </head>
             <body className="relative h-screen w-full overflow-hidden">
-                <ToastProvider position="top-right">
-                    <AnchoredToastProvider>
-                        <div className="absolute top-0 left-0 h-full w-full scrollbar-none overflow-hidden">
-                            {children}
-                            <ScrollRestoration />
-                        </div>
-                    </AnchoredToastProvider>
-                </ToastProvider>
+                <ExegiaProvider>
+                    <ToastProvider position="top-right">
+                        <AnchoredToastProvider>
+                            <div className="absolute top-0 left-0 h-full w-full scrollbar-none overflow-hidden">
+                                {children}
+                                <ScrollRestoration />
+                            </div>
+                        </AnchoredToastProvider>
+                    </ToastProvider>
+                </ExegiaProvider>
                 <Scripts />
             </body>
         </html>
