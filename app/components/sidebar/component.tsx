@@ -48,7 +48,10 @@ export function Sidebar({ header, footer, children }: ISidebarProps) {
     ]
 
     return (
-        <div className="flex h-full w-full flex-1 flex-col justify-between gap-4 px-6 pb-4">
+        <div
+            className={`flex h-full w-full flex-1 flex-col justify-between gap-4 pb-4 transition-[padding] duration-200 ${
+                collapsed ? "px-2" : "px-6"
+            }`}>
             <div className="flex flex-1 flex-col gap-4">
                 {header ? header : null}
                 <Tree collapsed={collapsed} items={treeData} variant="sidebar" onNavigate={handleNavigate} />
