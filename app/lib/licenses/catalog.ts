@@ -41,6 +41,26 @@ export async function listLicences(): Promise<CatalogLicence[]> {
   return ((data ?? []) as CatalogRow[]).map(toCatalogLicence)
 }
 
+/**
+ * Best-effort catalog lookup for a display label. Corpus documents store the
+ * manifest's licence string ("CC BY 4.0"), while catalog ids are hyphenated
+ * ("CC-BY-4.0") — so match id and title with separators normalised away.
+ */
+export async function findLicenceByLabel(
+  label: string,
+): Promise<LicenceDetail | null> {
+  const normalise = (value: string) =>
+    value.trim().toLowerCase().replace(/[\s_-]+/g, "-")
+  const wanted = normalise(label)
+  if (!wanted) return null
+  const catalog = await listLicences()
+  const hit = catalog.find(
+    (licence) =>
+      normalise(licence.id) === wanted || normalise(licence.title) === wanted,
+  )
+  return hit ? getLicence(hit.id) : null
+}
+
 /** One licence with its conformance + provenance fields, or null when gone. */
 export async function getLicence(id: string): Promise<LicenceDetail | null> {
   const { data, error } = await getSupabase()

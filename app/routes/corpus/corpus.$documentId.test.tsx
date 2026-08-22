@@ -82,9 +82,10 @@ describe("/corpus/:documentId detail", () => {
     expect(screen.getByText("English")).toBeInTheDocument()
     // Source format shows twice: the header's format badge and the card row.
     expect(screen.getAllByText("text-fabric")).toHaveLength(2)
+    // The licence opens the detail sheet rather than linking to the catalog.
     expect(
-      screen.getByRole("link", { name: "CC BY-SA 4.0" }),
-    ).toHaveAttribute("href", "/licenses")
+      screen.getByRole("button", { name: "CC BY-SA 4.0" }),
+    ).toHaveAttribute("data-slot", "sheet-trigger")
   })
 
   it("shows the Overview sections and disables the undesigned tabs", async () => {
