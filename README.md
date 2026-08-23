@@ -45,25 +45,26 @@ Route types are generated into `.react-router/` by `react-router typegen` (runs 
 
 ## Branching, CI, and releases
 
-Same model as [corpora-ui](https://github.com/exegia/corpora-ui), with the npm
-publish replaced by a Vercel deploy — this app is private and ships as a
-deployment, not a package. Full details: [`.github/WORKFLOW.md`](.github/WORKFLOW.md).
+Same deployment-not-package split as [corpora-ui](https://github.com/exegia/corpora-ui):
+this app is private and `main` deploys to Vercel production. Full details:
+[`.github/WORKFLOW.md`](.github/WORKFLOW.md).
 
 ```
-feat/add-tooltip ──PR──> release/v0.4.0 ──PR──> main ──> Vercel prod + tag v0.4.0
-      (deleted on merge)   (deleted on release)          (opens release/v0.5.0)
+feat/add-tooltip ──PR──> dev ──(daily/manual)──> next ──cut──> release/vX.Y.Z ──PR──> main
+                    (deleted on merge)         (preview)                    (prod + tag)
 ```
 
 | Flow | What happens |
 | --- | --- |
-| `<type>/<slug>` → PR to the open `release/vX.Y.Z` | `guard` (branch name + conventional-commit PR title), `check` (typecheck, lint, test, build), and an AI review once the PR is ready for review |
-| PR merged into `release/*` | The branch deletes itself, the draft release PR into `main` is refreshed with a changelog, and the release preview redeploys |
+| `<type>/<slug>` → PR to `dev` | `guard` (branch name + conventional-commit PR title), `check` (typecheck, lint, test, build), and an AI review once the PR is ready for review |
+| **Promote to next** (22:00 UTC or manual) | Opens `dev` → `next` with a version from line-count churn (`< 100` patch, `100–999` minor, `≥ 1000` major) and auto-merges after CI |
+| Push to `next` | Rolling Vercel preview; cuts or refreshes `release/vX.Y.Z`; the draft PR into `main` is opened or updated |
 | `release/vX.Y.Z` → PR to `main` | `guard` also asserts `package.json` matches the branch version; `package` uploads the production build as an artifact |
-| Release PR merged | Deploys to Vercel production, tags `vX.Y.Z`, publishes a GitHub Release, then cuts the next release branch |
+| Release PR merged | Deploys to Vercel production, tags `vX.Y.Z`, publishes a GitHub Release, syncs `main` back into `next` and `dev`, deletes leftover branches |
 
-Exactly one release branch is open at a time, and it carries a rolling Vercel
-preview. `main` takes PRs only from `release/vX.Y.Z`; the ruleset requires the
-`guard`, `check` and `package` checks.
+Exactly one release branch is in flight at a time. `main` takes PRs only from
+`release/vX.Y.Z`; the ruleset requires the `guard`, `check` and `package`
+checks. `dev` and `next` require `guard` and `check`.
 
 Every CI step is a `make` target, so anything CI does can be reproduced
 locally — `make ci` is what runs on a PR. `make help` lists the rest.
@@ -78,9 +79,10 @@ make rulesets-apply                    # push .github/rulesets/*.json
 
 Then add the secrets listed in [`.github/WORKFLOW.md`](.github/WORKFLOW.md) —
 `VERCEL_TOKEN` on the `preview` and `production` environments, and the
-automation App credentials on the repository. There is no release branch on a
-fresh repo: run **Actions → Release → Run workflow** once (or
-`make release-branch`) to open the first one.
+automation App credentials on the repository. Enable **Allow auto-merge**.
+There are no `dev` / `next` lanes on a fresh repo: run **Actions → Release →
+Run workflow** once (or `make bootstrap-lanes`) to create them, then
+**Promote to next** when `dev` has work.
 
 ## Deployment (Vercel)
 

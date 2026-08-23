@@ -1,0 +1,82 @@
+# `next` moved: rolling Vercel preview, then cut/refresh `release/vX.Y.Z`.
+#
+# `pr.yml` already ran the full suite on the promote PR, so this only deploys
+# and versions. Pushing the release branch is what starts pr-merged.yml, which
+# opens or refreshes the draft PR into main.
+#
+# Replaces the old release-preview.yml (preview used to hang off release/v*).
+name: Next
+
+on:
+  push:
+    branches:
+      - next
+  workflow_dispatch:
+
+concurrency:
+  group: next
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  INSTALL_FLAGS: --frozen-lockfile
+
+jobs:
+  preview:
+    name: preview
+    runs-on: ubuntu-latest
+    environment: preview
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+
+      # A missing token means previews were never configured — that is a
+      # skipped step with a note, not a red branch.
+      - name: Note that preview deploys are unconfigured
+        if: ${{ env.VERCEL_TOKEN == '' }}
+        run: |
+          {
+            echo "### Preview skipped"
+            echo
+            echo "\`VERCEL_TOKEN\` is not set on the \`preview\` environment."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - if: ${{ env.VERCEL_TOKEN != '' }}
+        run: make install
+
+      - name: Deploy preview to Vercel
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        run: make deploy-preview
+
+  cut-release:
+    name: cut-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ secrets.AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: ./.github/actions/setup
+
+      - name: Cut or refresh the release branch
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          git config user.name  "corpora-automation[bot]"
+          git config user.email "corpora-automation[bot]@users.noreply.github.com"
+          make cut-release

@@ -1,7 +1,7 @@
 {
     "name": "corpora-web",
     "private": true,
-    "version": "0.9.0",
+    "version": "0.10.0",
     "type": "module",
     "scripts": {
         "dev": "dotenvx run -- react-router dev",

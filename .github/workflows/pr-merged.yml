@@ -1,22 +1,14 @@
-# A commit landed on a release branch — normally a feature PR merging in.
-# Keep the release's draft PR into main up to date.
+# The release branch was cut or refreshed from `next`. Keep its draft PR
+# into main up to date.
 #
-# Triggered by `push`, not `pull_request: [closed]`. This repo's PRs form a
-# GitHub stack (<type>/<slug> -> release/vX.Y.Z -> main), and for a stacked PR
-# GitHub matches `on.pull_request.branches` against the stack's *ultimate* base
-# (main) rather than the PR's own parent. The `release/v*` filter therefore
-# never matched, and this workflow silently never ran — a merged feature left
-# the release notes stale with nothing to show it had been skipped. A push
-# filter matches the ref that actually moved, which is not rewritten.
+# Triggered by `push`, not `pull_request: [closed]`. GitHub matches
+# `on.pull_request.branches` against a stack's *ultimate* base (main) rather
+# than the PR's own parent, so a filter on `release/v*` would never match a
+# stacked event. A push filter matches the ref that actually moved.
 #
-# The same rewriting is why pr.yml reads `event.pull_request.base.ref` instead
-# of `github.base_ref`; unlike an expression, a trigger filter cannot be worked
-# around, which is what forced the change of event here.
-#
-# Branch cleanup is deliberately gone: a push carries no head branch to delete.
-# The repository's "Automatically delete head branches" setting already removes
-# a merged PR's branch — that setting is what actually cleaned up the v0.3.0
-# feature branches while this workflow was not running.
+# Branch cleanup of feature heads is not this workflow's job: the repository's
+# "Automatically delete head branches" setting removes a merged PR's branch,
+# and `make cleanup-cycle` (after a production release) catches leftovers.
 #
 # Runs as the automation GitHub App rather than GITHUB_TOKEN: a PR opened with
 # GITHUB_TOKEN cannot trigger further workflows, so the release PR's own checks
@@ -28,7 +20,7 @@ on:
     branches:
       - "release/v*"
 
-# Two features merging at once must not both rewrite the release PR body.
+# Two cuts/refreshes at once must not both rewrite the release PR body.
 concurrency:
   group: release-pr-${{ github.ref_name }}
   cancel-in-progress: false
