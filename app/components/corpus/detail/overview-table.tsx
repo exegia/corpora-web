@@ -33,10 +33,10 @@ export default function OverviewTable({ sections }: OverviewTableProps) {
                 </span>
               </TableCell>
               <TableCell className="text-sm tabular-nums">
-                {section.nodes.toLocaleString("en-US")}
+                {section.nodes?.toLocaleString("en-US") ?? "—"}
               </TableCell>
               <TableCell className="text-sm tabular-nums">
-                {section.words.toLocaleString("en-US")}
+                {section.words?.toLocaleString("en-US") ?? "—"}
               </TableCell>
               <TableCell>
                 {/* Decorative for now — section reading is a later feature. */}

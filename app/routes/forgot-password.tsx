@@ -1,7 +1,7 @@
 import { ForgotPasswordBlock } from "@exegia/corpora-ui"
 import { useNavigate, useSearchParams } from "react-router"
 import { Auth } from "@/components/auth"
-import { requireAnon, safeRedirectTo, sendPasswordReset } from "@/lib/auth"
+import { DEFAULT_AUTHENTICATED_PATH, requireAnon, safeRedirectTo, sendPasswordReset } from "@/lib/auth"
 import type { Route } from "./+types/forgot-password"
 
 export async function clientLoader({ request }: Route.ClientLoaderArgs) {
@@ -13,7 +13,7 @@ export default function ForgotPassword() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const redirectTo = safeRedirectTo(params.get("redirectTo"))
-  const search = redirectTo === "/" ? "" : `?redirectTo=${encodeURIComponent(redirectTo)}`
+  const search = redirectTo === DEFAULT_AUTHENTICATED_PATH ? "" : `?redirectTo=${encodeURIComponent(redirectTo)}`
 
   return (
     <ForgotPasswordBlock

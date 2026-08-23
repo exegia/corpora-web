@@ -1,4 +1,3 @@
-import { Link } from "react-router"
 import {
   Card,
   CardFrame,
@@ -6,6 +5,7 @@ import {
   CardFrameTitle,
   CardPanel,
 } from "@/components/ui/card"
+import { License } from "@/components/licenses"
 import { formatDate } from "@/lib/format"
 import type { DetailsCardProps } from "./types"
 import { formatSize } from "../list/utils"
@@ -46,12 +46,7 @@ export default function DetailsCard({ document }: DetailsCardProps) {
             <Item label="Source format">{document.sourceFormat ?? "—"}</Item>
             <Item label="License">
               {document.licence ? (
-                <Link
-                  className="text-warning-foreground hover:underline"
-                  to="/licenses"
-                >
-                  {document.licence}
-                </Link>
+                <License.DetailSheet label={document.licence} />
               ) : (
                 "—"
               )}

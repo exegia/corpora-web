@@ -1,3 +1,13 @@
+import {
+  type FileIconProps,
+  FileWordmarkCorpus,
+  FileWordmarkPdf,
+  FileWordmarkTei,
+  FileWordmarkTf,
+  FileWordmarkTxt,
+  FileWordmarkXml,
+} from "@exegia/corpora-ui"
+import type { ComponentType } from "react"
 import type { BadgeProps } from "@/components/ui/badge"
 import type { CorpusDocument, CorpusType } from "@/lib/corpus"
 import type { CorpusFilters, DateFilter } from "./types"
@@ -37,11 +47,45 @@ export function formatSize(bytes: number | null): string {
 }
 
 /** The "format · licence" subtitle, degrading for legacy rows. */
-export function subtitleOf(document: CorpusDocument): string {
-  const format =
+/** The source format shown on the row's format badge ("tei", ".corpus"). */
+export function formatOf(document: CorpusDocument): string {
+  return (
     document.sourceFormat ??
     (document.source === "huggingface" ? "Hugging Face" : ".corpus")
-  return `${format} · ${document.licence ?? "No licence"}`
+  )
+}
+
+/**
+ * The corpora-ui wordmark file icon for a document's format. Formats without
+ * artwork (html, epub) return null so the row falls back to its initial.
+ */
+export function fileIconFor(
+  document: CorpusDocument,
+): ComponentType<FileIconProps> | null {
+  switch (document.sourceFormat) {
+    case "tei":
+    case "tei_zip":
+      return FileWordmarkTei
+    case "text-fabric":
+    case "tf_zip":
+      return FileWordmarkTf
+    case "plain":
+      return FileWordmarkTxt
+    case "pdf":
+      return FileWordmarkPdf
+    case "xml":
+      return FileWordmarkXml
+    case null:
+    case undefined:
+      // No source format means the document *is* a .corpus archive.
+      return FileWordmarkCorpus
+    default:
+      return null
+  }
+}
+
+export function subtitleOf(document: CorpusDocument): string {
+  return `${formatOf(document)} · ${document.licence ?? "No licence"}`
 }
 
 const DATE_WINDOWS: Record<Exclude<DateFilter, "any">, number> = {

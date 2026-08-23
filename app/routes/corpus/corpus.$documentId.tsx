@@ -1,4 +1,4 @@
-import { Download, FileArchive } from "lucide-react"
+import { Download, FileArchive, ListTree } from "lucide-react"
 import { redirect, useLoaderData } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Blocks } from "@/components/blocks"
@@ -14,7 +14,6 @@ import {
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument } from "@/lib/corpus"
-import { fabricateSections } from "@/lib/corpus-convert"
 import { DataError } from "@/lib/projects"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
@@ -94,7 +93,6 @@ export default function CorpusDetailPage() {
               fields={{ documentId: document.id }}
               intent="delete-document"
               title={`Delete “${document.name}”?`}
-              trigger={<Button size="sm" type="button" variant="outline" />}
             />
             <Button
               onClick={() => exportDocument(document)}
@@ -124,9 +122,21 @@ export default function CorpusDetailPage() {
             </TabsTab>
           </TabsList>
           <TabsPanel value="overview">
-            <CorpusDetail.OverviewTable
-              sections={fabricateSections(document.id)}
-            />
+            {document.toc && document.toc.length > 0 ? (
+              <CorpusDetail.OverviewTable sections={document.toc} />
+            ) : (
+              <Empty className="py-10">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <ListTree />
+                  </EmptyMedia>
+                  <EmptyTitle>No sections yet</EmptyTitle>
+                  <EmptyDescription>
+                    No section data was captured for this corpus.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
           </TabsPanel>
         </Tabs>
       </div>

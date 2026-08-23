@@ -125,9 +125,11 @@ export async function requireSession(request: Request): Promise<SessionUser> {
     throw redirect(`/auth/callback?error_description=${encodeURIComponent(authError)}`)
   }
 
+  // Neither the default landing nor the root (which only dispatches there)
+  // is worth carrying as a redirectTo.
   const from = pathWithSearch(request)
   const search =
-    from === DEFAULT_AUTHENTICATED_PATH
+    from === DEFAULT_AUTHENTICATED_PATH || from === "/"
       ? ""
       : `?redirectTo=${encodeURIComponent(from)}`
   throw redirect(`${LOGIN_PATH}${search}`)

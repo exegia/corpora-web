@@ -54,7 +54,7 @@ describe("routes", () => {
     })
     expect(
       within(breadcrumb).getByRole("link", { name: "Dashboard" }),
-    ).toHaveAttribute("href", "/")
+    ).toHaveAttribute("href", "/dashboard")
     expect(within(breadcrumb).getByText("Projects")).toBeInTheDocument()
     expect(
       within(breadcrumb).queryByRole("link", { name: "Projects" }),

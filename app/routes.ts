@@ -1,6 +1,9 @@
-import { type RouteConfig, layout, route } from "@react-router/dev/routes"
+import { type RouteConfig, index, layout, route } from "@react-router/dev/routes"
 
 export default [
+    // `/` only dispatches: signed in → /dashboard, otherwise → /login.
+    index("routes/index.tsx"),
+
     // Auth screens: their own chrome, no sidebar. `/login`, `/signup` and
     // `/forgot-password` are guest-only (each guards itself with `requireAnon`);
     // `/reset-password` and `/verify` are mid-flow and stay open.
@@ -27,8 +30,8 @@ export default [
         route("library", "routes/library.tsx"),
         route("project", "routes/project.tsx"),
         route("project/:projectId", "routes/project.$projectId.tsx"),
-        route("corpus", "routes/corpus.tsx"),
-        route("corpus/:documentId", "routes/corpus.$documentId.tsx"),
+        route("corpus", "routes/corpus/index.tsx"),
+        route("corpus/:documentId", "routes/corpus/corpus.$documentId.tsx"),
         route("licenses", "routes/licenses.tsx"),
         route("licenses/:licenceId", "routes/licenses.$licenceId.tsx"),
         route("profile", "routes/profile.tsx"),

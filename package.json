@@ -16,7 +16,7 @@
     "dependencies": {
         "@base-ui/react": "^1.7.0",
         "@dotenvx/dotenvx": "^2.21.0",
-        "@exegia/corpora-ui": "0.25.0",
+        "@exegia/corpora-ui": "0.28.0",
         "@exegia/plugin-supabase-auth": "0.12.0",
         "@exegia/use-auth": "0.12.0",
         "@supabase/supabase-js": "^2.112.3",
@@ -30,16 +30,18 @@
         "isomorphic-git": "^1.41.7",
         "lucide-react": "^1.33.0",
         "marked": "^18.0.10",
-        "motion": "^13.1.0",
+        "motion": "^13.1.1",
         "ogl": "^1.0.11",
         "prettier-plugin-tailwindcss": "^0.8.1",
+        "radix-ui": "^1.6.7",
         "react": "^19.2.8",
         "react-day-picker": "^10.0.1",
         "react-dom": "^19.2.8",
         "react-remark": "^2.1.0",
         "react-router": "^8.3.0",
         "tailwind-merge": "^3.6.0",
-        "tailwindcss": "^4"
+        "tailwindcss": "^4",
+        "yaml": "^2.9.0"
     },
     "devDependencies": {
         "@react-router/dev": "^8.3.0",

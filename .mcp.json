@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "corpora": {
+      "type": "http",
+      "url": "https://api.exegia.co/mcp/"
+    }
+  }
+}

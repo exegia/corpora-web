@@ -6,9 +6,9 @@
 // stores the resulting commits via lib/corpus.
 
 import { Buffer } from "buffer"
-import { unzipSync } from "fflate"
 import git from "isomorphic-git"
 import type { CorpusCommitInput } from "@/lib/corpus"
+import { unzipCorpusArchive } from "@/lib/corpus-archive"
 import { DataError } from "@/lib/projects"
 
 // isomorphic-git assumes the Node Buffer global; browsers don't have one and
@@ -137,15 +137,7 @@ function makeMemFs(files: Map<string, Uint8Array>) {
 export async function extractCorpusHistory(
   file: File,
 ): Promise<CorpusCommitInput[] | null> {
-  let entries: Record<string, Uint8Array>
-  try {
-    entries = unzipSync(new Uint8Array(await file.arrayBuffer()))
-  } catch {
-    throw new DataError(
-      "validation",
-      "This does not look like a valid .corpus archive.",
-    )
-  }
+  const entries = await unzipCorpusArchive(file)
 
   // The .git directory may sit at the archive root or under one folder —
   // pick the shallowest HEAD as the repository root.

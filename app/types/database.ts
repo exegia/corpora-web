@@ -277,6 +277,7 @@ export type Database = {
           converted_at: string | null
           corpus_type: string | null
           created_at: string
+          description: string | null
           docs_count: number | null
           filename: string | null
           id: string
@@ -289,6 +290,7 @@ export type Database = {
           source: string
           source_format: string | null
           status: string | null
+          toc: Json | null
           uploaded_at: string
           words: number | null
         }
@@ -296,6 +298,7 @@ export type Database = {
           converted_at?: string | null
           corpus_type?: string | null
           created_at?: string
+          description?: string | null
           docs_count?: number | null
           filename?: string | null
           id?: string
@@ -308,6 +311,7 @@ export type Database = {
           source: string
           source_format?: string | null
           status?: string | null
+          toc?: Json | null
           uploaded_at?: string
           words?: number | null
         }
@@ -315,6 +319,7 @@ export type Database = {
           converted_at?: string | null
           corpus_type?: string | null
           created_at?: string
+          description?: string | null
           docs_count?: number | null
           filename?: string | null
           id?: string
@@ -327,6 +332,7 @@ export type Database = {
           source?: string
           source_format?: string | null
           status?: string | null
+          toc?: Json | null
           uploaded_at?: string
           words?: number | null
         }

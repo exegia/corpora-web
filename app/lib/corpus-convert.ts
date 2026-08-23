@@ -1,11 +1,22 @@
-// Conversion pipeline for the Corpus route (feat/corpus-convert). The state
-// model mirrors the corpora-py example client (UploadEntry / deriveStages in
-// github.com/exegia/corpora-py example/app): statuses are STORED on a single
-// tracked entry, the visible step timeline is DERIVED, never stored. The
-// transport below is a client-side simulation with realistic timing;
-// `runConversion` is the seam — the real implementation replaces its body
-// with `POST /convert` + WebSocket/polling and feeds the same
-// `onChange(entry)` updates. Route modules import ONLY from this module.
+// Conversion pipeline for the Corpus route (004-connect-with-py). The state
+// model mirrors the corpora-py client contract: statuses are STORED on a
+// single tracked entry, the visible step timeline is DERIVED, never stored.
+// `runConversion` drives the REAL service through app/lib/corpora-api by
+// polling — on the deployed backend the in-flight poll request is what
+// advances the job, so there is deliberately no WebSocket path (see
+// specs/004-connect-with-py/research.md R1). Route modules import ONLY from
+// this module.
+
+import {
+  CorporaApiError,
+  createConversion,
+  detectSourceFormat,
+  downloadConversion,
+  getConversion,
+  SUPPORTED_EXTENSIONS,
+  validateConversion,
+} from "@/lib/corpora-api"
+import type { JobStatusMessage } from "@/lib/corpora-api"
 
 /** Mirrors corpora-py's UploadStatus verbatim. */
 export type ConversionStatus =
@@ -33,8 +44,8 @@ export interface ConversionLog {
 export interface ValidationOutcome {
   status: "running" | "valid" | "invalid" | "skipped"
   reasons?: string[]
-  /** CorpusStats subset the UI shows. */
-  stats?: { nodes: number; words: number; docsCount: number }
+  /** Raw CorpusStats (max_slot, node_types, node_features, edge_features). */
+  stats?: Record<string, number>
 }
 
 /** The tracked upload — the UploadEntry subset this app needs. */
@@ -50,7 +61,7 @@ export interface ConversionEntry {
   uploadedAt: number
   /** Ended (ready or error), for the "Completed in …" footer. */
   finishedAt: number | null
-  /** `source_format` as sent to POST /convert. */
+  /** `source_format` as sent to POST /convert ("tei", "epub", …). */
   sourceFormat: string | null
   logs: ConversionLog[]
   /** Server-assigned job id, set once POST /convert responds. */
@@ -58,6 +69,10 @@ export interface ConversionEntry {
   validation: ValidationOutcome | null
   corpusName: string | null
   corpusSize: number | null
+  /** The downloaded archive, present once status is "ready". */
+  corpusBlob: Blob | null
+  /** The step a failed run stopped in (set when status turns "error"). */
+  failedStep: ConversionStepId | null
 }
 
 export interface ConversionStep {
@@ -72,103 +87,10 @@ export const CONVERSION_STEPS: ReadonlyArray<{
   title: string
 }> = [
   { id: "receive", title: "File received" },
-  { id: "validate", title: "Validating text-fabric" },
+  { id: "validate", title: "Validating source" },
   { id: "convert", title: "Converting to .corpus" },
-  { id: "index", title: "Indexing & finalizing" },
+  { id: "index", title: "Validating & finalizing" },
 ]
-
-const SOURCE_FORMATS: Record<string, string> = {
-  xml: "text-fabric",
-  tei: "tei",
-}
-
-/** Resolve the `source_format` from the filename, or null if unsupported. */
-export function detectSourceFormat(filename: string): string | null {
-  const ext = filename.split(".").pop()?.toLowerCase() ?? ""
-  return SOURCE_FORMATS[ext] ?? null
-}
-
-/** Deterministic demo failures: any filename containing "fail". */
-export function shouldFail(filename: string): boolean {
-  return /fail/i.test(filename)
-}
-
-// FNV-1a — a stable seed so the same file always fabricates the same stats.
-function hash(value: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < value.length; i++) {
-    h ^= value.charCodeAt(i)
-    h = Math.imul(h, 0x01000193)
-  }
-  return h >>> 0
-}
-
-const LANGUAGES = ["English", "Greek", "Hebrew", "Latin", "Multi"]
-const LICENCES = [
-  "CC BY-SA 4.0",
-  "CC BY 4.0",
-  "Public domain",
-  "Custom licence",
-]
-
-export interface FabricatedStats {
-  nodes: number
-  words: number
-  docsCount: number
-  language: string
-  licence: string
-}
-
-/** Stable fabricated corpus stats for the simulated pipeline. */
-export function fabricateStats(filename: string): FabricatedStats {
-  const seed = hash(filename)
-  const nodes = 8_000 + (seed % 52_000)
-  return {
-    nodes,
-    words: nodes * (28 + (seed % 14)),
-    docsCount: 40 + (seed % 860),
-    language: LANGUAGES[seed % LANGUAGES.length],
-    licence: LICENCES[(seed >> 3) % LICENCES.length],
-  }
-}
-
-const SECTION_TITLES = [
-  "Prologue",
-  "Prima Pars",
-  "Prima Secundae",
-  "Secunda Secundae",
-  "Tertia Pars",
-  "Supplementum",
-  "Appendix",
-  "Index Rerum",
-]
-
-export interface FabricatedSection {
-  title: string
-  nodes: number
-  words: number
-}
-
-/** Stable fabricated section rows for the detail page's Overview tab. */
-export function fabricateSections(seed: string): FabricatedSection[] {
-  const base = hash(seed)
-  const count = 4 + (base % 3)
-  return Array.from({ length: count }, (_, i) => {
-    const s = hash(`${seed}:${i}`)
-    const nodes = 800 + (s % 9_500)
-    return {
-      title: SECTION_TITLES[(base + i) % SECTION_TITLES.length],
-      nodes,
-      words: nodes * (30 + (s % 10)),
-    }
-  })
-}
-
-/** A stable, uuid-looking job id derived from the filename. */
-function fabricateJobId(filename: string): string {
-  const h = (n: number) => hash(`${filename}:${n}`).toString(16).padStart(8, "0")
-  return `${h(1)}-${h(2).slice(0, 4)}-${h(3).slice(0, 4)}`
-}
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -199,14 +121,18 @@ export function createConversionEntry(file: {
     validation: null,
     corpusName: null,
     corpusSize: null,
+    corpusBlob: null,
+    failedStep: null,
   }
 }
 
 /**
- * Which step an errored run stopped at — same derivation the corpora-py
- * example uses: no job id means the server never accepted the file.
+ * Which step an errored run stopped at. Prefers the explicitly recorded
+ * step; the fallback is the corpora-py derivation — no job id means the
+ * server never accepted the file.
  */
 function erroredStep(entry: ConversionEntry): ConversionStepId {
+  if (entry.failedStep) return entry.failedStep
   if (!entry.jobId) return "receive"
   return entry.validation ? "index" : "convert"
 }
@@ -269,6 +195,39 @@ export function deriveProgress(entry: ConversionEntry): number {
   return steps.filter((step) => step.state === "completed").length / steps.length
 }
 
+const POLL_INTERVAL_MS = 2_000
+
+/** First polls tolerate instance fan-out: retry this often before failing. */
+const FIRST_POLL_RETRIES = 3
+
+/**
+ * User-facing copy per failure kind (FR-006): every mode reads as its own
+ * message, and each is worth retrying except a signed-out 401.
+ */
+export function conversionErrorMessage(error: unknown): string {
+  if (error instanceof CorporaApiError) {
+    switch (error.kind) {
+      case "unreachable":
+        return "The conversion service could not be reached. Check your connection and retry."
+      case "unauthorized":
+        return "The conversion service requires you to sign in."
+      case "too-large":
+        return "This file exceeds the service's 500 MiB upload limit."
+      case "unsupported":
+        return `This file type cannot be converted. Supported: ${SUPPORTED_EXTENSIONS.join(", ")}.`
+      case "queue-full":
+        return "The conversion queue is full right now — retry in a moment."
+      case "not-found":
+        return "The service no longer knows this job — its instance was recycled. Retry to start over."
+      case "not-ready":
+        return "The archive was not ready to download. Retry the conversion."
+      default:
+        return error.message
+    }
+  }
+  return error instanceof Error ? error.message : "Something went wrong."
+}
+
 const defaultDelay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms))
 
@@ -278,17 +237,24 @@ export interface RunConversionOptions {
   delay?: (ms: number) => Promise<void>
 }
 
+/** Server status → the step its log lines belong to while it lasts. */
+const STEP_FOR_SERVER_STATUS: Record<JobStatusMessage["status"], ConversionStepId> = {
+  queued: "validate",
+  running: "convert",
+  succeeded: "index",
+  failed: "convert",
+}
+
 /**
- * THE TRANSPORT SEAM. Walks the entry through the corpora-py status
- * sequence (uploading → queued → converting → validating → ready), calling
- * `onChange` with a fresh snapshot at every observable event. The real
- * implementation replaces this body with the POST /convert round-trip plus
- * WebSocket/polling job tracking and feeds the same updates.
- *
- * Returns the terminal entry (status "ready" or "error"). An aborted run
- * resolves with the last snapshot; it never persists anything.
+ * Drive one conversion against the real service: POST /convert, then a 2 s
+ * poll loop (the poll advances the job on the deployed backend), then
+ * POST /validate and the archive download. Calls `onChange` with a fresh
+ * snapshot at every observable event and resolves the terminal entry
+ * (status "ready" or "error"). An aborted run resolves with the last
+ * snapshot; nothing is persisted here — the caller owns that.
  */
 export async function runConversion(
+  file: File,
   initial: ConversionEntry,
   onChange: (entry: ConversionEntry) => void,
   options: RunConversionOptions = {},
@@ -305,16 +271,21 @@ export async function runConversion(
     }
     onChange(entry)
   }
-  const tick = async (ms: number) => {
-    await delay(ms)
-    return !signal?.aborted
+  const fail = (step: ConversionStepId, message: string) => {
+    emit(
+      {
+        status: "error",
+        error: message,
+        finishedAt: Date.now(),
+        failedStep: step,
+      },
+      { step, text: `✗ ${message}`, tone: "error" },
+    )
+    return entry
   }
+  const message = conversionErrorMessage
 
-  const stats = fabricateStats(entry.name)
-  const jobId = fabricateJobId(entry.name)
-
-  // receive — the storage upload already happened in the route; these are
-  // the client-side acceptance checks.
+  // receive — client-side acceptance + the upload round-trip.
   emit(
     { status: "uploading" },
     {
@@ -323,109 +294,128 @@ export async function runConversion(
       tone: "info",
     },
   )
-  if (!(await tick(500))) return entry
-  emit(
-    { jobId },
-    {
-      step: "receive",
-      text: `✓ File type validated — source "${entry.name.split(".").pop()}"`,
-      tone: "success",
-    },
-  )
-
-  // validate — parse nodes and feature data.
-  if (!(await tick(600))) return entry
-  emit(
-    { status: "queued" },
-    {
-      step: "validate",
-      text: "> Parsing nodes and feature data…",
-      tone: "info",
-    },
-  )
-  for (const share of [0.41, 0.78]) {
-    if (!(await tick(900))) return entry
-    emit(
-      {},
-      {
-        step: "validate",
-        text: `> ${Math.round(stats.nodes * share).toLocaleString("en-US")} / ${stats.nodes.toLocaleString("en-US")} nodes validated`,
-        tone: "info",
-      },
-    )
+  if (!entry.sourceFormat) {
+    return fail("receive", "This file type cannot be converted.")
   }
-  if (!(await tick(900))) return entry
   emit(
     {},
     {
-      step: "validate",
-      text: `✓ Validation passed — ${stats.nodes.toLocaleString("en-US")} nodes parsed`,
+      step: "receive",
+      text: `✓ File type validated — source "${entry.sourceFormat}"`,
       tone: "success",
     },
   )
 
-  // convert — the server-side build; the deterministic demo failure lives
-  // here, mirroring where a real conversion actually breaks.
-  if (!(await tick(500))) return entry
+  let jobId: string
+  try {
+    ;({ jobId } = await createConversion({
+      file,
+      sourceFormat: entry.sourceFormat as never,
+      name: entry.name.replace(/\.[^.]+$/, ""),
+    }))
+  } catch (error) {
+    return fail("receive", message(error))
+  }
+  if (signal?.aborted) return entry
   emit(
-    { status: "converting" },
+    { jobId, status: "queued" },
     {
-      step: "convert",
-      text: "> Building Text-Fabric dataset…",
+      step: "validate",
+      text: `> Job ${jobId} created — tracking conversion`,
       tone: "info",
     },
   )
-  if (!(await tick(1200))) return entry
-  if (shouldFail(entry.name)) {
+
+  // Poll loop — payload is ConversionJob.to_dict(); new log lines land on
+  // the step implied by the CURRENT server status.
+  let seenLogs = 0
+  let reachedJob = false
+  let earlyFailures = 0
+  while (true) {
+    await delay(POLL_INTERVAL_MS)
+    if (signal?.aborted) return entry
+
+    let job: JobStatusMessage
+    try {
+      job = await getConversion(jobId)
+      reachedJob = true
+    } catch (error) {
+      // Vercel fan-out: the first polls can land on an instance that never
+      // saw the job — tolerate a few before concluding it is gone.
+      if (!reachedJob && ++earlyFailures <= FIRST_POLL_RETRIES) continue
+      return fail(
+        entry.status === "queued" ? "validate" : "convert",
+        message(error),
+      )
+    }
+    if (signal?.aborted) return entry
+
+    const step = STEP_FOR_SERVER_STATUS[job.status]
+    for (const line of job.logs.slice(seenLogs)) {
+      emit({}, { step, text: `> ${line}`, tone: "info" })
+    }
+    seenLogs = job.logs.length
+
+    if (job.status === "failed") {
+      return fail("convert", job.error ?? "Conversion failed.")
+    }
+    if (job.status === "running" && entry.status !== "converting") {
+      emit({ status: "converting" })
+    }
+    if (job.status === "succeeded") break
+  }
+
+  // index — POST /validate (annotates, never gates) + the archive download.
+  emit(
+    { status: "validating", validation: { status: "running" } },
+    { step: "index", text: "> Validating dataset…", tone: "info" },
+  )
+  const report = await validateConversion(jobId)
+  if (signal?.aborted) return entry
+  if (report.status === "valid") {
+    const slots = report.stats?.max_slot
     emit(
+      { validation: report },
       {
-        status: "error",
-        error: `IndexError — job ${jobId}`,
-        finishedAt: Date.now(),
+        step: "index",
+        text: `✓ Corpus validated${slots ? ` — ${slots.toLocaleString("en-US")} slots` : ""}`,
+        tone: "success",
       },
+    )
+  } else if (report.status === "invalid") {
+    // The verdict annotates the conversion; the download still proceeds.
+    emit(
+      { validation: report },
       {
-        step: "convert",
-        text: `✗ IndexError — job ${jobId}`,
+        step: "index",
+        text: `✗ Validation failed: ${report.reasons?.[0] ?? "unknown reason"}`,
         tone: "error",
       },
     )
-    return entry
+  } else {
+    emit(
+      { validation: report },
+      { step: "index", text: "> Validation skipped", tone: "info" },
+    )
   }
-  emit(
-    {},
-    {
-      step: "convert",
-      text: `✓ ${stats.nodes.toLocaleString("en-US")} nodes written to .corpus`,
-      tone: "success",
-    },
-  )
 
-  // index — the POST /validate round-trip plus final packaging.
-  if (!(await tick(500))) return entry
-  emit(
-    {
-      status: "validating",
-      validation: { status: "running" },
-    },
-    { step: "index", text: "> Building corpus index…", tone: "info" },
-  )
-  if (!(await tick(1100))) return entry
+  let blob: Blob
+  try {
+    blob = await downloadConversion(jobId)
+  } catch (error) {
+    return fail("index", message(error))
+  }
+  if (signal?.aborted) return entry
+
   emit(
     {
       status: "ready",
       finishedAt: Date.now(),
-      validation: {
-        status: "valid",
-        stats: {
-          nodes: stats.nodes,
-          words: stats.words,
-          docsCount: stats.docsCount,
-        },
-      },
+      corpusBlob: blob,
       corpusName: entry.name.replace(/\.[^.]+$/, ".corpus"),
-      corpusSize: Math.round(entry.size * 1.6),
+      corpusSize: blob.size,
     },
-    { step: "index", text: "✓ Index built — corpus ready", tone: "success" },
+    { step: "index", text: "✓ Archive downloaded — corpus ready", tone: "success" },
   )
   return entry
 }

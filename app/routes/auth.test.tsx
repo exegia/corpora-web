@@ -8,6 +8,7 @@ import AuthCallbackRoute, {
 import ForgotPasswordRoute, {
   clientLoader as forgotLoader,
 } from "@/routes/forgot-password"
+import IndexRoute, { clientLoader as indexLoader } from "@/routes/index"
 import LoginRoute, { clientLoader as loginLoader } from "@/routes/login"
 import ProtectedLayout, {
   clientLoader as protectedLoader,
@@ -98,7 +99,7 @@ function renderAuth(initialEntry: string) {
       loader: resetLoader as never,
     },
     { path: "/verify", Component: VerifyRoute },
-    { path: "/", Component: () => <h1>Dashboard</h1> },
+    { path: "/dashboard", Component: () => <h1>Dashboard</h1> },
     { path: "/corpus", Component: () => <h1>Corpus</h1> },
   ])
   return render(<Stub initialEntries={[initialEntry]} />)
@@ -415,5 +416,34 @@ describe("route guards", () => {
         screen.getByRole("button", { name: /Ada Researcher.*account menu/i }),
       ).toBeInTheDocument(),
     )
+  })
+})
+
+describe("/ dispatcher", () => {
+  function renderRoot() {
+    const Stub = createRoutesStub([
+      {
+        index: true,
+        Component: IndexRoute,
+        HydrateFallback: () => null,
+        // biome-ignore lint: route module functions match at runtime
+        loader: indexLoader as never,
+      },
+      { path: "/dashboard", Component: () => <h1>Dashboard</h1> },
+      { path: "/login", Component: () => <h1>Login</h1> },
+    ])
+    return render(<Stub initialEntries={["/"]} />)
+  }
+
+  it("sends a signed-in visitor to /dashboard", async () => {
+    givenSignedIn()
+    renderRoot()
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument()
+  })
+
+  it("sends a signed-out visitor to /login", async () => {
+    givenSignedOut()
+    renderRoot()
+    expect(await screen.findByRole("heading", { name: "Login" })).toBeInTheDocument()
   })
 })

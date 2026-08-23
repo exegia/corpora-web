@@ -2,7 +2,13 @@ import { FileText, RotateCw, X } from "lucide-react"
 import { Link } from "react-router"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardPanel } from "@/components/ui/card"
+import {
+  Card,
+  CardFrame,
+  CardFrameAction,
+  CardFrameHeader,
+  CardPanel,
+} from "@/components/ui/card"
 import { formatBytes } from "@/lib/corpus-convert"
 import { formatDate } from "@/lib/format"
 import type { FileSummaryProps } from "./types"
@@ -27,7 +33,8 @@ function formatDateTime(ms: number): string {
   })
 }
 
-/** The source-file card under the logs: status, actions, metadata grid. */
+/** The source-file frame under the logs: status and actions in the frame
+ * header, the metadata grid on the nested card. */
 export default function FileSummary({
   entry,
   documentId,
@@ -38,9 +45,9 @@ export default function FileSummary({
   const failed = entry.status === "error"
 
   return (
-    <Card>
-      <CardPanel className="flex flex-col gap-3">
-        <div className="flex items-start gap-3">
+    <CardFrame>
+      <CardFrameHeader className="px-4 py-3">
+        <div className="flex min-w-0 items-start gap-3">
           <span
             aria-hidden="true"
             className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
@@ -64,28 +71,30 @@ export default function FileSummary({
                 />
                 {failed ? "Failed" : done ? "Converted" : "Converting"}
               </span>
-              {done && documentId && (
-                <Button
-                  render={<Link to={`/corpus/${documentId}`} viewTransition />}
-                  size="sm"
-                  variant="outline"
-                >
-                  View corpus
-                </Button>
-              )}
-              {failed && (
-                <Button
-                  className="text-destructive-foreground"
-                  onClick={onRetry}
-                  size="sm"
-                  type="button"
-                  variant="destructive-outline"
-                >
-                  <RotateCw /> Retry
-                </Button>
-              )}
             </div>
           </div>
+        </div>
+        <CardFrameAction className="flex items-center gap-1">
+          {done && documentId && (
+            <Button
+              render={<Link to={`/corpus/${documentId}`} viewTransition />}
+              size="sm"
+              variant="outline"
+            >
+              View corpus
+            </Button>
+          )}
+          {failed && (
+            <Button
+              className="text-destructive-foreground"
+              onClick={onRetry}
+              size="sm"
+              type="button"
+              variant="destructive-outline"
+            >
+              <RotateCw /> Retry
+            </Button>
+          )}
           <Button
             aria-label="Dismiss conversion"
             onClick={onDismiss}
@@ -95,18 +104,22 @@ export default function FileSummary({
           >
             <X />
           </Button>
-        </div>
-        <dl className="grid grid-cols-2 gap-3 border-t pt-3">
-          <Meta label="Size" value={formatBytes(entry.size)} />
-          <Meta label="Type" value={entry.type} />
-          <Meta label="Source format" value={entry.sourceFormat ?? "—"} />
-          <Meta
-            label="Last modified"
-            value={formatDate(new Date(entry.lastModified).toISOString())}
-          />
-          <Meta label="Uploaded" value={formatDateTime(entry.uploadedAt)} />
-        </dl>
-      </CardPanel>
-    </Card>
+        </CardFrameAction>
+      </CardFrameHeader>
+      <Card>
+        <CardPanel className="p-4">
+          <dl className="grid grid-cols-2 gap-3">
+            <Meta label="Size" value={formatBytes(entry.size)} />
+            <Meta label="Type" value={entry.type} />
+            <Meta label="Source format" value={entry.sourceFormat ?? "—"} />
+            <Meta
+              label="Last modified"
+              value={formatDate(new Date(entry.lastModified).toISOString())}
+            />
+            <Meta label="Uploaded" value={formatDateTime(entry.uploadedAt)} />
+          </dl>
+        </CardPanel>
+      </Card>
+    </CardFrame>
   )
 }

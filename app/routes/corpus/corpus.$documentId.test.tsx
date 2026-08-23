@@ -8,7 +8,7 @@ import { isCorpusDetailData } from "@/components/breadcrumb/utils"
 import CorpusDetailRoute, {
   clientAction,
   clientLoader,
-} from "@/routes/corpus.$documentId"
+} from "@/routes/corpus/corpus.$documentId"
 
 vi.mock("@/lib/corpus", () => ({
   listCorpusDocuments: vi.fn(),
@@ -16,7 +16,6 @@ vi.mock("@/lib/corpus", () => ({
   deleteCorpusDocument: vi.fn(),
   getCorpusDocument: vi.fn(),
   uploadCorpusFile: vi.fn(),
-  uploadConversionSource: vi.fn(),
 }))
 
 const summa: CorpusDocument = {
@@ -36,6 +35,11 @@ const summa: CorpusDocument = {
   words: 1_135_799,
   status: "converted",
   convertedAt: "2026-08-08T13:14:00Z",
+  description: "The Summa, converted from TEI.",
+  toc: [
+    { title: "Prima Pars", nodes: 8442, words: 312004 },
+    { title: "Supplementum", nodes: 997, words: null },
+  ],
   commits: [],
 }
 
@@ -68,16 +72,20 @@ describe("/corpus/:documentId detail", () => {
     expect(
       await screen.findByRole("heading", { name: "Summa Theologia (1200, ENG)" }),
     ).toBeInTheDocument()
-    expect(screen.getByText("XML")).toBeInTheDocument()
     expect(screen.getByText("converted")).toBeInTheDocument()
+    expect(
+      screen.getByText("The Summa, converted from TEI."),
+    ).toBeInTheDocument()
     expect(screen.getByText("4.2 MB")).toBeInTheDocument()
     expect(screen.getByText("30,102")).toBeInTheDocument()
     expect(screen.getByText("613")).toBeInTheDocument()
     expect(screen.getByText("English")).toBeInTheDocument()
-    expect(screen.getByText("text-fabric")).toBeInTheDocument()
+    // Source format shows twice: the header's format badge and the card row.
+    expect(screen.getAllByText("text-fabric")).toHaveLength(2)
+    // The licence opens the detail sheet rather than linking to the catalog.
     expect(
-      screen.getByRole("link", { name: "CC BY-SA 4.0" }),
-    ).toHaveAttribute("href", "/licenses")
+      screen.getByRole("button", { name: "CC BY-SA 4.0" }),
+    ).toHaveAttribute("data-slot", "sheet-trigger")
   })
 
   it("shows the Overview sections and disables the undesigned tabs", async () => {
@@ -87,11 +95,21 @@ describe("/corpus/:documentId detail", () => {
       // Base UI disables tabs via data-disabled, not the disabled attribute.
       expect(screen.getByRole("tab", { name })).toHaveAttribute("data-disabled")
     }
-    // Fabricated sections are stable per document id, so rows are present.
+    // Sections come from the toc captured at conversion time.
     const table = screen.getByRole("table")
-    expect(table).toHaveTextContent("Title")
-    expect(table).toHaveTextContent("Nodes")
-    expect(table).toHaveTextContent("Words")
+    expect(table).toHaveTextContent("Prima Pars")
+    expect(table).toHaveTextContent("8,442")
+    expect(table).toHaveTextContent("312,004")
+    expect(table).toHaveTextContent("Supplementum")
+  })
+
+  it("shows an explicit empty state for rows without section data", async () => {
+    vi.mocked(getCorpusDocument).mockResolvedValue({ ...summa, toc: null })
+    renderRoute()
+    expect(
+      await screen.findByText("No section data was captured for this corpus."),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("table")).not.toBeInTheDocument()
   })
 
   it("renders a not-found state when the document is gone", async () => {
