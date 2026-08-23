@@ -57,9 +57,9 @@ feat: rework the licence catalog        # passes
 ```
 
 `<type>` is one of `feat fix chore docs ci refactor test perf build style
-revert`, optionally `(scope)` and `!`. Branches into `release/v*` must read
-`<type>/<slug>`, lowercase; `main` only accepts `release/vX.Y.Z` matching the
-`package.json` version.
+revert`, optionally `(scope)` and `!`. Branches into `dev` (or an in-flight
+`release/v*`) must read `<type>/<slug>`, lowercase; `next` only accepts `dev`;
+`main` only accepts `release/vX.Y.Z` matching the `package.json` version.
 
 **Retitling a red PR does not re-run the guard.** `.github/workflows/pr.yml`
 fires on `opened / reopened / ready_for_review / synchronize` — not `edited` —

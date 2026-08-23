@@ -13,6 +13,11 @@ INSTALL_FLAGS ?=
 # Bump used when opening the next release branch.
 BUMP ?= minor
 
+# Line-count thresholds for promote: insertions+deletions of next...dev.
+# < CHURN_MINOR → patch (0.0.+1); < CHURN_MAJOR → minor (0.+1.0); else major.
+CHURN_MINOR ?= 100
+CHURN_MAJOR ?= 1000
+
 # Commit range for `release-notes`.
 RANGE ?= origin/main..HEAD
 
@@ -34,7 +39,9 @@ pkg_version = node -p "require('./package.json').version"
 .PHONY: help install serve build preview test typecheck lint check ci pack \
         clean distclean pkg-version next-version version-set release-notes \
         pr-guard release-pr release-branch delete-branch deploy deploy-preview \
-        tag-release rulesets-apply rulesets-diff
+        tag-release rulesets-apply rulesets-diff \
+        churn-info churn-bump bootstrap-lanes promote-pr cut-release \
+        sync-lanes cleanup-cycle cleanup-local
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -108,14 +115,18 @@ pr-guard: ## Validate a PR's base, branch name and title (env: BASE, HEAD, TITLE
 	  [ "$$want" = "$$HEAD" ] \
 	    || { echo "::error::package.json declares $$want but the branch is $$HEAD"; exit 1; }; \
 	  ;; \
-	release/v*) \
+	dev|release/v*) \
 	  echo "$$HEAD" | grep -Eq '^($(TYPES))/[a-z0-9][a-z0-9._-]*$$' \
 	    || { echo "::error::branch must be <type>/<slug> — one of $(TYPES) (got '$$HEAD')"; exit 1; }; \
 	  printf '%s' "$${TITLE-}" | grep -Eq '^($(TYPES))(\([a-z0-9._/-]+\))?!?: .+' \
 	    || { echo "::error::PR title must read '<type>: summary' (got '$${TITLE-}')"; exit 1; }; \
 	  ;; \
+	next) \
+	  [ "$$HEAD" = "dev" ] || echo "$$HEAD" | grep -Eq '^chore/sync-main-into-next$$' \
+	    || { echo "::error::next only accepts PRs from dev (got '$$HEAD')"; exit 1; }; \
+	  ;; \
 	*) \
-	  echo "::error::$$BASE is not a valid base — target main or release/vX.Y.Z"; exit 1;; \
+	  echo "::error::$$BASE is not a valid base — target dev, next, main, or release/vX.Y.Z"; exit 1;; \
 	esac; \
 	echo "guard passed: $$HEAD -> $$BASE"
 
@@ -128,7 +139,7 @@ release-pr: ## Open or refresh the draft release PR into main (env: BRANCH)
 	body="$$(mktemp)"; \
 	{ printf 'Release **v%s**.\n\n## Changes\n\n' "$$version"; \
 	  $(MAKE) -s --no-print-directory release-notes RANGE="origin/main..origin/$$branch"; \
-	  printf '\n---\nRefreshed automatically whenever a PR lands on `%s`.\n' "$$branch"; \
+	  printf '\n---\nRefreshed automatically whenever `%s` is updated from `next`.\n' "$$branch"; \
 	} > "$$body"; \
 	num="$$(gh pr list --base main --head "$$branch" --state open --json number --jq '.[0].number // empty')"; \
 	if [ -n "$$num" ]; then \
@@ -183,20 +194,195 @@ tag-release: ## Tag HEAD as v<package version> and publish the GitHub Release
 	  --title "$$tag" --generate-notes; \
 	echo "released $$tag"
 
-release-branch: ## Cut release/v<next> from main with the version bumped (env: VERSION, BUMP)
+# --- promotion (dev → next → release/v*) ------------------------------------
+
+# Prints: bump insertions deletions total
+# bump is major|minor|patch from CHURN_* thresholds.
+churn-info: ## Print bump and line counts for FROM...TO (env: FROM, TO)
 	@set -eu; \
-	git fetch --quiet --force --tags origin "main:refs/remotes/origin/main"; \
-	version="$${VERSION:-$$($(MAKE) -s --no-print-directory next-version)}"; \
-	branch="release/v$$version"; \
-	if git ls-remote --exit-code --heads origin "$$branch" >/dev/null 2>&1; then \
-	  echo "$$branch already exists — nothing to do"; exit 0; \
+	: "$${FROM:?FROM is required}" "$${TO:?TO is required}"; \
+	stat="$$(git diff --shortstat "$$FROM...$$TO" 2>/dev/null || true)"; \
+	ins="$$(printf '%s' "$$stat" | sed -n 's/.* \([0-9][0-9]*\) insertion.*/\1/p')"; \
+	del="$$(printf '%s' "$$stat" | sed -n 's/.* \([0-9][0-9]*\) deletion.*/\1/p')"; \
+	ins="$${ins:-0}"; del="$${del:-0}"; \
+	total=$$((ins + del)); \
+	if [ "$$total" -ge $(CHURN_MAJOR) ]; then bump=major; \
+	elif [ "$$total" -ge $(CHURN_MINOR) ]; then bump=minor; \
+	else bump=patch; \
 	fi; \
-	git checkout --quiet -B "$$branch" origin/main; \
+	printf '%s %s %s %s\n' "$$bump" "$$ins" "$$del" "$$total"
+
+churn-bump: ## Classify a bump from git diff --shortstat (env: FROM, TO)
+	@$(MAKE) -s --no-print-directory churn-info FROM="$(FROM)" TO="$(TO)" | awk '{print $$1}'
+
+bootstrap-lanes: ## Create origin/dev and origin/next if they do not exist
+	@set -eu; \
+	git fetch --quiet --force --tags origin \
+	  "+refs/heads/main:refs/remotes/origin/main"; \
+	if git ls-remote --exit-code --heads origin next >/dev/null 2>&1; then \
+	  echo "origin/next already exists"; \
+	else \
+	  git push origin refs/remotes/origin/main:refs/heads/next; \
+	  echo "created origin/next from main"; \
+	fi; \
+	if git ls-remote --exit-code --heads origin dev >/dev/null 2>&1; then \
+	  echo "origin/dev already exists"; \
+	else \
+	  ver="$$(git ls-remote --heads origin 'release/v*' \
+	    | awk '{print $$2}' \
+	    | sed 's|refs/heads/release/v||' \
+	    | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$$' \
+	    | sort -t. -k1,1n -k2,2n -k3,3n \
+	    | tail -1 || true)"; \
+	  if [ -n "$$ver" ]; then src="release/v$$ver"; \
+	  else src=main; \
+	  fi; \
+	  git fetch --quiet origin "+refs/heads/$$src:refs/remotes/origin/$$src"; \
+	  git push origin "refs/remotes/origin/$$src:refs/heads/dev"; \
+	  echo "created origin/dev from $$src"; \
+	fi
+
+promote-pr: ## Open or refresh the PR from dev into next (env: VERSION, BUMP, CHURN)
+	@set -eu; \
+	git fetch --quiet --force origin \
+	  "+refs/heads/dev:refs/remotes/origin/dev" \
+	  "+refs/heads/next:refs/remotes/origin/next"; \
+	ahead="$$(git rev-list --count origin/next..origin/dev)"; \
+	if [ "$$ahead" -eq 0 ]; then \
+	  echo "dev is not ahead of next — nothing to promote"; \
+	  exit 0; \
+	fi; \
+	: "$${VERSION:?VERSION is required}"; \
+	stat="$$(git diff --shortstat origin/next...origin/dev || true)"; \
+	body="$$(mktemp)"; \
+	{ printf 'Promote **v%s** (`%s`%s).\n\n' "$$VERSION" "$${BUMP:-patch}" \
+	    "$${CHURN:+, $$CHURN lines of churn}"; \
+	  printf '<!-- corpora-release: v%s -->\n\n' "$$VERSION"; \
+	  printf '%s\n\n' "$${stat:-0 files changed}"; \
+	  printf -- '- bump: %s\n' "$${BUMP:-patch}"; \
+	} > "$$body"; \
+	num="$$(gh pr list --base next --head dev --state open --json number --jq '.[0].number // empty')"; \
+	if [ -n "$$num" ]; then \
+	  gh pr edit "$$num" --title "chore: promote v$$VERSION to next" --body-file "$$body"; \
+	  echo "refreshed promote PR #$$num"; \
+	else \
+	  gh pr create --base next --head dev \
+	    --title "chore: promote v$$VERSION to next" --body-file "$$body"; \
+	  num="$$(gh pr list --base next --head dev --state open --json number --jq '.[0].number // empty')"; \
+	  echo "opened promote PR #$$num"; \
+	fi; \
+	rm -f "$$body"; \
+	gh pr merge "$$num" --auto --merge
+
+cut-release: ## Cut or refresh release/v<VERSION> from origin/next (env: VERSION)
+	@set -eu; \
+	git fetch --quiet --force origin \
+	  "+refs/heads/next:refs/remotes/origin/next" \
+	  "+refs/heads/main:refs/remotes/origin/main"; \
+	if git diff --quiet origin/main origin/next; then \
+	  echo "next and main have the same tree — nothing to cut"; \
+	  exit 0; \
+	fi; \
+	existing="$$(gh pr list --base main --state open --json headRefName \
+	  --jq '[.[] | select(.headRefName | test("^release/v[0-9]"))] | .[0].headRefName // empty')"; \
+	if [ -n "$$existing" ]; then \
+	  version="$${existing#release/v}"; \
+	  echo "in-flight $$existing — refreshing at v$$version"; \
+	else \
+	  if [ -z "$${VERSION-}" ]; then \
+	    body="$$(gh pr list --base next --head dev --state merged --limit 1 \
+	      --json body --jq '.[0].body // empty')"; \
+	    VERSION="$$(printf '%s' "$$body" | sed -n 's/.*<!-- corpora-release: v\([0-9][0-9.]*\) -->.*/\1/p')"; \
+	  fi; \
+	  if [ -z "$${VERSION-}" ]; then \
+	    b="$$($(MAKE) -s --no-print-directory churn-bump FROM=origin/main TO=origin/next)"; \
+	    VERSION="$$($(MAKE) -s --no-print-directory next-version BUMP="$$b")"; \
+	  fi; \
+	  version="$$VERSION"; \
+	fi; \
+	: "$${version:?could not determine VERSION to cut}"; \
+	branch="release/v$$version"; \
+	if git fetch --quiet origin "+refs/heads/$$branch:refs/remotes/origin/$$branch" 2>/dev/null; then \
+	  git checkout --quiet -B "$$branch" "origin/$$branch"; \
+	  git merge --quiet --no-edit -X theirs origin/next; \
+	else \
+	  git checkout --quiet -B "$$branch" origin/next; \
+	fi; \
 	$(MAKE) -s --no-print-directory version-set VERSION="$$version"; \
 	git add package.json; \
-	git commit --quiet -m "chore(release): open v$$version"; \
+	if git diff --cached --quiet; then \
+	  echo "package.json already $$version"; \
+	else \
+	  git commit --quiet -m "chore(release): open v$$version"; \
+	fi; \
 	git push --quiet -u origin "$$branch"; \
-	echo "opened $$branch"
+	echo "updated $$branch"
+
+release-branch: ## Cut release/v<next> from origin/next (env: VERSION, BUMP)
+	@$(MAKE) --no-print-directory cut-release \
+	  VERSION="$${VERSION:-$$($(MAKE) -s --no-print-directory next-version)}"
+
+sync-lanes: ## Merge origin/main into next and dev via PRs
+	@set -eu; \
+	$(MAKE) --no-print-directory bootstrap-lanes; \
+	git fetch --quiet --force origin \
+	  "+refs/heads/main:refs/remotes/origin/main" \
+	  "+refs/heads/next:refs/remotes/origin/next" \
+	  "+refs/heads/dev:refs/remotes/origin/dev"; \
+	for lane in next dev; do \
+	  head="chore/sync-main-into-$$lane"; \
+	  git checkout --quiet -B "$$head" "origin/$$lane"; \
+	  if git merge-base --is-ancestor origin/main HEAD; then \
+	    echo "$$lane already contains main"; \
+	    continue; \
+	  fi; \
+	  git merge --quiet --no-edit origin/main; \
+	  git push --force-with-lease --quiet -u origin "$$head"; \
+	  body="$$(mktemp)"; \
+	  printf 'Sync **main** into `%s` after the production release.\n' "$$lane" > "$$body"; \
+	  num="$$(gh pr list --base "$$lane" --head "$$head" --state open --json number --jq '.[0].number // empty')"; \
+	  if [ -n "$$num" ]; then \
+	    gh pr edit "$$num" --title "chore: sync main into $$lane" --body-file "$$body"; \
+	    echo "refreshed sync PR #$$num into $$lane"; \
+	  else \
+	    gh pr create --base "$$lane" --head "$$head" \
+	      --title "chore: sync main into $$lane" --body-file "$$body"; \
+	    num="$$(gh pr list --base "$$lane" --head "$$head" --state open --json number --jq '.[0].number // empty')"; \
+	    echo "opened sync PR #$$num into $$lane"; \
+	  fi; \
+	  rm -f "$$body"; \
+	  gh pr merge "$$num" --auto --merge; \
+	done
+
+cleanup-cycle: ## Delete remote feature branches merged into dev, leftover release/v*
+	@set -eu; \
+	git fetch --quiet --prune origin; \
+	git fetch --quiet --force origin "+refs/heads/dev:refs/remotes/origin/dev"; \
+	for ref in $$(git branch -r --merged origin/dev \
+	    | sed 's/^[[:space:]]*origin\///' \
+	    | grep -E '^($(TYPES))/' || true); do \
+	  $(MAKE) -s --no-print-directory delete-branch BRANCH="$$ref"; \
+	done; \
+	open="$$(gh pr list --base main --state open --json headRefName \
+	  --jq '[.[].headRefName | select(startswith("release/v"))] | join(" ")')"; \
+	for ref in $$(git ls-remote --heads origin 'release/v*' \
+	    | awk '{print $$2}' | sed 's|refs/heads/||'); do \
+	  case " $$open " in *" $$ref "*) continue ;; esac; \
+	  $(MAKE) -s --no-print-directory delete-branch BRANCH="$$ref"; \
+	done
+
+cleanup-local: ## Delete local feature/release branches whose remotes are gone
+	@set -eu; \
+	git fetch --prune --quiet origin; \
+	current="$$(git rev-parse --abbrev-ref HEAD)"; \
+	for b in $$(git branch --format='%(refname:short)' \
+	    | grep -E '^($(TYPES))/|^release/v' || true); do \
+	  [ "$$b" = "$$current" ] && continue; \
+	  if git ls-remote --exit-code --heads origin "$$b" >/dev/null 2>&1; then \
+	    continue; \
+	  fi; \
+	  git branch -D "$$b"; \
+	done
 
 # --- repository settings ----------------------------------------------------
 
