@@ -1,4 +1,4 @@
-# A release PR landed on main: deploy it, then open the next release branch.
+# A release PR landed on main: deploy it, then sync `next` and `dev`.
 #
 # Nothing is re-tested here — the exact tree being deployed already passed
 # `check` and `package` on the release PR.
@@ -8,8 +8,9 @@
 # by GITHUB_TOKEN do not start new workflow runs, so a `release: [published]`
 # trigger would sit there and never fire.
 #
-# The dispatch is the bootstrap: it opens a release branch without a preceding
-# deploy, which is how the first one (and any manual re-cut) gets created.
+# The dispatch is the bootstrap: it creates `dev` and `next` without a
+# preceding deploy. The next versioned release is cut by **Promote to next**,
+# not from this file.
 name: Release
 
 on:
@@ -17,12 +18,6 @@ on:
     types: [closed]
     branches: [main]
   workflow_dispatch:
-    inputs:
-      bump:
-        description: Bump for the next release branch
-        default: minor
-        type: choice
-        options: [major, minor, patch]
 
 concurrency:
   group: release
@@ -76,11 +71,11 @@ jobs:
           BRANCH: ${{ github.head_ref }}
         run: make delete-branch
 
-  next-release:
-    name: next-release
+  wrapup:
+    name: wrapup
     needs: [deploy]
-    # `deploy` is skipped on a manual dispatch, which is exactly the bootstrap
-    # case — so run whenever it did not actually fail.
+    # `deploy` is skipped on a manual dispatch, which is the bootstrap case —
+    # so run whenever it did not actually fail.
     if: ${{ always() && (github.event_name == 'workflow_dispatch' || needs.deploy.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
@@ -90,7 +85,6 @@ jobs:
           app-id: ${{ secrets.AUTOMATION_APP_ID }}
           private-key: ${{ secrets.AUTOMATION_APP_PRIVATE_KEY }}
 
-      # Full history and tags: `make next-version` reads the newest vX.Y.Z tag.
       - uses: actions/checkout@v7
         with:
           ref: main
@@ -98,12 +92,17 @@ jobs:
           fetch-tags: true
           token: ${{ steps.app-token.outputs.token }}
 
-      - uses: ./.github/actions/setup
-
-      - name: Open the next release branch
+      - name: Sync lanes and clean up
         env:
-          BUMP: ${{ inputs.bump || 'minor' }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           git config user.name  "corpora-automation[bot]"
           git config user.email "corpora-automation[bot]@users.noreply.github.com"
-          make release-branch
+          make bootstrap-lanes
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            make sync-lanes
+            make cleanup-cycle
+          fi
+
