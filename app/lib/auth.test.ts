@@ -90,21 +90,21 @@ describe("safeRedirectTo", () => {
   })
 
   it("falls back when there is no value", () => {
-    expect(safeRedirectTo(null)).toBe("/")
-    expect(safeRedirectTo("")).toBe("/")
+    expect(safeRedirectTo(null)).toBe("/dashboard")
+    expect(safeRedirectTo("")).toBe("/dashboard")
   })
 
   it("refuses absolute and protocol-relative URLs", () => {
-    expect(safeRedirectTo("https://evil.example/steal")).toBe("/")
-    expect(safeRedirectTo("//evil.example")).toBe("/")
-    expect(safeRedirectTo("/\\evil.example")).toBe("/")
+    expect(safeRedirectTo("https://evil.example/steal")).toBe("/dashboard")
+    expect(safeRedirectTo("//evil.example")).toBe("/dashboard")
+    expect(safeRedirectTo("/\\evil.example")).toBe("/dashboard")
   })
 
   // Without this the login screen would redirect to itself forever.
   it("refuses auth paths, which is what stops the /login → / → /login loop", () => {
-    expect(safeRedirectTo("/login")).toBe("/")
-    expect(safeRedirectTo("/signup?redirectTo=/login")).toBe("/")
-    expect(safeRedirectTo("/auth/callback")).toBe("/")
+    expect(safeRedirectTo("/login")).toBe("/dashboard")
+    expect(safeRedirectTo("/signup?redirectTo=/login")).toBe("/dashboard")
+    expect(safeRedirectTo("/auth/callback")).toBe("/dashboard")
   })
 })
 
@@ -203,7 +203,7 @@ describe("requireAnon", () => {
 
   it("sends a signed-in visitor to the app", async () => {
     givenSignedIn()
-    expect(await locationOf(() => requireAnon(request("/login")))).toBe("/")
+    expect(await locationOf(() => requireAnon(request("/login")))).toBe("/dashboard")
   })
 
   it("honours a vetted redirectTo", async () => {
@@ -219,7 +219,7 @@ describe("requireAnon", () => {
     const location = await locationOf(() =>
       requireAnon(request("/login?redirectTo=https%3A%2F%2Fevil.example")),
     )
-    expect(location).toBe("/")
+    expect(location).toBe("/dashboard")
   })
 })
 
@@ -323,7 +323,7 @@ describe("completeAuthRedirect", () => {
     const result = await completeAuthRedirect(
       "https://corpora.test/auth/callback?next=https%3A%2F%2Fevil.example",
     )
-    expect(result.next).toBe("/")
+    expect(result.next).toBe("/dashboard")
   })
 
   it("surfaces an error carried in the query", async () => {
@@ -438,7 +438,7 @@ describe("signInWithProvider", () => {
 
     const { options } = authApi.signInWithOAuth.mock.calls[0][0]
     expect(options.redirectTo).toBe(
-      `${window.location.origin}/auth/callback?next=${encodeURIComponent("/")}`,
+      `${window.location.origin}/auth/callback?next=${encodeURIComponent("/dashboard")}`,
     )
     expect(options.redirectTo).not.toContain("evil.example")
   })

@@ -19,7 +19,7 @@ import type { DrawerProps } from "@/components/sidebar/types"
 import { cn } from "@/lib/utils"
 
 const items = [
-    { title: "Dashboard", url: "/", icon: LayoutDashboard },
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
     { title: "References", url: "/references", icon: BookMarked },
     { title: "Library", url: "/library", icon: BookOpen },
     { title: "Project", url: "/project", icon: FolderKanban },
@@ -45,7 +45,7 @@ export default function Drawer({ user }: DrawerProps) {
                                     {/* isPending: react-router's local pending navigation. Route
                                         modules are code-split, so this covers the chunk fetch on
                                         a first visit; loaders themselves no longer block. */}
-                                    <NavLink to={item.url} end={item.url === "/"} viewTransition>
+                                    <NavLink to={item.url} viewTransition>
                                         {({ isActive, isPending }) => (
                                             <SidebarMenuButton
                                                 isActive={isActive}

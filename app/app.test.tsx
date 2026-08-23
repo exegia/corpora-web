@@ -54,7 +54,7 @@ describe("routes", () => {
     })
     expect(
       within(breadcrumb).getByRole("link", { name: "Dashboard" }),
-    ).toHaveAttribute("href", "/")
+    ).toHaveAttribute("href", "/dashboard")
     expect(within(breadcrumb).getByText("Projects")).toBeInTheDocument()
     expect(
       within(breadcrumb).queryByRole("link", { name: "Projects" }),
@@ -70,7 +70,9 @@ describe("routes", () => {
       "Project",
       "Corpus",
     ]) {
-      expect(screen.getByRole("link", { name: label })).toBeInTheDocument()
+      // The modernized layout renders navigation as a tree of buttons
+      // (corpora-ui Tree), not anchor links.
+      expect(screen.getByRole("treeitem", { name: label })).toBeInTheDocument()
     }
   })
 })

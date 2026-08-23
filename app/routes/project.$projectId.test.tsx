@@ -181,6 +181,20 @@ beforeEach(() => {
     email: "manny.defreitas7@gmail.com",
   })
   vi.mocked(listLicences).mockResolvedValue([catalogLicense, softwareLicense])
+  const noMetadata = {
+    corpusType: null,
+    sourceFormat: null,
+    licence: null,
+    language: null,
+    sizeBytes: null,
+    docsCount: null,
+    nodes: null,
+    words: null,
+    status: null,
+    convertedAt: null,
+    description: null,
+    toc: null,
+  }
   vi.mocked(listCorpusDocuments).mockResolvedValue([
     {
       id: "d1",
@@ -190,6 +204,7 @@ beforeEach(() => {
       filename: "peshitta.corpus",
       uploadedAt: "2026-07-10T00:00:00Z",
       commits: [],
+      ...noMetadata,
     },
     {
       id: "d2",
@@ -199,6 +214,7 @@ beforeEach(() => {
       filename: null,
       uploadedAt: "2026-07-11T00:00:00Z",
       commits: [],
+      ...noMetadata,
     },
   ])
   vi.mocked(listOrganizations).mockResolvedValue([
