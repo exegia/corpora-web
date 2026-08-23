@@ -1,108 +1,146 @@
-import { useMemo, useState } from "react"
+import { useEffect, useState } from "react"
+import { BookOpenText } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
-  PreviewCard,
-  PreviewCardPopup,
-  PreviewCardTrigger,
-} from "@/components/ui/preview-card"
-import { Button } from "@/components/ui/button"
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import type { CorpusArchive, CorpusNode, CorpusPassage } from "@/lib/corpora-api"
+import { fetchCorpusContent, fetchCorpusNode } from "@/lib/corpora-api"
+import { findIndexItem, lemmaFromNode, slotForToken } from "@/lib/corpus-explore"
 import { cn } from "@/lib/utils"
-import { DOCTRINA, readerFor } from "./demo-data"
 import Panel from "./panel"
 import WordPanel from "./word-panel"
-import type { Lemma, ReaderPassage } from "./types"
-import { formatCount } from "./utils"
+import type { Lemma } from "./types"
 
-const LEMMA_PATTERN = /\bdoctrina\b/gi
-
-function WordToken({
-  form,
-  lemma,
-  onInspect,
-}: {
-  form: string
-  lemma: Lemma
-  onInspect: (lemma: Lemma) => void
-}) {
-  return (
-    <PreviewCard>
-      <PreviewCardTrigger
-        render={
-          <button
-            className="rounded-sm px-0.5 outline outline-primary"
-            onClick={() => onInspect(lemma)}
-            type="button"
-          />
-        }
-      >
-        {form}
-      </PreviewCardTrigger>
-      <PreviewCardPopup className="w-64">
-        <p className="font-medium">{lemma.lemma}</p>
-        <p className="text-muted-foreground text-xs">
-          {lemma.posCode} · {lemma.genderCode} · {lemma.numberCode} ·{" "}
-          {lemma.caseCode}
-        </p>
-        <p className="mt-2 text-sm">
-          lemma {lemma.lemma} — “{lemma.gloss}”
-        </p>
-        <p className="text-muted-foreground text-xs">
-          {formatCount(lemma.occurrences)} occurrences in corpus
-        </p>
-        <Button
-          className="mt-3 h-auto p-0 text-primary"
-          onClick={() => onInspect(lemma)}
-          size="sm"
-          type="button"
-          variant="link"
-        >
-          View details →
-        </Button>
-      </PreviewCardPopup>
-    </PreviewCard>
-  )
+function placeholderNode(form: string, passage: CorpusPassage, node: number): CorpusNode {
+  return {
+    node,
+    otype: "word",
+    is_slot: true,
+    slot_type: "word",
+    first_slot: node,
+    last_slot: node,
+    section_ref: passage.ref,
+    text: form,
+    features: {},
+    annotation: null,
+    node_types: [],
+  }
 }
 
-function PassageText({
+async function inspectLiveToken(
+  filename: string,
+  passage: CorpusPassage,
+  form: string,
+  wordIndex: number,
+): Promise<Lemma> {
+  if (passage.node == null) {
+    return lemmaFromNode(placeholderNode(form, passage, 0), form)
+  }
+  try {
+    const container = await fetchCorpusNode(filename, passage.node)
+    const slot = slotForToken(container, wordIndex)
+    if (slot != null && slot !== container.node) {
+      try {
+        return lemmaFromNode(await fetchCorpusNode(filename, slot), form)
+      } catch {
+        return lemmaFromNode(container, form)
+      }
+    }
+    return lemmaFromNode(container, form)
+  } catch {
+    return lemmaFromNode(placeholderNode(form, passage, passage.node), form)
+  }
+}
+
+function LivePassage({
   passage,
+  filename,
+  index,
   onInspect,
 }: {
-  passage: ReaderPassage
+  passage: CorpusPassage
+  filename: string
+  index: number
   onInspect: (lemma: Lemma) => void
 }) {
-  const parts = passage.text.split(LEMMA_PATTERN)
-  const matches = passage.text.match(LEMMA_PATTERN) ?? []
+  const tokens = passage.text.split(/(\s+)/)
+  let wordIndex = -1
   return (
-    <p className="text-sm leading-7">
-      {parts.map((part, index) => (
-        <span key={`${passage.n}-${index}`}>
-          {part}
-          {matches[index] ? (
-            <WordToken
-              form={matches[index]}
-              lemma={DOCTRINA}
-              onInspect={onInspect}
-            />
-          ) : null}
-        </span>
-      ))}
-    </p>
+    <li className="flex gap-4">
+      <span
+        aria-hidden="true"
+        className="w-4 shrink-0 pt-0.5 text-muted-foreground text-xs tabular-nums"
+      >
+        {index + 1}
+      </span>
+      <p className="text-sm leading-7">
+        {tokens.map((token, tokenIndex) => {
+          if (!token || /^\s+$/.test(token)) return token
+          const thisWord = ++wordIndex
+          const form = token.replace(/^[^\p{L}\p{M}]+|[^\p{L}\p{M}]+$/gu, "") || token
+          return (
+            <button
+              className="rounded-sm hover:outline hover:outline-primary"
+              key={`${passage.ref}-${tokenIndex}`}
+              onClick={() => {
+                void inspectLiveToken(filename, passage, form, thisWord).then(onInspect)
+              }}
+              type="button"
+            >
+              {token}
+            </button>
+          )
+        })}
+      </p>
+    </li>
   )
 }
 
-/** Documents tab: contents list + article, with optional word inspect panel. */
-export default function Reader({
+function LiveReader({
+  archive,
   sectionTitle,
   onViewOccurrences,
 }: {
+  archive: CorpusArchive
   sectionTitle: string
   onViewOccurrences?: () => void
 }) {
-  const reader = useMemo(() => readerFor(sectionTitle), [sectionTitle])
-  const [questionId, setQuestionId] = useState(reader.defaultQuestionId)
+  const item = findIndexItem(archive.index, sectionTitle)
+  const questions = item?.children.length
+    ? item.children
+    : item
+      ? [{ title: item.title, ref: item.ref }]
+      : []
+  const [selected, setSelected] = useState(questions[0]?.ref ?? item?.ref ?? "")
   const [lemma, setLemma] = useState<Lemma | null>(null)
+  const [passages, setPassages] = useState<CorpusPassage[]>([])
+  const [loading, setLoading] = useState(Boolean(selected))
 
-  const article =
-    reader.articles[questionId] ?? reader.articles[reader.defaultQuestionId]
+  useEffect(() => {
+    if (!selected) return
+    let cancelled = false
+    setLoading(true)
+    fetchCorpusContent(archive.filename, { ref: selected, limit: 20 })
+      .then((content) => {
+        if (!cancelled) setPassages(content.passages)
+      })
+      .catch(() => {
+        if (!cancelled) setPassages([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [archive.filename, selected])
+
+  const heading = questions.find((question) => question.ref === selected)?.title ?? sectionTitle
 
   return (
     <div
@@ -116,20 +154,20 @@ export default function Reader({
       <Panel bodyClassName="p-2" title="Contents">
         <nav aria-label="Section contents">
           <ul className="flex flex-col">
-            {reader.questions.map((question) => {
-              const selected = question.id === questionId
+            {questions.map((question) => {
+              const isSelected = question.ref === selected
               return (
-                <li key={question.id}>
+                <li key={question.ref}>
                   <button
-                    aria-current={selected ? "true" : undefined}
+                    aria-current={isSelected ? "true" : undefined}
                     className={cn(
                       "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm",
-                      selected
+                      isSelected
                         ? "border-s-2 border-primary bg-muted font-medium"
                         : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                     )}
                     onClick={() => {
-                      setQuestionId(question.id)
+                      setSelected(question.ref)
                       setLemma(null)
                     }}
                     type="button"
@@ -142,35 +180,30 @@ export default function Reader({
           </ul>
         </nav>
       </Panel>
-
       <article className="min-w-0 rounded-2xl border p-6">
-        {article && (
-          <>
-            <header className="mb-6">
-              <h2 className="font-heading text-xl font-semibold">
-                {article.heading}
-              </h2>
-              <p className="mt-1 text-muted-foreground text-sm">
-                {article.subtitle}
-              </p>
-            </header>
-            <ol className="flex flex-col gap-6">
-              {article.passages.map((passage) => (
-                <li className="flex gap-4" key={passage.n}>
-                  <span
-                    aria-hidden="true"
-                    className="w-4 shrink-0 pt-0.5 text-muted-foreground text-xs tabular-nums"
-                  >
-                    {passage.n}
-                  </span>
-                  <PassageText onInspect={setLemma} passage={passage} />
-                </li>
-              ))}
-            </ol>
-          </>
+        <header className="mb-6">
+          <h2 className="font-heading text-xl font-semibold">{heading}</h2>
+        </header>
+        {loading ? (
+          <div aria-label="Loading passages" className="flex flex-col gap-3" role="status">
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-5/6" />
+            <Skeleton className="h-5 w-2/3" />
+          </div>
+        ) : (
+          <ol className="flex flex-col gap-6">
+            {passages.map((passage, index) => (
+              <LivePassage
+                filename={archive.filename}
+                index={index}
+                key={`${passage.ref}-${passage.node ?? index}`}
+                onInspect={setLemma}
+                passage={passage}
+              />
+            ))}
+          </ol>
         )}
       </article>
-
       {lemma && (
         <WordPanel
           lemma={lemma}
@@ -179,5 +212,39 @@ export default function Reader({
         />
       )}
     </div>
+  )
+}
+
+/** Documents tab: Hub passages when a matching archive is published. */
+export default function Reader({
+  sectionTitle,
+  archive,
+  onViewOccurrences,
+}: {
+  sectionTitle: string
+  archive?: CorpusArchive | null
+  onViewOccurrences?: () => void
+}) {
+  if (archive?.index.sections?.items.length) {
+    return (
+      <LiveReader
+        archive={archive}
+        onViewOccurrences={onViewOccurrences}
+        sectionTitle={sectionTitle}
+      />
+    )
+  }
+  return (
+    <Empty className="py-10">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <BookOpenText />
+        </EmptyMedia>
+        <EmptyTitle>No passages yet</EmptyTitle>
+        <EmptyDescription>
+          Passages load from a published Hub archive for this corpus.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   )
 }

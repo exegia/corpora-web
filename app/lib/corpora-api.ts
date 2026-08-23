@@ -241,3 +241,205 @@ export async function validateConversion(
     return { status: "skipped" }
   }
 }
+
+// ── Hub storage (corpus-detail) ──────────────────────────────────────────────
+// Detail endpoints serve published Hub archives only, not conversion jobs.
+// See specs/004-connect-with-py/contracts/corpora-api.md ("Adjacent surface").
+
+export interface StoredCorpus {
+  filename: string
+  size_bytes: number | null
+  repo_id: string
+  url: string
+}
+
+export interface IndexChild {
+  title: string
+  ref: string
+}
+
+export interface IndexItem {
+  title: string
+  ref: string
+  children: IndexChild[]
+}
+
+export interface IndexSections {
+  levels: string[]
+  items: IndexItem[]
+}
+
+export interface NodeTypeCount {
+  type: string
+  count: number
+}
+
+/** GET /storage/{filename}/index */
+export interface CorpusIndex {
+  toc: unknown
+  sections: IndexSections | null
+  node_types: NodeTypeCount[]
+}
+
+export interface CorpusPassage {
+  ref: string
+  text: string
+  node?: number
+}
+
+/** GET /storage/{filename}/content */
+export interface ContentResponse {
+  ref: string | null
+  format: string
+  passages: CorpusPassage[]
+  total: number
+  offset: number
+  limit: number
+  next_offset: number | null
+}
+
+export interface ContentQuery {
+  ref?: string | null
+  fmt?: string | null
+  offset?: number
+  limit?: number
+}
+
+/** GET /storage/{filename}/nodes/{node} */
+export interface CorpusNode {
+  node: number
+  otype: string
+  is_slot: boolean
+  slot_type: string | null
+  first_slot: number | null
+  last_slot: number | null
+  section_ref: string | null
+  text: string
+  features: Record<string, unknown>
+  annotation: Record<string, unknown> | null
+  node_types: string[]
+}
+
+export interface CorpusArchive {
+  filename: string
+  index: CorpusIndex
+}
+
+function storageBase(filename: string): string {
+  return `/storage/${encodeURIComponent(filename)}`
+}
+
+/** Turn a library name or upload filename into a Hub `.corpus` archive name. */
+export function asCorpusFilename(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) return ""
+  if (/\.corpus$/i.test(trimmed)) return trimmed
+  const stem = trimmed.replace(/\.[^./]+$/, "")
+  return `${stem}.corpus`
+}
+
+/** Hub filenames to try for a library document, in lookup order. */
+export function hubFilenameCandidates(document: {
+  filename: string | null
+  name: string
+}): string[] {
+  const seen = new Set<string>()
+  const names: string[] = []
+  for (const raw of [document.filename, document.name]) {
+    if (!raw) continue
+    const filename = asCorpusFilename(raw)
+    const key = filename.toLowerCase()
+    if (!filename || seen.has(key)) continue
+    seen.add(key)
+    names.push(filename)
+  }
+  return names
+}
+
+/** GET /storage — published Hub archives. */
+export async function listStoredCorpora(): Promise<StoredCorpus[]> {
+  const response = await apiFetch("/storage")
+  return (await response.json()) as StoredCorpus[]
+}
+
+/** GET /storage/{filename}/index */
+export async function fetchCorpusIndex(filename: string): Promise<CorpusIndex> {
+  const response = await apiFetch(`${storageBase(filename)}/index`)
+  return (await response.json()) as CorpusIndex
+}
+
+/** GET /storage/{filename}/content */
+export async function fetchCorpusContent(
+  filename: string,
+  query: ContentQuery = {},
+): Promise<ContentResponse> {
+  const params = new URLSearchParams()
+  if (query.ref != null && query.ref !== "") params.set("ref", query.ref)
+  if (query.fmt != null && query.fmt !== "") params.set("fmt", query.fmt)
+  if (query.offset != null) params.set("offset", String(query.offset))
+  if (query.limit != null) params.set("limit", String(query.limit))
+  const suffix = params.toString() ? `?${params}` : ""
+  const response = await apiFetch(`${storageBase(filename)}/content${suffix}`)
+  return (await response.json()) as ContentResponse
+}
+
+/** GET /storage/{filename}/nodes/{node} */
+export async function fetchCorpusNode(
+  filename: string,
+  node: number,
+): Promise<CorpusNode> {
+  const response = await apiFetch(`${storageBase(filename)}/nodes/${node}`)
+  return (await response.json()) as CorpusNode
+}
+
+/** GET /storage/{filename}/download — the published .corpus archive. */
+export async function downloadStoredCorpus(filename: string): Promise<Blob> {
+  const response = await apiFetch(`${storageBase(filename)}/download`)
+  return response.blob()
+}
+
+function matchesHubFilename(
+  stored: string,
+  stems: Set<string>,
+): boolean {
+  const stem = stored.replace(/\.corpus$/i, "").toLowerCase()
+  return stems.has(stem) || stems.has(stored.toLowerCase())
+}
+
+/**
+ * Resolve a library document to a published Hub archive. Lists Hub storage
+ * first so a miss is a 200 (not a 404 in the console), then loads that
+ * archive's index. Direct `/index` lookups run only when listing itself
+ * fails. Returns null when the Hub has no match or is unreachable.
+ */
+export async function loadCorpusArchive(document: {
+  filename: string | null
+  name: string
+}): Promise<CorpusArchive | null> {
+  const candidates = hubFilenameCandidates(document)
+  const stems = new Set(
+    candidates.map((name) => name.replace(/\.corpus$/i, "").toLowerCase()),
+  )
+  try {
+    const listed = await listStoredCorpora()
+    const match = listed.find((item) => matchesHubFilename(item.filename, stems))
+    if (!match) return null
+    const index = await fetchCorpusIndex(match.filename)
+    return { filename: match.filename, index }
+  } catch (error) {
+    if (error instanceof CorporaApiError && error.kind === "unreachable") {
+      return null
+    }
+  }
+  for (const filename of candidates) {
+    try {
+      const index = await fetchCorpusIndex(filename)
+      return { filename, index }
+    } catch (error) {
+      if (error instanceof CorporaApiError && error.kind === "unreachable") {
+        return null
+      }
+    }
+  }
+  return null
+}

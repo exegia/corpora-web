@@ -1,5 +1,5 @@
-import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
-import type { ExploreTab, NodeTypeStat } from "./types"
+import type { CorpusSection } from "@/lib/corpus"
+import type { ExploreTab } from "./types"
 
 export const EXPLORE_TABS = [
   "overview",
@@ -55,28 +55,6 @@ export function abbreviateSection(title: string): string {
   if (key === "tertia pars") return "III"
   if (key.startsWith("supplement")) return "Suppl."
   return title.length > 8 ? `${title.slice(0, 7)}…` : title
-}
-
-/**
- * Node-type stats for the Analytics / Structure tabs. Prefers live counts
- * from the document when present, and fills in the remaining rows from the
- * design's Text-Fabric hierarchy so the charts have a complete shape.
- */
-export function nodeTypeStats(
-  document: CorpusDocument,
-  demo: NodeTypeStat[],
-): NodeTypeStat[] {
-  const words = document.words
-  return demo.map((row) => {
-    if (row.type === "word" && words != null) {
-      return { ...row, count: words }
-    }
-    if (row.type === "book" && document.toc && document.toc.length > 0) {
-      return { ...row, count: document.toc.length }
-    }
-    if (row.type === "corpus") return { ...row, count: 1 }
-    return row
-  })
 }
 
 export function sectionByTitle(

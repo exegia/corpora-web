@@ -2,9 +2,14 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { isCorpusDetailData } from "@/components/breadcrumb/utils"
+import {
+  fetchCorpusContent,
+  fetchCorpusNode,
+  loadCorpusArchive,
+} from "@/lib/corpora-api"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument } from "@/lib/corpus"
-import { isCorpusDetailData } from "@/components/breadcrumb/utils"
 import CorpusDetailRoute, {
   clientAction,
   clientLoader,
@@ -16,6 +21,13 @@ vi.mock("@/lib/corpus", () => ({
   deleteCorpusDocument: vi.fn(),
   getCorpusDocument: vi.fn(),
   uploadCorpusFile: vi.fn(),
+}))
+
+vi.mock("@/lib/corpora-api", () => ({
+  loadCorpusArchive: vi.fn(async () => null),
+  fetchCorpusContent: vi.fn(),
+  fetchCorpusNode: vi.fn(),
+  downloadStoredCorpus: vi.fn(),
 }))
 
 const summa: CorpusDocument = {
@@ -61,9 +73,28 @@ function renderRoute() {
   return render(<Stub initialEntries={["/corpus/d2"]} />)
 }
 
+const hubIndex = {
+  toc: null,
+  sections: {
+    levels: ["book", "chapter"],
+    items: [
+      {
+        title: "Prima Pars",
+        ref: "Prima Pars",
+        children: [{ title: "Q.1", ref: "Prima Pars, Q.1" }],
+      },
+    ],
+  },
+  node_types: [
+    { type: "word", count: 80 },
+    { type: "clause", count: 20 },
+  ],
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getCorpusDocument).mockResolvedValue(summa)
+  vi.mocked(loadCorpusArchive).mockResolvedValue(null)
 })
 
 describe("/corpus/:documentId detail", () => {
@@ -76,7 +107,8 @@ describe("/corpus/:documentId detail", () => {
     expect(
       screen.getByText("The Summa, converted from TEI."),
     ).toBeInTheDocument()
-    expect(screen.getByText("4.2 MB")).toBeInTheDocument()
+    // Details sit behind the deferred Hub archive <Await>.
+    expect(await screen.findByText("4.2 MB")).toBeInTheDocument()
     expect(screen.getByText("30,102")).toBeInTheDocument()
     expect(screen.getByText("613")).toBeInTheDocument()
     expect(screen.getByText("English")).toBeInTheDocument()
@@ -95,7 +127,7 @@ describe("/corpus/:documentId detail", () => {
       expect(screen.getByRole("tab", { name })).toBeEnabled()
       expect(screen.getByRole("tab", { name })).not.toHaveAttribute("data-disabled")
     }
-    const table = screen.getByRole("table")
+    const table = await screen.findByRole("table")
     expect(table).toHaveTextContent("Prima Pars")
     expect(table).toHaveTextContent("8,442")
     expect(table).toHaveTextContent("312,004")
@@ -127,6 +159,58 @@ describe("/corpus/:documentId detail", () => {
     } as never)
     expect(isCorpusDetailData(data)).toBe(true)
     expect(data.document?.name).toBe("Summa Theologia (1200, ENG)")
+    expect(await data.archive).toBeNull()
+  })
+
+  it("fills Overview and Analytics from a published Hub archive when toc is empty", async () => {
+    const user = userEvent.setup()
+    vi.mocked(getCorpusDocument).mockResolvedValue({ ...summa, toc: null })
+    vi.mocked(loadCorpusArchive).mockResolvedValue({
+      filename: "summa-theologia-1200-ENG.corpus",
+      index: hubIndex,
+    })
+    renderRoute()
+    const table = await screen.findByRole("table")
+    expect(table).toHaveTextContent("Prima Pars")
+    expect(
+      screen.queryByText("No section data was captured for this corpus."),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("tab", { name: "Analytics" }))
+    expect(
+      await screen.findByRole("heading", { name: "Nodes by type" }),
+    ).toBeInTheDocument()
+    expect(screen.getByText("80 %")).toBeInTheDocument()
+    expect(screen.queryByText("65.8 %")).not.toBeInTheDocument()
+  })
+
+  it("reads Hub passages when opening a section from a published archive", async () => {
+    const user = userEvent.setup()
+    vi.mocked(loadCorpusArchive).mockResolvedValue({
+      filename: "summa-theologia-1200-ENG.corpus",
+      index: hubIndex,
+    })
+    vi.mocked(fetchCorpusContent).mockResolvedValue({
+      ref: "Prima Pars, Q.1",
+      format: "text-orig-full",
+      passages: [{ ref: "p1", text: "Sic venit doctrina", node: 9 }],
+      total: 1,
+      offset: 0,
+      limit: 20,
+      next_offset: null,
+    })
+    renderRoute()
+    await user.click(await screen.findByRole("button", { name: "Prima Pars" }))
+    expect(
+      await screen.findByRole("heading", { name: "Prima Pars" }),
+    ).toBeInTheDocument()
+    expect(await screen.findByRole("button", { name: "Q.1" })).toBeInTheDocument()
+    expect(await screen.findByRole("button", { name: "Sic" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "doctrina" })).toBeInTheDocument()
+    expect(fetchCorpusContent).toHaveBeenCalledWith(
+      "summa-theologia-1200-ENG.corpus",
+      { ref: "Prima Pars, Q.1", limit: 20 },
+    )
   })
 
   it("opens the Documents reader from an Overview section row", async () => {
@@ -134,26 +218,80 @@ describe("/corpus/:documentId detail", () => {
     renderRoute()
     await user.click(await screen.findByRole("button", { name: "Prima Pars" }))
     expect(await screen.findByRole("heading", { name: "Prima Pars" })).toBeInTheDocument()
-    expect(screen.getByRole("navigation", { name: "Section contents" })).toBeInTheDocument()
     expect(
-      screen.getByRole("heading", { name: /Quaestio 1/ }),
+      await screen.findByText(
+        "Passages load from a published Hub archive for this corpus.",
+      ),
     ).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: "Documents" })).toHaveAttribute(
       "data-active",
     )
   })
 
-  it("opens word details from a highlighted lemma", async () => {
+  it("opens word details from a Hub slot node", async () => {
     const user = userEvent.setup()
+    vi.mocked(loadCorpusArchive).mockResolvedValue({
+      filename: "summa-theologia-1200-ENG.corpus",
+      index: hubIndex,
+    })
+    vi.mocked(fetchCorpusContent).mockResolvedValue({
+      ref: "Prima Pars, Q.1",
+      format: "text-orig-full",
+      passages: [{ ref: "p1", text: "Sic venit doctrina", node: 9 }],
+      total: 1,
+      offset: 0,
+      limit: 20,
+      next_offset: null,
+    })
+    vi.mocked(fetchCorpusNode)
+      .mockResolvedValueOnce({
+        node: 9,
+        otype: "verse",
+        is_slot: false,
+        slot_type: "word",
+        first_slot: 1,
+        last_slot: 3,
+        section_ref: "Prima Pars, Q.1",
+        text: "Sic venit doctrina",
+        features: {},
+        annotation: null,
+        node_types: ["verse", "word"],
+      })
+      .mockResolvedValueOnce({
+        node: 3,
+        otype: "word",
+        is_slot: true,
+        slot_type: "word",
+        first_slot: 3,
+        last_slot: 3,
+        section_ref: "Prima Pars, Q.1",
+        text: "doctrina",
+        features: {
+          lemma: "doctrina",
+          sp: "Noun",
+          case: "Nominative",
+          gn: "f",
+          nu: "sg",
+        },
+        annotation: null,
+        node_types: ["word"],
+      })
     renderRoute()
     await user.click(await screen.findByRole("button", { name: "Prima Pars" }))
-    const tokens = await screen.findAllByRole("button", { name: "doctrina" })
-    await user.click(tokens[0]!)
+    await user.click(await screen.findByRole("button", { name: "doctrina" }))
     expect(
       await screen.findByRole("heading", { name: "doctrina" }),
     ).toBeInTheDocument()
     expect(screen.getByText("Morphology")).toBeInTheDocument()
     expect(screen.getByText("Nominative")).toBeInTheDocument()
+    expect(fetchCorpusNode).toHaveBeenCalledWith(
+      "summa-theologia-1200-ENG.corpus",
+      9,
+    )
+    expect(fetchCorpusNode).toHaveBeenCalledWith(
+      "summa-theologia-1200-ENG.corpus",
+      3,
+    )
   })
 
   it("renders structure, analytics, and activity from the explorer tabs", async () => {
@@ -163,37 +301,25 @@ describe("/corpus/:documentId detail", () => {
 
     await user.click(screen.getByRole("tab", { name: "Structure" }))
     expect(
-      await screen.findByRole("heading", { name: "Document hierarchy" }),
+      await screen.findByText(
+        "Structure loads from a published Hub archive for this corpus.",
+      ),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole("button", { name: "Expand Summa Theologia (1200, ENG)" }),
-    ).toBeInTheDocument()
-    expect(screen.queryByText("quaestio")).not.toBeInTheDocument()
-    expect(screen.queryByText("Slot type")).not.toBeInTheDocument()
-
-    await user.click(
-      screen.getByRole("button", { name: "Expand Summa Theologia (1200, ENG)" }),
-    )
-    expect(await screen.findByText("Prima Pars")).toBeInTheDocument()
-    expect(screen.getByText("Supplementum")).toBeInTheDocument()
-    // Children of the corpus are the two toc books, not a corpus-wide type total.
-    expect(screen.getByText("2")).toBeInTheDocument()
-    expect(screen.getByText("119")).toBeInTheDocument()
-    expect(screen.queryByText("234,175")).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole("button", { name: "Expand Prima Pars" }))
-    expect(
-      await screen.findByRole("status", { name: "Loading children" }),
-    ).toBeInTheDocument()
-    expect(await screen.findByText("Q.1 · Sacred doctrine")).toBeInTheDocument()
-    expect(screen.queryByText("Slot type")).not.toBeInTheDocument()
+      screen.queryByRole("heading", { name: "Document hierarchy" }),
+    ).not.toBeInTheDocument()
 
     await user.click(screen.getByRole("tab", { name: "Analytics" }))
     expect(
       await screen.findByRole("heading", { name: "Nodes by type" }),
     ).toBeInTheDocument()
     expect(screen.getByText("Words per document")).toBeInTheDocument()
-    expect(screen.getByText("65.8 %")).toBeInTheDocument()
+    expect(
+      screen.getAllByText(
+        "No node-type counts were published for this corpus.",
+      ).length,
+    ).toBeGreaterThan(0)
+    expect(screen.queryByText("65.8 %")).not.toBeInTheDocument()
 
     await user.click(screen.getByRole("tab", { name: "Activity" }))
     expect(
@@ -201,6 +327,25 @@ describe("/corpus/:documentId detail", () => {
     ).toBeInTheDocument()
     expect(screen.getByText("Conversion succeeded")).toBeInTheDocument()
     expect(screen.getByText("Initial upload")).toBeInTheDocument()
+  })
+
+  it("expands the Hub structure tree from the published index", async () => {
+    const user = userEvent.setup()
+    vi.mocked(loadCorpusArchive).mockResolvedValue({
+      filename: "summa-theologia-1200-ENG.corpus",
+      index: hubIndex,
+    })
+    renderRoute()
+    await user.click(await screen.findByRole("tab", { name: "Structure" }))
+    expect(
+      await screen.findByRole("heading", { name: "Document hierarchy" }),
+    ).toBeInTheDocument()
+    await user.click(
+      screen.getByRole("button", { name: "Expand Summa Theologia (1200, ENG)" }),
+    )
+    expect(await screen.findByText("Prima Pars")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Expand Prima Pars" }))
+    expect(await screen.findByText("Q.1")).toBeInTheDocument()
   })
 
   it("deletes after the DELETE gate and redirects to the library", async () => {

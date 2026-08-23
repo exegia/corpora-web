@@ -1,5 +1,6 @@
 import { Download, FileArchive, ListTree } from "lucide-react"
-import { redirect, useLoaderData, useSearchParams } from "react-router"
+import { Suspense } from "react"
+import { Await, redirect, useLoaderData, useSearchParams } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Blocks } from "@/components/blocks"
 import { CorpusDetail } from "@/components/corpus/detail"
@@ -16,16 +17,25 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
+import type { CorpusArchive } from "@/lib/corpora-api"
+import { downloadStoredCorpus, loadCorpusArchive } from "@/lib/corpora-api"
+import { sectionsFromIndex } from "@/lib/corpus-explore"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import { DataError } from "@/lib/projects"
+import { useLoadingSound, useReadySound } from "@/lib/sounds"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   // Awaited: the breadcrumb reads `document` off loaderData synchronously
   // (components/breadcrumb), and it is one indexed row.
   const document = await getCorpusDocument(params.documentId ?? "")
-  return { document }
+  // Hub index is the slow follow-up; defer so the header paints immediately.
+  const archive = document
+    ? loadCorpusArchive(document)
+    : Promise.resolve(null)
+  return { document, archive }
 }
 
 export async function clientAction({ request }: ActionFunctionArgs) {
@@ -64,20 +74,56 @@ function NotFound() {
   )
 }
 
-/**
- * Honest client stub for Export: a JSON snapshot of the document's metadata.
- * The real backend replaces this with GET /convert/{id}/download (corpora-py).
- */
-function exportDocument(document: CorpusDocument) {
-  const blob = new Blob([JSON.stringify(document, null, 2)], {
-    type: "application/json",
-  })
+function saveDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const anchor = window.document.createElement("a")
   anchor.href = url
-  anchor.download = `${document.name}.json`
+  anchor.download = filename
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+/**
+ * Prefer the published Hub archive (`GET /storage/{filename}/download`).
+ * Library rows that never made it to the Hub fall back to a JSON snapshot
+ * of the document's metadata.
+ */
+async function exportDocument(document: CorpusDocument) {
+  try {
+    const archive = await loadCorpusArchive(document)
+    if (archive) {
+      saveDownload(await downloadStoredCorpus(archive.filename), archive.filename)
+      return
+    }
+  } catch {
+    // Hub miss or unreachable — keep the metadata snapshot.
+  }
+  saveDownload(
+    new Blob([JSON.stringify(document, null, 2)], {
+      type: "application/json",
+    }),
+    `${document.name}.json`,
+  )
+}
+
+function ArchiveFallback() {
+  useLoadingSound()
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Loading corpus archive"
+      className="grid gap-6 lg:grid-cols-[18rem_1fr]"
+      role="status"
+    >
+      <div className="flex flex-col gap-3 rounded-2xl border p-4">
+        <Skeleton className="h-4 w-20" />
+        {Array.from({ length: 6 }, (_, i) => (
+          <Skeleton className="h-8 w-full" key={i} />
+        ))}
+      </div>
+      <Skeleton className="h-48 w-full" />
+    </div>
+  )
 }
 
 function EmptySections() {
@@ -96,16 +142,82 @@ function EmptySections() {
   )
 }
 
+function ExplorerPanels({
+  document,
+  archive,
+  sectionTitle,
+  onOpenSection,
+  onAnalytics,
+}: {
+  document: CorpusDocument
+  archive: CorpusArchive | null
+  sectionTitle: string | null
+  onOpenSection: (section: CorpusSection) => void
+  onAnalytics: () => void
+}) {
+  useReadySound()
+  const sections = document.toc?.length
+    ? document.toc
+    : archive
+      ? sectionsFromIndex(archive.index)
+      : []
+  const section = sectionByTitle(sections, sectionTitle)
+
+  return (
+    <>
+      <TabsPanel value="overview">
+        <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
+          <CorpusDetail.DetailsCard document={document} />
+          {sections.length > 0 ? (
+            <CorpusDetail.OverviewTable
+              onOpenSection={onOpenSection}
+              sections={sections}
+            />
+          ) : (
+            <EmptySections />
+          )}
+        </div>
+      </TabsPanel>
+
+      <TabsPanel value="documents">
+        {section ? (
+          <CorpusDetail.Reader
+            archive={archive}
+            key={section.title}
+            onViewOccurrences={onAnalytics}
+            sectionTitle={section.title}
+          />
+        ) : (
+          <EmptySections />
+        )}
+      </TabsPanel>
+
+      <TabsPanel value="structure">
+        <CorpusDetail.Structure archive={archive} document={document} />
+      </TabsPanel>
+
+      <TabsPanel value="analytics">
+        <CorpusDetail.Analytics archive={archive} document={document} />
+      </TabsPanel>
+
+      <TabsPanel value="activity">
+        <CorpusDetail.Activity document={document} />
+      </TabsPanel>
+    </>
+  )
+}
+
 /** One corpus document: details, explorer tabs, and its lifecycle actions. */
 export default function CorpusDetailPage() {
-  const { document } = useLoaderData<typeof clientLoader>()
+  const { document, archive } = useLoaderData<typeof clientLoader>()
   const [params, setParams] = useSearchParams()
 
   if (!document) return <NotFound />
 
   const tab = parseExploreTab(params.get("tab"))
-  const section = sectionByTitle(document.toc, params.get("section"))
-  const reading = tab === "documents" && section
+  const sectionTitle = params.get("section")
+  const tocSection = sectionByTitle(document.toc, sectionTitle)
+  const reading = tab === "documents" && (tocSection != null || Boolean(sectionTitle))
 
   function setTab(next: string) {
     const nextParams = new URLSearchParams(params)
@@ -152,8 +264,12 @@ export default function CorpusDetailPage() {
           reading
             ? [
                 document.name,
-                section.nodes != null ? `${formatCount(section.nodes)} nodes` : null,
-                `${formatCount(section.words)} words`,
+                tocSection?.nodes != null
+                  ? `${formatCount(tocSection.nodes)} nodes`
+                  : null,
+                tocSection?.words != null
+                  ? `${formatCount(tocSection.words)} words`
+                  : null,
               ]
                 .filter(Boolean)
                 .join(" · ")
@@ -170,46 +286,22 @@ export default function CorpusDetailPage() {
             <TabsTab value="activity">Activity</TabsTab>
           </TabsList>
         }
-        title={reading ? section.title : undefined}
+        title={reading ? (tocSection?.title ?? sectionTitle ?? undefined) : undefined}
       />
 
-      <TabsPanel value="overview">
-        <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
-          <CorpusDetail.DetailsCard document={document} />
-          {document.toc && document.toc.length > 0 ? (
-            <CorpusDetail.OverviewTable
+      <Suspense fallback={<ArchiveFallback />}>
+        <Await resolve={archive}>
+          {(resolved) => (
+            <ExplorerPanels
+              archive={resolved}
+              document={document}
+              onAnalytics={() => setTab("analytics")}
               onOpenSection={openSection}
-              sections={document.toc}
+              sectionTitle={params.get("section")}
             />
-          ) : (
-            <EmptySections />
           )}
-        </div>
-      </TabsPanel>
-
-      <TabsPanel value="documents">
-        {section ? (
-          <CorpusDetail.Reader
-            key={section.title}
-            onViewOccurrences={() => setTab("analytics")}
-            sectionTitle={section.title}
-          />
-        ) : (
-          <EmptySections />
-        )}
-      </TabsPanel>
-
-      <TabsPanel value="structure">
-        <CorpusDetail.Structure document={document} />
-      </TabsPanel>
-
-      <TabsPanel value="analytics">
-        <CorpusDetail.Analytics document={document} />
-      </TabsPanel>
-
-      <TabsPanel value="activity">
-        <CorpusDetail.Activity document={document} />
-      </TabsPanel>
+        </Await>
+      </Suspense>
     </Tabs>
   )
 }

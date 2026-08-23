@@ -43,9 +43,11 @@ export interface StructureNode {
   id: string
   type: string
   label: string
-  /** Direct children of this node, not a corpus-wide type total. */
-  childCount: number
+  /** Direct children of this node. Null when the count is not known yet. */
+  childCount: number | null
   slotType?: boolean
+  ref?: string
+  node?: number
   children?: StructureNode[]
 }
 
@@ -65,28 +67,6 @@ export interface Lemma {
   occurrences: number
   occurrencesInSection: number
   context: string[]
-}
-
-export interface ReaderQuestion {
-  id: string
-  title: string
-}
-
-export interface ReaderPassage {
-  n: number
-  text: string
-}
-
-export interface ReaderArticle {
-  heading: string
-  subtitle: string
-  passages: ReaderPassage[]
-}
-
-export interface ReaderDocument {
-  questions: ReaderQuestion[]
-  defaultQuestionId: string
-  articles: Record<string, ReaderArticle>
 }
 
 export interface VersionEntry {

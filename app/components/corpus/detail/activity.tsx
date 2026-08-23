@@ -1,10 +1,85 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { CorpusDocument } from "@/lib/corpus"
-import { activityFor, activityTimestamp, versionsFor } from "./demo-data"
+import { formatSize } from "../list/utils"
 import Panel from "./panel"
 import { formatDateTime } from "./utils"
 import type { ActivityEvent, VersionEntry } from "./types"
+
+function versionsFor(document: CorpusDocument): VersionEntry[] {
+  const versions: VersionEntry[] = []
+  if (document.convertedAt) {
+    versions.push({
+      id: "converted",
+      label: "v1.1",
+      title: "Converted",
+      at: document.convertedAt,
+      current: true,
+      notes: document.sourceFormat
+        ? [`Source format ${document.sourceFormat}`]
+        : [],
+    })
+  }
+  versions.push({
+    id: "uploaded",
+    label: "v1.0",
+    title: "Initial upload",
+    at: document.uploadedAt,
+    current: !document.convertedAt,
+    notes: [
+      document.filename ? document.filename : "Uploaded to the library",
+      document.docsCount
+        ? `${document.docsCount.toLocaleString("en-US")} documents imported`
+        : null,
+    ].filter((note): note is string => Boolean(note)),
+  })
+  return versions
+}
+
+function activityFor(document: CorpusDocument): ActivityEvent[] {
+  const events: ActivityEvent[] = []
+  if (document.convertedAt) {
+    events.push({
+      id: "converted",
+      title: "Conversion succeeded",
+      detail: document.sourceFormat
+        ? `${document.sourceFormat} → corpus archive`
+        : "Archive ready to browse",
+      at: document.convertedAt,
+      accent: true,
+    })
+  }
+  events.push({
+    id: "uploaded",
+    title: "Upload received",
+    detail:
+      [document.filename, formatSize(document.sizeBytes)]
+        .filter((part) => part && part !== "—")
+        .join(" · ") || "File stored in the library",
+    at: document.uploadedAt,
+    accent: !document.convertedAt,
+  })
+  events.push({
+    id: "created",
+    title: "Corpus created",
+    detail: "Added to the library",
+    at: document.uploadedAt,
+    accent: false,
+  })
+  return events
+}
+
+function activityTimestamp(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ""
+  const delta = now.getTime() - then
+  const day = 1000 * 60 * 60 * 24
+  if (delta < day) return formatDateTime(iso).replace(/.*,\s*/, "")
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })
+}
 
 function VersionRow({ version }: { version: VersionEntry }) {
   return (
