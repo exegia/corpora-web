@@ -1,8 +1,13 @@
 import { Download, FileArchive, ListTree } from "lucide-react"
-import { redirect, useLoaderData } from "react-router"
+import { redirect, useLoaderData, useSearchParams } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Blocks } from "@/components/blocks"
 import { CorpusDetail } from "@/components/corpus/detail"
+import {
+  formatCount,
+  parseExploreTab,
+  sectionByTitle,
+} from "@/components/corpus/detail/utils"
 import { Button } from "@/components/ui/button"
 import {
   Empty,
@@ -13,7 +18,7 @@ import {
 } from "@/components/ui/empty"
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
-import type { CorpusDocument } from "@/lib/corpus"
+import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import { DataError } from "@/lib/projects"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
@@ -75,16 +80,56 @@ function exportDocument(document: CorpusDocument) {
   URL.revokeObjectURL(url)
 }
 
-/** One corpus document: details, overview sections, and its lifecycle actions. */
+function EmptySections() {
+  return (
+    <Empty className="py-10">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <ListTree />
+        </EmptyMedia>
+        <EmptyTitle>No sections yet</EmptyTitle>
+        <EmptyDescription>
+          No section data was captured for this corpus.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  )
+}
+
+/** One corpus document: details, explorer tabs, and its lifecycle actions. */
 export default function CorpusDetailPage() {
   const { document } = useLoaderData<typeof clientLoader>()
+  const [params, setParams] = useSearchParams()
 
   if (!document) return <NotFound />
 
+  const tab = parseExploreTab(params.get("tab"))
+  const section = sectionByTitle(document.toc, params.get("section"))
+  const reading = tab === "documents" && section
+
+  function setTab(next: string) {
+    const nextParams = new URLSearchParams(params)
+    const parsed = parseExploreTab(next)
+    if (parsed === "overview") nextParams.delete("tab")
+    else nextParams.set("tab", parsed)
+    if (parsed !== "documents") nextParams.delete("section")
+    setParams(nextParams, { replace: true, preventScrollReset: true })
+  }
+
+  function openSection(next: CorpusSection) {
+    const nextParams = new URLSearchParams(params)
+    nextParams.set("tab", "documents")
+    nextParams.set("section", next.title)
+    setParams(nextParams, { preventScrollReset: true })
+  }
+
   return (
-    <section className="flex flex-col gap-6">
+    <Tabs
+      className="flex flex-col gap-6"
+      onValueChange={setTab}
+      value={tab}
+    >
       <CorpusDetail.Header
-        document={document}
         actions={
           <>
             <Blocks.ConfirmDelete
@@ -103,43 +148,68 @@ export default function CorpusDetailPage() {
             </Button>
           </>
         }
+        description={
+          reading
+            ? [
+                document.name,
+                section.nodes != null ? `${formatCount(section.nodes)} nodes` : null,
+                `${formatCount(section.words)} words`,
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : undefined
+        }
+        document={document}
+        hideMeta={Boolean(reading)}
+        tabs={
+          <TabsList>
+            <TabsTab value="overview">Overview</TabsTab>
+            <TabsTab value="documents">Documents</TabsTab>
+            <TabsTab value="structure">Structure</TabsTab>
+            <TabsTab value="analytics">Analytics</TabsTab>
+            <TabsTab value="activity">Activity</TabsTab>
+          </TabsList>
+        }
+        title={reading ? section.title : undefined}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
-        <CorpusDetail.DetailsCard document={document} />
-        <Tabs defaultValue="overview">
-          <TabsList variant="underline">
-            <TabsTab value="overview">Overview</TabsTab>
-            {/* Present but inert until those views are designed. */}
-            <TabsTab disabled value="documents">
-              Documents
-            </TabsTab>
-            <TabsTab disabled value="structure">
-              Structure
-            </TabsTab>
-            <TabsTab disabled value="activity">
-              Activity
-            </TabsTab>
-          </TabsList>
-          <TabsPanel value="overview">
-            {document.toc && document.toc.length > 0 ? (
-              <CorpusDetail.OverviewTable sections={document.toc} />
-            ) : (
-              <Empty className="py-10">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <ListTree />
-                  </EmptyMedia>
-                  <EmptyTitle>No sections yet</EmptyTitle>
-                  <EmptyDescription>
-                    No section data was captured for this corpus.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )}
-          </TabsPanel>
-        </Tabs>
-      </div>
-    </section>
+      <TabsPanel value="overview">
+        <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
+          <CorpusDetail.DetailsCard document={document} />
+          {document.toc && document.toc.length > 0 ? (
+            <CorpusDetail.OverviewTable
+              onOpenSection={openSection}
+              sections={document.toc}
+            />
+          ) : (
+            <EmptySections />
+          )}
+        </div>
+      </TabsPanel>
+
+      <TabsPanel value="documents">
+        {section ? (
+          <CorpusDetail.Reader
+            key={section.title}
+            onViewOccurrences={() => setTab("analytics")}
+            sectionTitle={section.title}
+          />
+        ) : (
+          <EmptySections />
+        )}
+      </TabsPanel>
+
+      <TabsPanel value="structure">
+        <CorpusDetail.Structure document={document} />
+      </TabsPanel>
+
+      <TabsPanel value="analytics">
+        <CorpusDetail.Analytics document={document} />
+      </TabsPanel>
+
+      <TabsPanel value="activity">
+        <CorpusDetail.Activity document={document} />
+      </TabsPanel>
+    </Tabs>
   )
 }

@@ -14,7 +14,7 @@ import {
  * loader silently degrades the trail, and nothing type-errors.
  */
 export function useCrumbs(): Crumb[] {
-    const { pathname } = useLocation()
+    const { pathname, search } = useLocation()
     const matches = useMatches()
 
     const crumbs: Crumb[] = [{ label: "Dashboard", href: "/dashboard" }]
@@ -37,7 +37,17 @@ export function useCrumbs(): Crumb[] {
     if (section === "corpus" && segments.length > 1) {
         const detail = matches.find(match => isCorpusDetailData(match.loaderData))
         const document = detail && isCorpusDetailData(detail.loaderData) ? detail.loaderData.document : null
-        crumbs.push({ label: document?.name ?? "Corpus", href: pathname })
+        crumbs.push({
+            label: document?.name ?? "Corpus",
+            href: `/${section}/${segments[1]}`,
+        })
+        const sectionTitle = new URLSearchParams(search).get("section")
+        if (sectionTitle) {
+            crumbs.push({
+                label: sectionTitle,
+                href: `${pathname}?tab=documents&section=${encodeURIComponent(sectionTitle)}`,
+            })
+        }
     }
 
     if (section === "licenses" && segments.length > 1) {

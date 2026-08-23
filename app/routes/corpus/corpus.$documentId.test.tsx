@@ -82,20 +82,19 @@ describe("/corpus/:documentId detail", () => {
     expect(screen.getByText("English")).toBeInTheDocument()
     // Source format shows twice: the header's format badge and the card row.
     expect(screen.getAllByText("text-fabric")).toHaveLength(2)
-    // The licence opens the detail sheet rather than linking to the catalog.
-    expect(
-      screen.getByRole("button", { name: "CC BY-SA 4.0" }),
-    ).toHaveAttribute("data-slot", "sheet-trigger")
+    // Header + details card both open the licence sheet.
+    const licenceTriggers = screen.getAllByRole("button", { name: "CC BY-SA 4.0" })
+    expect(licenceTriggers.length).toBeGreaterThanOrEqual(1)
+    expect(licenceTriggers[0]).toHaveAttribute("data-slot", "sheet-trigger")
   })
 
-  it("shows the Overview sections and disables the undesigned tabs", async () => {
+  it("shows the Overview sections and enables the explorer tabs", async () => {
     renderRoute()
     expect(await screen.findByRole("tab", { name: "Overview" })).toBeEnabled()
-    for (const name of ["Documents", "Structure", "Activity"]) {
-      // Base UI disables tabs via data-disabled, not the disabled attribute.
-      expect(screen.getByRole("tab", { name })).toHaveAttribute("data-disabled")
+    for (const name of ["Documents", "Structure", "Analytics", "Activity"]) {
+      expect(screen.getByRole("tab", { name })).toBeEnabled()
+      expect(screen.getByRole("tab", { name })).not.toHaveAttribute("data-disabled")
     }
-    // Sections come from the toc captured at conversion time.
     const table = screen.getByRole("table")
     expect(table).toHaveTextContent("Prima Pars")
     expect(table).toHaveTextContent("8,442")
@@ -128,6 +127,80 @@ describe("/corpus/:documentId detail", () => {
     } as never)
     expect(isCorpusDetailData(data)).toBe(true)
     expect(data.document?.name).toBe("Summa Theologia (1200, ENG)")
+  })
+
+  it("opens the Documents reader from an Overview section row", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+    await user.click(await screen.findByRole("button", { name: "Prima Pars" }))
+    expect(await screen.findByRole("heading", { name: "Prima Pars" })).toBeInTheDocument()
+    expect(screen.getByRole("navigation", { name: "Section contents" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", { name: /Quaestio 1/ }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Documents" })).toHaveAttribute(
+      "data-active",
+    )
+  })
+
+  it("opens word details from a highlighted lemma", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+    await user.click(await screen.findByRole("button", { name: "Prima Pars" }))
+    const tokens = await screen.findAllByRole("button", { name: "doctrina" })
+    await user.click(tokens[0]!)
+    expect(
+      await screen.findByRole("heading", { name: "doctrina" }),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Morphology")).toBeInTheDocument()
+    expect(screen.getByText("Nominative")).toBeInTheDocument()
+  })
+
+  it("renders structure, analytics, and activity from the explorer tabs", async () => {
+    const user = userEvent.setup()
+    renderRoute()
+    await screen.findByRole("tab", { name: "Overview" })
+
+    await user.click(screen.getByRole("tab", { name: "Structure" }))
+    expect(
+      await screen.findByRole("heading", { name: "Document hierarchy" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Expand Summa Theologia (1200, ENG)" }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText("quaestio")).not.toBeInTheDocument()
+    expect(screen.queryByText("Slot type")).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole("button", { name: "Expand Summa Theologia (1200, ENG)" }),
+    )
+    expect(await screen.findByText("Prima Pars")).toBeInTheDocument()
+    expect(screen.getByText("Supplementum")).toBeInTheDocument()
+    // Children of the corpus are the two toc books, not a corpus-wide type total.
+    expect(screen.getByText("2")).toBeInTheDocument()
+    expect(screen.getByText("119")).toBeInTheDocument()
+    expect(screen.queryByText("234,175")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Expand Prima Pars" }))
+    expect(
+      await screen.findByRole("status", { name: "Loading children" }),
+    ).toBeInTheDocument()
+    expect(await screen.findByText("Q.1 · Sacred doctrine")).toBeInTheDocument()
+    expect(screen.queryByText("Slot type")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("tab", { name: "Analytics" }))
+    expect(
+      await screen.findByRole("heading", { name: "Nodes by type" }),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Words per document")).toBeInTheDocument()
+    expect(screen.getByText("65.8 %")).toBeInTheDocument()
+
+    await user.click(screen.getByRole("tab", { name: "Activity" }))
+    expect(
+      await screen.findByRole("heading", { name: "Version history" }),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Conversion succeeded")).toBeInTheDocument()
+    expect(screen.getByText("Initial upload")).toBeInTheDocument()
   })
 
   it("deletes after the DELETE gate and redirects to the library", async () => {
