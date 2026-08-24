@@ -49,6 +49,8 @@ export interface CorpusDocument {
   /** Storage path for uploads, the full URL for Hugging Face. */
   path: string
   filename: string | null
+  /** Conversion job id for GET /convert/{job_id}/… explore. Null on uploads. */
+  jobId: string | null
   uploadedAt: string
   commits: CorpusCommit[]
   /** Conversion metadata (corpora-py contract) — null on legacy rows. */
@@ -92,6 +94,7 @@ interface DocumentRow {
   source: CorpusSource
   path: string
   filename: string | null
+  job_id: string | null
   uploaded_at: string
   corpus_type: CorpusType | null
   source_format: string | null
@@ -108,7 +111,7 @@ interface DocumentRow {
   corpus_commits: CommitRow[]
 }
 
-const DOCUMENT_COLUMNS = `id, name, source, path, filename, uploaded_at,
+const DOCUMENT_COLUMNS = `id, name, source, path, filename, job_id, uploaded_at,
   corpus_type, source_format, licence, language, size_bytes, docs_count,
   nodes, words, status, converted_at, description, toc,
   corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at )`
@@ -132,6 +135,7 @@ function toDocument(row: DocumentRow): CorpusDocument {
     source: row.source,
     path: row.path,
     filename: row.filename,
+    jobId: row.job_id ?? null,
     uploadedAt: row.uploaded_at,
     corpusType: row.corpus_type ?? null,
     sourceFormat: row.source_format ?? null,
@@ -230,6 +234,7 @@ export interface CorpusMetadataInput {
   convertedAt?: string | null
   description?: string | null
   toc?: CorpusSection[] | null
+  jobId?: string | null
 }
 
 /** Record a corpus document with the history extracted from its archive. */
@@ -255,6 +260,7 @@ export async function createCorpusDocument(input: {
       source: input.source,
       path: input.path,
       filename: input.filename,
+      job_id: input.jobId ?? null,
       corpus_type: input.corpusType ?? null,
       source_format: input.sourceFormat ?? null,
       licence: input.licence ?? null,
@@ -270,7 +276,7 @@ export async function createCorpusDocument(input: {
       // Json type just can't see through the interface.
       toc: (input.toc ?? null) as unknown as Json,
     })
-    .select(`id, name, source, path, filename, uploaded_at,
+    .select(`id, name, source, path, filename, job_id, uploaded_at,
       corpus_type, source_format, licence, language, size_bytes, docs_count,
       nodes, words, status, converted_at, description, toc`)
     .single()

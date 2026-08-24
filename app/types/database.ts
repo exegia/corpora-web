@@ -281,6 +281,7 @@ export type Database = {
           docs_count: number | null
           filename: string | null
           id: string
+          job_id: string | null
           language: string | null
           licence: string | null
           name: string
@@ -302,6 +303,7 @@ export type Database = {
           docs_count?: number | null
           filename?: string | null
           id?: string
+          job_id?: string | null
           language?: string | null
           licence?: string | null
           name: string
@@ -323,6 +325,7 @@ export type Database = {
           docs_count?: number | null
           filename?: string | null
           id?: string
+          job_id?: string | null
           language?: string | null
           licence?: string | null
           name?: string

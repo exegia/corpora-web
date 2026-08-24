@@ -3,6 +3,7 @@ import type {
   CorpusIndex,
   CorpusNode,
   IndexItem,
+  SectionEntry,
 } from "@/lib/corpora-api"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import type {
@@ -11,14 +12,14 @@ import type {
   StructureNode,
 } from "@/components/corpus/detail/types"
 
-/** Overview rows from a Hub index when the library document has no toc. */
+/** Overview rows from a live index when the library document has no toc. */
 export function sectionsFromIndex(index: CorpusIndex): CorpusSection[] {
   const items = index.sections?.items
   if (!items?.length) return []
   return items.map((item) => ({
     title: item.title,
-    nodes: item.children.length,
-    words: null,
+    nodes: item.nodes ?? item.child_count ?? item.children.length,
+    words: item.words ?? null,
   }))
 }
 
@@ -32,7 +33,7 @@ export function findIndexItem(
   return items.find((item) => item.title === title) ?? items[0] ?? null
 }
 
-/** Collapsible tree from the Hub index's two-level section list. */
+/** Collapsible tree from the index's section list. */
 export function structureRootFromIndex(
   document: CorpusDocument,
   index: CorpusIndex,
@@ -47,18 +48,31 @@ export function structureRootFromIndex(
     childCount: sections.items.length,
     children: sections.items.map((item) => ({
       id: item.ref || item.title,
-      type: topType ?? "book",
+      type: item.otype ?? topType ?? "book",
       label: item.title,
-      childCount: item.children.length,
+      childCount: item.child_count ?? item.children.length,
       ref: item.ref,
       children: item.children.map((child) => ({
         id: child.ref || child.title,
-        type: childType ?? "section",
+        type: child.otype ?? childType ?? "section",
         label: child.title,
-        childCount: null,
+        childCount: child.child_count ?? null,
         ref: child.ref,
       })),
     })),
+  }
+}
+
+export function structureNodeFromSection(
+  item: SectionEntry,
+  fallbackType: string,
+): StructureNode {
+  return {
+    id: item.ref || item.title,
+    type: item.otype ?? fallbackType,
+    label: item.title,
+    childCount: item.child_count ?? null,
+    ref: item.ref,
   }
 }
 
@@ -85,9 +99,9 @@ export function nodeTypeStatsFromIndex(index: CorpusIndex): NodeTypeStat[] {
   return types.map((row) => ({
     type: row.type,
     count: row.count,
-    avgSlots: 0,
+    avgSlots: row.avg_slots ?? 0,
     pct: (row.count / total) * 100,
-    slotType: row.type === slot.type,
+    slotType: row.is_slot ?? row.type === slot.type,
   }))
 }
 
@@ -131,9 +145,11 @@ export function lemmaFromNode(
   const gender = featureString(node.features, ["gn", "gender", "gen"]) ?? "—"
   const number = featureString(node.features, ["nu", "number", "num"]) ?? "—"
   const gloss = featureString(node.features, ["gloss", "g_word", "g_lex"]) ?? ""
-  const context = node.section_ref
-    ? node.section_ref.split(/[>,]/).map((part) => part.trim()).filter(Boolean)
-    : []
+  const context = node.context?.length
+    ? node.context.map((crumb) => crumb.ref || crumb.otype).filter(Boolean)
+    : node.section_ref
+      ? node.section_ref.split(/[>,]/).map((part) => part.trim()).filter(Boolean)
+      : []
   return {
     form,
     lemma,
@@ -147,8 +163,8 @@ export function lemmaFromNode(
     number,
     numberCode: number.toUpperCase(),
     node: node.node,
-    occurrences: 0,
-    occurrencesInSection: 0,
+    occurrences: node.occurrences ?? 0,
+    occurrencesInSection: node.occurrences_in_section ?? 0,
     context,
   }
 }

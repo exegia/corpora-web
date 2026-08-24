@@ -41,6 +41,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
                     source: "upload",
                     path: String(form.get("path") ?? ""),
                     filename: String(form.get("filename") ?? "") || null,
+                    jobId: String(form.get("jobId") ?? "").trim() || null,
                     corpusType: (String(form.get("corpusType") ?? "") as CorpusType) || null,
                     sourceFormat: String(form.get("sourceFormat") ?? "") || null,
                     language: String(form.get("language") ?? "") || null,

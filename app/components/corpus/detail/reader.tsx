@@ -8,7 +8,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import type { CorpusArchive, CorpusNode, CorpusPassage } from "@/lib/corpora-api"
+import type {
+  CorpusArchive,
+  CorpusNode,
+  CorpusPassage,
+  PassageToken,
+} from "@/lib/corpora-api"
 import { fetchCorpusContent, fetchCorpusNode } from "@/lib/corpora-api"
 import { findIndexItem, lemmaFromNode, slotForToken } from "@/lib/corpus-explore"
 import { cn } from "@/lib/utils"
@@ -32,8 +37,21 @@ function placeholderNode(form: string, passage: CorpusPassage, node: number): Co
   }
 }
 
-async function inspectLiveToken(
-  filename: string,
+async function inspectTokenNode(
+  archive: CorpusArchive,
+  passage: CorpusPassage,
+  form: string,
+  node: number,
+): Promise<Lemma> {
+  try {
+    return lemmaFromNode(await fetchCorpusNode(archive, node), form)
+  } catch {
+    return lemmaFromNode(placeholderNode(form, passage, node), form)
+  }
+}
+
+async function inspectSplitToken(
+  archive: CorpusArchive,
   passage: CorpusPassage,
   form: string,
   wordIndex: number,
@@ -42,11 +60,11 @@ async function inspectLiveToken(
     return lemmaFromNode(placeholderNode(form, passage, 0), form)
   }
   try {
-    const container = await fetchCorpusNode(filename, passage.node)
+    const container = await fetchCorpusNode(archive, passage.node)
     const slot = slotForToken(container, wordIndex)
     if (slot != null && slot !== container.node) {
       try {
-        return lemmaFromNode(await fetchCorpusNode(filename, slot), form)
+        return lemmaFromNode(await fetchCorpusNode(archive, slot), form)
       } catch {
         return lemmaFromNode(container, form)
       }
@@ -57,14 +75,77 @@ async function inspectLiveToken(
   }
 }
 
-function LivePassage({
+function TokenPassage({
   passage,
-  filename,
+  archive,
   index,
   onInspect,
 }: {
   passage: CorpusPassage
-  filename: string
+  archive: CorpusArchive
+  index: number
+  onInspect: (lemma: Lemma) => void
+}) {
+  const tokens = passage.tokens ?? []
+  return (
+    <li className="flex gap-4">
+      <span
+        aria-hidden="true"
+        className="w-4 shrink-0 pt-0.5 text-muted-foreground text-xs tabular-nums"
+      >
+        {index + 1}
+      </span>
+      <p className="text-sm leading-7">
+        {tokens.map((token, tokenIndex) => (
+          <TokenButton
+            archive={archive}
+            key={`${passage.ref}-${tokenIndex}`}
+            onInspect={onInspect}
+            passage={passage}
+            token={token}
+          />
+        ))}
+      </p>
+    </li>
+  )
+}
+
+function TokenButton({
+  archive,
+  passage,
+  token,
+  onInspect,
+}: {
+  archive: CorpusArchive
+  passage: CorpusPassage
+  token: PassageToken
+  onInspect: (lemma: Lemma) => void
+}) {
+  return (
+    <>
+      <button
+        className="rounded-sm hover:outline hover:outline-primary"
+        onClick={() => {
+          if (token.node == null) return
+          void inspectTokenNode(archive, passage, token.text, token.node).then(onInspect)
+        }}
+        type="button"
+      >
+        {token.text}
+      </button>
+      {token.after}
+    </>
+  )
+}
+
+function SplitPassage({
+  passage,
+  archive,
+  index,
+  onInspect,
+}: {
+  passage: CorpusPassage
+  archive: CorpusArchive
   index: number
   onInspect: (lemma: Lemma) => void
 }) {
@@ -88,7 +169,7 @@ function LivePassage({
               className="rounded-sm hover:outline hover:outline-primary"
               key={`${passage.ref}-${tokenIndex}`}
               onClick={() => {
-                void inspectLiveToken(filename, passage, form, thisWord).then(onInspect)
+                void inspectSplitToken(archive, passage, form, thisWord).then(onInspect)
               }}
               type="button"
             >
@@ -125,7 +206,7 @@ function LiveReader({
     if (!selected) return
     let cancelled = false
     setLoading(true)
-    fetchCorpusContent(archive.filename, { ref: selected, limit: 20 })
+    fetchCorpusContent(archive, { ref: selected, limit: 20 })
       .then((content) => {
         if (!cancelled) setPassages(content.passages)
       })
@@ -138,7 +219,7 @@ function LiveReader({
     return () => {
       cancelled = true
     }
-  }, [archive.filename, selected])
+  }, [archive, selected])
 
   const heading = questions.find((question) => question.ref === selected)?.title ?? sectionTitle
 
@@ -192,15 +273,25 @@ function LiveReader({
           </div>
         ) : (
           <ol className="flex flex-col gap-6">
-            {passages.map((passage, index) => (
-              <LivePassage
-                filename={archive.filename}
-                index={index}
-                key={`${passage.ref}-${passage.node ?? index}`}
-                onInspect={setLemma}
-                passage={passage}
-              />
-            ))}
+            {passages.map((passage, index) =>
+              passage.tokens?.length ? (
+                <TokenPassage
+                  archive={archive}
+                  index={index}
+                  key={`${passage.ref}-${passage.node ?? index}`}
+                  onInspect={setLemma}
+                  passage={passage}
+                />
+              ) : (
+                <SplitPassage
+                  archive={archive}
+                  index={index}
+                  key={`${passage.ref}-${passage.node ?? index}`}
+                  onInspect={setLemma}
+                  passage={passage}
+                />
+              ),
+            )}
           </ol>
         )}
       </article>
@@ -215,7 +306,7 @@ function LiveReader({
   )
 }
 
-/** Documents tab: Hub passages when a matching archive is published. */
+/** Documents tab: live passages from the conversion job or a Hub import. */
 export default function Reader({
   sectionTitle,
   archive,
@@ -242,7 +333,7 @@ export default function Reader({
         </EmptyMedia>
         <EmptyTitle>No passages yet</EmptyTitle>
         <EmptyDescription>
-          Passages load from a published Hub archive for this corpus.
+          No live archive is available for this corpus yet.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

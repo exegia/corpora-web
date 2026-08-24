@@ -20,7 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import type { CorpusArchive } from "@/lib/corpora-api"
-import { downloadStoredCorpus, loadCorpusArchive } from "@/lib/corpora-api"
+import { downloadExploreCorpus, loadCorpusArchive } from "@/lib/corpora-api"
 import { sectionsFromIndex } from "@/lib/corpus-explore"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
@@ -31,7 +31,8 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
   // Awaited: the breadcrumb reads `document` off loaderData synchronously
   // (components/breadcrumb), and it is one indexed row.
   const document = await getCorpusDocument(params.documentId ?? "")
-  // Hub index is the slow follow-up; defer so the header paints immediately.
+  // Job (or Hub-import) index is the slow follow-up; defer so the header
+  // paints immediately. The breadcrumb only needs `document`.
   const archive = document
     ? loadCorpusArchive(document)
     : Promise.resolve(null)
@@ -84,19 +85,21 @@ function saveDownload(blob: Blob, filename: string) {
 }
 
 /**
- * Prefer the published Hub archive (`GET /storage/{filename}/download`).
- * Library rows that never made it to the Hub fall back to a JSON snapshot
- * of the document's metadata.
+ * Prefer the live archive (`GET /convert/{job_id}/download` or Hub download).
+ * Rows with no reachable job or Hub object fall back to a JSON snapshot.
  */
 async function exportDocument(document: CorpusDocument) {
   try {
     const archive = await loadCorpusArchive(document)
     if (archive) {
-      saveDownload(await downloadStoredCorpus(archive.filename), archive.filename)
+      const filename =
+        document.filename ??
+        (archive.kind === "hub" ? archive.key : `${document.name}.corpus`)
+      saveDownload(await downloadExploreCorpus(archive), filename)
       return
     }
   } catch {
-    // Hub miss or unreachable — keep the metadata snapshot.
+    // Job expired or unreachable — keep the metadata snapshot.
   }
   saveDownload(
     new Blob([JSON.stringify(document, null, 2)], {
@@ -201,7 +204,7 @@ function ExplorerPanels({
       </TabsPanel>
 
       <TabsPanel value="activity">
-        <CorpusDetail.Activity document={document} />
+        <CorpusDetail.Activity archive={archive} document={document} />
       </TabsPanel>
     </>
   )

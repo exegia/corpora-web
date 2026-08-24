@@ -58,7 +58,11 @@ function scriptConversion(outcome: Outcome) {
       { status: "uploading" },
       { step: "receive", text: `> ${entry.name}`, tone: "info" },
     )
-    emit({ jobId: "j1" })
+    emit({
+      jobId: "j1",
+      displayName: "Summa Theologiae",
+      resultFilename: "summa-theologiae.corpus",
+    })
     emit(
       { status: "queued" },
       { step: "validate", text: "> Parsing nodes…", tone: "info" },
@@ -115,6 +119,7 @@ function doc(overrides: Partial<CorpusDocument> = {}): CorpusDocument {
     convertedAt: null,
     description: null,
     toc: null,
+    jobId: null,
     commits: [],
     ...overrides,
   }
@@ -345,10 +350,11 @@ describe("/corpus library", () => {
     await waitFor(() =>
       expect(createCorpusDocument).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: "Summa Theologia",
+          name: "Summa Theologiae",
           source: "upload",
           path: "d9/summa.corpus",
-          filename: "summa.corpus",
+          filename: "summa-theologiae.corpus",
+          jobId: "j1",
           sourceFormat: "tei",
           corpusType: "text",
           language: "English",
@@ -362,7 +368,7 @@ describe("/corpus library", () => {
     )
     // The stored archive is the downloaded blob, renamed .corpus.
     const stored = vi.mocked(uploadCorpusFile).mock.calls[0][0]
-    expect(stored.name).toBe("summa.corpus")
+    expect(stored.name).toBe("summa-theologiae.corpus")
     expect(await screen.findByText("Conversion complete")).toBeInTheDocument()
     // Both the header pill's link and the file card's link target the
     // persisted row (the panel no longer aria-hides the header behind it).

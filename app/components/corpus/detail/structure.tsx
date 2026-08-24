@@ -16,9 +16,12 @@ import {
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { CorpusArchive } from "@/lib/corpora-api"
-import { fetchCorpusContent } from "@/lib/corpora-api"
+import { fetchCorpusSections } from "@/lib/corpora-api"
 import type { CorpusDocument } from "@/lib/corpus"
-import { passagesToNodes, structureRootFromIndex } from "@/lib/corpus-explore"
+import {
+  structureNodeFromSection,
+  structureRootFromIndex,
+} from "@/lib/corpus-explore"
 import Panel from "./panel"
 import type { StructureNode } from "./types"
 import { formatCount } from "./utils"
@@ -47,7 +50,8 @@ function NodeRow({
   depth: number
   archive: CorpusArchive | null
 }) {
-  const expandable = (node.childCount ?? 0) > 0 || Boolean(node.ref)
+  const expandable =
+    (node.childCount ?? 0) > 0 || (node.children?.length ?? 0) > 0
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [children, setChildren] = useState<StructureNode[]>(node.children ?? [])
@@ -132,11 +136,13 @@ async function loadChildren(
 ): Promise<StructureNode[]> {
   if (node.children?.length) return node.children
   if (archive && node.ref) {
-    const content = await fetchCorpusContent(archive.filename, {
-      ref: node.ref,
-      limit: 8,
+    const page = await fetchCorpusSections(archive, {
+      parent: node.ref,
+      limit: 50,
     })
-    return passagesToNodes(content, node)
+    return page.items.map((item) =>
+      structureNodeFromSection(item, node.type),
+    )
   }
   return []
 }
@@ -163,7 +169,7 @@ export default function Structure({
           </EmptyMedia>
           <EmptyTitle>No structure yet</EmptyTitle>
           <EmptyDescription>
-            Structure loads from a published Hub archive for this corpus.
+            No live archive is available for this corpus yet.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>

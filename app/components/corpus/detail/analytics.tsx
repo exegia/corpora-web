@@ -1,6 +1,6 @@
 import type { CorpusArchive } from "@/lib/corpora-api"
 import type { CorpusDocument } from "@/lib/corpus"
-import { nodeTypeStatsFromIndex } from "@/lib/corpus-explore"
+import { nodeTypeStatsFromIndex, sectionsFromIndex } from "@/lib/corpus-explore"
 import Panel from "./panel"
 import { abbreviateSection, formatCompact, formatCount } from "./utils"
 
@@ -18,7 +18,12 @@ export default function Analytics({
 }) {
   const stats = archive ? nodeTypeStatsFromIndex(archive.index) : []
   const widest = maxCount(stats.map((row) => row.count))
-  const sections = document.toc ?? []
+  const sections =
+    document.toc?.length
+      ? document.toc
+      : archive
+        ? sectionsFromIndex(archive.index)
+        : []
   const tallest = maxCount(sections.map((section) => section.words ?? 0))
 
   return (

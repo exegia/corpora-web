@@ -18,6 +18,9 @@ const index: CorpusIndex = {
       {
         title: "Prima Pars",
         ref: "Prima Pars",
+        child_count: 2,
+        nodes: 8442,
+        words: 312004,
         children: [
           { title: "Q.1", ref: "Prima Pars, Q.1" },
           { title: "Q.2", ref: "Prima Pars, Q.2" },
@@ -27,8 +30,8 @@ const index: CorpusIndex = {
     ],
   },
   node_types: [
-    { type: "word", count: 80 },
-    { type: "clause", count: 20 },
+    { type: "word", count: 80, avg_slots: 1, is_slot: true },
+    { type: "clause", count: 20, avg_slots: 4.2, is_slot: false },
   ],
 }
 
@@ -37,7 +40,7 @@ const document = { name: "Summa" } as CorpusDocument
 describe("corpus-explore mappers", () => {
   it("builds overview rows and a relative structure tree from the Hub index", () => {
     expect(sectionsFromIndex(index)).toEqual([
-      { title: "Prima Pars", nodes: 2, words: null },
+      { title: "Prima Pars", nodes: 8442, words: 312004 },
       { title: "Supplementum", nodes: 0, words: null },
     ])
     const root = structureRootFromIndex(document, index)
@@ -51,7 +54,10 @@ describe("corpus-explore mappers", () => {
     const stats = nodeTypeStatsFromIndex(index)
     expect(stats[0]?.type).toBe("word")
     expect(stats[0]?.pct).toBe(80)
+    expect(stats[0]?.avgSlots).toBe(1)
     expect(stats[0]?.slotType).toBe(true)
+    expect(stats[1]?.avgSlots).toBe(4.2)
+    expect(stats[1]?.slotType).toBe(false)
   })
 
   it("maps Hub node features onto the inspect lemma", () => {
@@ -67,12 +73,20 @@ describe("corpus-explore mappers", () => {
       features: { lemma: "doctrina", sp: "subs", gn: "f", nu: "sg" },
       annotation: null,
       node_types: ["word"],
+      context: [
+        { node: 1, otype: "book", ref: "Prima Pars" },
+        { node: 2, otype: "question", ref: "Q.1" },
+      ],
+      occurrences: 12,
+      occurrences_in_section: 2,
     }
     const lemma = lemmaFromNode(node, "doctrinam")
     expect(lemma.lemma).toBe("doctrina")
     expect(lemma.pos).toBe("subs")
     expect(lemma.gender).toBe("f")
     expect(lemma.context).toEqual(["Prima Pars", "Q.1"])
+    expect(lemma.occurrences).toBe(12)
+    expect(lemma.occurrencesInSection).toBe(2)
   })
 
   it("maps a token index onto a consecutive slot range", () => {

@@ -16,6 +16,8 @@ export interface JobStatusMessage {
   id: string
   source_format: string
   name: string
+  /** Source-derived title; null while the job is still queued. */
+  display_name: string | null
   status: JobStatus
   created_at: number
   started_at: number | null
@@ -23,6 +25,8 @@ export interface JobStatusMessage {
   error: string | null
   logs: string[]
   last_log: string | null
+  /** Slug of display_name (or request name), always `*.corpus`. */
+  result_filename: string
   download_ready: boolean
 }
 
@@ -242,9 +246,10 @@ export async function validateConversion(
   }
 }
 
-// ── Hub storage (corpus-detail) ──────────────────────────────────────────────
-// Detail endpoints serve published Hub archives only, not conversion jobs.
-// See specs/004-connect-with-py/contracts/corpora-api.md ("Adjacent surface").
+// ── Corpus explore (job-scoped, Hub only for published imports) ──────────────
+// Library conversions: GET /convert/{job_id}/{index,sections,content,nodes,versions}.
+// Hugging Face imports: GET /storage/{filename}/… (publishing surface).
+// Same response shapes on both prefixes.
 
 export interface StoredCorpus {
   filename: string
@@ -253,15 +258,24 @@ export interface StoredCorpus {
   url: string
 }
 
-export interface IndexChild {
-  title: string
-  ref: string
+/** Job result or a published Hub archive — builds the explore URL prefix. */
+export interface ExploreRef {
+  kind: "job" | "hub"
+  key: string
 }
 
-export interface IndexItem {
+export interface SectionEntry {
   title: string
   ref: string
-  children: IndexChild[]
+  otype?: string
+  child_count?: number
+  nodes?: number | null
+  words?: number | null
+  truncated?: boolean
+}
+
+export interface IndexItem extends SectionEntry {
+  children: SectionEntry[]
 }
 
 export interface IndexSections {
@@ -272,22 +286,31 @@ export interface IndexSections {
 export interface NodeTypeCount {
   type: string
   count: number
+  avg_slots?: number
+  is_slot?: boolean
 }
 
-/** GET /storage/{filename}/index */
+/** GET …/index */
 export interface CorpusIndex {
   toc: unknown
   sections: IndexSections | null
   node_types: NodeTypeCount[]
 }
 
+export interface PassageToken {
+  text: string
+  after: string
+  node: number | null
+}
+
 export interface CorpusPassage {
   ref: string
   text: string
   node?: number
+  tokens?: PassageToken[]
 }
 
-/** GET /storage/{filename}/content */
+/** GET …/content */
 export interface ContentResponse {
   ref: string | null
   format: string
@@ -305,7 +328,29 @@ export interface ContentQuery {
   limit?: number
 }
 
-/** GET /storage/{filename}/nodes/{node} */
+export interface SectionsQuery {
+  parent?: string | null
+  offset?: number
+  limit?: number
+}
+
+export interface SectionsResponse {
+  parent: string | null
+  levels: string[]
+  items: SectionEntry[]
+  total: number
+  offset: number
+  limit: number
+  next_offset: number | null
+}
+
+export interface NodeContext {
+  node: number
+  otype: string
+  ref: string
+}
+
+/** GET …/nodes/{node} */
 export interface CorpusNode {
   node: number
   otype: string
@@ -318,15 +363,45 @@ export interface CorpusNode {
   features: Record<string, unknown>
   annotation: Record<string, unknown> | null
   node_types: string[]
+  context?: NodeContext[]
+  occurrences?: number
+  occurrences_in_section?: number
 }
 
-export interface CorpusArchive {
-  filename: string
+export interface CorpusVersion {
+  id: string
+  sha: string | null
+  label: string
+  title: string
+  at: string
+  current: boolean
+  notes: string[]
+}
+
+export interface VersionsResponse {
+  versions: CorpusVersion[]
+}
+
+export interface CorpusArchive extends ExploreRef {
   index: CorpusIndex
 }
 
-function storageBase(filename: string): string {
-  return `/storage/${encodeURIComponent(filename)}`
+function exploreBase(ref: ExploreRef): string {
+  const id = encodeURIComponent(ref.key)
+  return ref.kind === "job" ? `/convert/${id}` : `/storage/${id}`
+}
+
+function withQuery(
+  path: string,
+  query: Record<string, string | number | null | undefined>,
+): string {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value == null || value === "") continue
+    params.set(key, String(value))
+  }
+  const suffix = params.toString()
+  return suffix ? `${path}?${suffix}` : path
 }
 
 /** Turn a library name or upload filename into a Hub `.corpus` archive name. */
@@ -356,46 +431,75 @@ export function hubFilenameCandidates(document: {
   return names
 }
 
-/** GET /storage — published Hub archives. */
+/** GET /storage — published Hub archives (import / publish, not library explore). */
 export async function listStoredCorpora(): Promise<StoredCorpus[]> {
   const response = await apiFetch("/storage")
   return (await response.json()) as StoredCorpus[]
 }
 
-/** GET /storage/{filename}/index */
-export async function fetchCorpusIndex(filename: string): Promise<CorpusIndex> {
-  const response = await apiFetch(`${storageBase(filename)}/index`)
+/** GET {job|storage}/index */
+export async function fetchCorpusIndex(ref: ExploreRef): Promise<CorpusIndex> {
+  const response = await apiFetch(`${exploreBase(ref)}/index`)
   return (await response.json()) as CorpusIndex
 }
 
-/** GET /storage/{filename}/content */
+/** GET {job|storage}/content */
 export async function fetchCorpusContent(
-  filename: string,
+  ref: ExploreRef,
   query: ContentQuery = {},
 ): Promise<ContentResponse> {
-  const params = new URLSearchParams()
-  if (query.ref != null && query.ref !== "") params.set("ref", query.ref)
-  if (query.fmt != null && query.fmt !== "") params.set("fmt", query.fmt)
-  if (query.offset != null) params.set("offset", String(query.offset))
-  if (query.limit != null) params.set("limit", String(query.limit))
-  const suffix = params.toString() ? `?${params}` : ""
-  const response = await apiFetch(`${storageBase(filename)}/content${suffix}`)
+  const response = await apiFetch(
+    withQuery(`${exploreBase(ref)}/content`, {
+      ref: query.ref,
+      fmt: query.fmt,
+      offset: query.offset,
+      limit: query.limit,
+    }),
+  )
   return (await response.json()) as ContentResponse
 }
 
-/** GET /storage/{filename}/nodes/{node} */
+/** GET {job|storage}/sections */
+export async function fetchCorpusSections(
+  ref: ExploreRef,
+  query: SectionsQuery = {},
+): Promise<SectionsResponse> {
+  const response = await apiFetch(
+    withQuery(`${exploreBase(ref)}/sections`, {
+      parent: query.parent,
+      offset: query.offset,
+      limit: query.limit,
+    }),
+  )
+  return (await response.json()) as SectionsResponse
+}
+
+/** GET {job|storage}/nodes/{node} */
 export async function fetchCorpusNode(
-  filename: string,
+  ref: ExploreRef,
   node: number,
 ): Promise<CorpusNode> {
-  const response = await apiFetch(`${storageBase(filename)}/nodes/${node}`)
+  const response = await apiFetch(`${exploreBase(ref)}/nodes/${node}`)
   return (await response.json()) as CorpusNode
 }
 
-/** GET /storage/{filename}/download — the published .corpus archive. */
-export async function downloadStoredCorpus(filename: string): Promise<Blob> {
-  const response = await apiFetch(`${storageBase(filename)}/download`)
+/** GET {job|storage}/versions */
+export async function fetchCorpusVersions(
+  ref: ExploreRef,
+): Promise<VersionsResponse> {
+  const response = await apiFetch(`${exploreBase(ref)}/versions`)
+  return (await response.json()) as VersionsResponse
+}
+
+/** GET {job|storage}/download */
+export async function downloadExploreCorpus(ref: ExploreRef): Promise<Blob> {
+  const response = await apiFetch(`${exploreBase(ref)}/download`)
   return response.blob()
+}
+
+/** GET /storage/{filename}/download — published Hub archive. */
+export async function downloadStoredCorpus(filename: string): Promise<Blob> {
+  return downloadExploreCorpus({ kind: "hub", key: filename })
 }
 
 function matchesHubFilename(
@@ -406,13 +510,16 @@ function matchesHubFilename(
   return stems.has(stem) || stems.has(stored.toLowerCase())
 }
 
-/**
- * Resolve a library document to a published Hub archive. Lists Hub storage
- * first so a miss is a 200 (not a 404 in the console), then loads that
- * archive's index. Direct `/index` lookups run only when listing itself
- * fails. Returns null when the Hub has no match or is unreachable.
- */
-export async function loadCorpusArchive(document: {
+function isQuietMiss(error: unknown): boolean {
+  return (
+    error instanceof CorporaApiError &&
+    (error.kind === "not-found" ||
+      error.kind === "not-ready" ||
+      error.kind === "unreachable")
+  )
+}
+
+async function loadHubArchive(document: {
   filename: string | null
   name: string
 }): Promise<CorpusArchive | null> {
@@ -424,8 +531,8 @@ export async function loadCorpusArchive(document: {
     const listed = await listStoredCorpora()
     const match = listed.find((item) => matchesHubFilename(item.filename, stems))
     if (!match) return null
-    const index = await fetchCorpusIndex(match.filename)
-    return { filename: match.filename, index }
+    const index = await fetchCorpusIndex({ kind: "hub", key: match.filename })
+    return { kind: "hub", key: match.filename, index }
   } catch (error) {
     if (error instanceof CorporaApiError && error.kind === "unreachable") {
       return null
@@ -433,13 +540,43 @@ export async function loadCorpusArchive(document: {
   }
   for (const filename of candidates) {
     try {
-      const index = await fetchCorpusIndex(filename)
-      return { filename, index }
+      const index = await fetchCorpusIndex({ kind: "hub", key: filename })
+      return { kind: "hub", key: filename, index }
     } catch (error) {
       if (error instanceof CorporaApiError && error.kind === "unreachable") {
         return null
       }
     }
+  }
+  return null
+}
+
+/**
+ * Resolve a library document to an explore archive.
+ *
+ * Converted rows use the persisted job id (`GET /convert/{job_id}/index`).
+ * A 404/409/unreachable job is an empty explorer, not an error. Hub listing
+ * is only for Hugging Face imports — never the default for an upload row.
+ */
+export async function loadCorpusArchive(document: {
+  jobId?: string | null
+  source?: string
+  filename: string | null
+  name: string
+}): Promise<CorpusArchive | null> {
+  const jobId = document.jobId?.trim()
+  if (jobId) {
+    const ref: ExploreRef = { kind: "job", key: jobId }
+    try {
+      const index = await fetchCorpusIndex(ref)
+      return { ...ref, index }
+    } catch (error) {
+      if (isQuietMiss(error)) return null
+      return null
+    }
+  }
+  if (document.source === "huggingface") {
+    return loadHubArchive(document)
   }
   return null
 }

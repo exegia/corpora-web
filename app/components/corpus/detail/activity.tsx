@@ -1,5 +1,9 @@
+import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { CorpusArchive } from "@/lib/corpora-api"
+import { fetchCorpusVersions } from "@/lib/corpora-api"
 import type { CorpusDocument } from "@/lib/corpus"
 import { formatSize } from "../list/utils"
 import Panel from "./panel"
@@ -144,19 +148,80 @@ function EventRow({ event }: { event: ActivityEvent }) {
   )
 }
 
+function toVersionEntry(row: {
+  id: string
+  label: string
+  title: string
+  at: string
+  current: boolean
+  notes: string[]
+}): VersionEntry {
+  return {
+    id: row.id,
+    label: row.label,
+    title: row.title,
+    at: row.at,
+    current: row.current,
+    notes: row.notes ?? [],
+  }
+}
+
 /** Activity tab: version timeline plus derived lifecycle events. */
-export default function Activity({ document }: { document: CorpusDocument }) {
-  const versions = versionsFor(document)
+export default function Activity({
+  document,
+  archive,
+}: {
+  document: CorpusDocument
+  archive: CorpusArchive | null
+}) {
+  const fallback = versionsFor(document)
+  const [remote, setRemote] = useState<VersionEntry[] | null>(null)
+  const [pending, setPending] = useState(() => Boolean(archive))
   const events = activityFor(document)
+  const archiveKey = archive ? `${archive.kind}:${archive.key}` : ""
+
+  useEffect(() => {
+    if (!archive) return
+    let cancelled = false
+    fetchCorpusVersions(archive)
+      .then((body) => {
+        if (cancelled) return
+        const rows = body.versions.map(toVersionEntry)
+        setRemote(rows.length > 0 ? rows : null)
+      })
+      .catch(() => {
+        if (!cancelled) setRemote(null)
+      })
+      .finally(() => {
+        if (!cancelled) setPending(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [archive, archiveKey])
+
+  const versions = remote ?? fallback
+  const loading = Boolean(archive) && pending && remote == null
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
       <Panel bodyClassName="ps-4" title="Version history">
-        <ol className="relative ms-1 border-s border-border ps-4">
-          {versions.map((version) => (
-            <VersionRow key={version.id} version={version} />
-          ))}
-        </ol>
+        {loading ? (
+          <div
+            aria-label="Loading version history"
+            className="flex flex-col gap-3 py-2"
+            role="status"
+          >
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-5/6" />
+          </div>
+        ) : (
+          <ol className="relative ms-1 border-s border-border ps-4">
+            {versions.map((version) => (
+              <VersionRow key={version.id} version={version} />
+            ))}
+          </ol>
+        )}
       </Panel>
       <Panel bodyClassName="p-0 px-4" title="Activity">
         <ol>
