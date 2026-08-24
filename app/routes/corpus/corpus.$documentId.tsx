@@ -1,9 +1,18 @@
 import { Download, FileArchive, ListTree } from "lucide-react"
 import { Suspense } from "react"
-import { Await, redirect, useLoaderData, useSearchParams } from "react-router"
+import {
+  Await,
+  NavLink,
+  Outlet,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useSearchParams,
+} from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
 import { Blocks } from "@/components/blocks"
 import { CorpusDetail } from "@/components/corpus/detail"
+import type { ExploreTab } from "@/components/corpus/detail/types"
 import {
   formatCount,
   parseExploreTab,
@@ -18,16 +27,75 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import type { CorpusArchive } from "@/lib/corpora-api"
-import { downloadExploreCorpus, loadCorpusArchive } from "@/lib/corpora-api"
+import {
+  CorporaApiError,
+  downloadExploreCorpus,
+  loadCorpusArchive,
+  restoreCorpusVersion,
+} from "@/lib/corpora-api"
 import { sectionsFromIndex } from "@/lib/corpus-explore"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import { DataError } from "@/lib/projects"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
+import { cn } from "@/lib/utils"
 
-export async function clientLoader({ params }: LoaderFunctionArgs) {
+export type CorpusExplorerContext = {
+  document: CorpusDocument
+  archive: CorpusArchive | null
+}
+
+const EXPLORE_TAB_LINKS: {
+  label: string
+  to: string
+  end?: boolean
+}[] = [
+  { label: "Overview", to: ".", end: true },
+  { label: "Documents", to: "documents" },
+  { label: "Structure", to: "structure" },
+  { label: "Analytics", to: "analytics" },
+  { label: "Activity", to: "activity" },
+]
+
+/** Map a leftover `?tab=` value onto the nested explorer path. */
+function legacyExplorePath(request: Request, documentId: string): string | null {
+  const url = new URL(request.url)
+  const tabParam = url.searchParams.get("tab")
+  if (tabParam === null) return null
+  const tab = parseExploreTab(tabParam)
+  url.searchParams.delete("tab")
+  if (tab !== "documents") url.searchParams.delete("section")
+  const pathname =
+    tab === "overview" ? `/corpus/${documentId}` : `/corpus/${documentId}/${tab}`
+  return `${pathname}${url.search}`
+}
+
+function exploreTabFromPath(
+  pathname: string,
+  documentId: string,
+): ExploreTab {
+  const prefix = `/corpus/${documentId}`
+  if (pathname === prefix || pathname === `${prefix}/`) return "overview"
+  if (!pathname.startsWith(`${prefix}/`)) return "overview"
+  const segment = pathname.slice(prefix.length + 1).split("/")[0] ?? ""
+  return parseExploreTab(segment || null)
+}
+
+export function explorerSections(
+  document: CorpusDocument,
+  archive: CorpusArchive | null,
+): CorpusSection[] {
+  return document.toc?.length
+    ? document.toc
+    : archive
+      ? sectionsFromIndex(archive.index)
+      : []
+}
+
+export async function clientLoader({ params, request }: LoaderFunctionArgs) {
+  const legacy = legacyExplorePath(request, params.documentId ?? "")
+  if (legacy) throw redirect(legacy)
   // Awaited: the breadcrumb reads `document` off loaderData synchronously
   // (components/breadcrumb), and it is one indexed row.
   const document = await getCorpusDocument(params.documentId ?? "")
@@ -47,11 +115,23 @@ export async function clientAction({ request }: ActionFunctionArgs) {
       case "delete-document":
         await deleteCorpusDocument(String(form.get("documentId") ?? ""))
         return redirect("/corpus")
+      case "restore-version": {
+        const jobId = String(form.get("jobId") ?? "")
+        const versionId = String(form.get("versionId") ?? "")
+        if (!jobId || !versionId) {
+          return { ok: false, error: "Missing version to restore." }
+        }
+        await restoreCorpusVersion({ kind: "job", key: jobId }, versionId)
+        return { ok: true }
+      }
       default:
         return { ok: false, error: "Unknown action." }
     }
   } catch (error) {
     if (error instanceof DataError) {
+      return { ok: false, error: error.message }
+    }
+    if (error instanceof CorporaApiError) {
       return { ok: false, error: error.message }
     }
     return { ok: false, error: "Something went wrong. Your change was not saved." }
@@ -129,7 +209,7 @@ function ArchiveFallback() {
   )
 }
 
-function EmptySections() {
+export function EmptySections() {
   return (
     <Empty className="py-10">
       <EmptyHeader>
@@ -145,105 +225,56 @@ function EmptySections() {
   )
 }
 
-function ExplorerPanels({
-  document,
-  archive,
-  sectionTitle,
-  onOpenSection,
-  onAnalytics,
-}: {
-  document: CorpusDocument
-  archive: CorpusArchive | null
-  sectionTitle: string | null
-  onOpenSection: (section: CorpusSection) => void
-  onAnalytics: () => void
-}) {
-  useReadySound()
-  const sections = document.toc?.length
-    ? document.toc
-    : archive
-      ? sectionsFromIndex(archive.index)
-      : []
-  const section = sectionByTitle(sections, sectionTitle)
-
+function ExploreTabs() {
   return (
-    <>
-      <TabsPanel value="overview">
-        <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
-          <CorpusDetail.DetailsCard document={document} />
-          {sections.length > 0 ? (
-            <CorpusDetail.OverviewTable
-              onOpenSection={onOpenSection}
-              sections={sections}
-            />
-          ) : (
-            <EmptySections />
-          )}
-        </div>
-      </TabsPanel>
-
-      <TabsPanel value="documents">
-        {section ? (
-          <CorpusDetail.Reader
-            archive={archive}
-            key={section.title}
-            onViewOccurrences={onAnalytics}
-            sectionTitle={section.title}
-          />
-        ) : (
-          <EmptySections />
-        )}
-      </TabsPanel>
-
-      <TabsPanel value="structure">
-        <CorpusDetail.Structure archive={archive} document={document} />
-      </TabsPanel>
-
-      <TabsPanel value="analytics">
-        <CorpusDetail.Analytics archive={archive} document={document} />
-      </TabsPanel>
-
-      <TabsPanel value="activity">
-        <CorpusDetail.Activity archive={archive} document={document} />
-      </TabsPanel>
-    </>
+    <nav
+      aria-label="Corpus explorer"
+      className="relative z-0 flex w-fit items-center justify-center gap-x-0.5 rounded-lg bg-muted p-0.5 text-muted-foreground/72"
+    >
+      {EXPLORE_TAB_LINKS.map((item) => (
+        <NavLink
+          className={({ isActive }) =>
+            cn(
+              "relative flex h-9 shrink-0 grow items-center justify-center whitespace-nowrap rounded-md border border-transparent px-[calc(--spacing(2.5)-1px)] font-medium text-base outline-none transition-[color,background-color,box-shadow] hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring sm:h-8 sm:text-sm",
+              isActive
+                ? "bg-background text-foreground shadow-sm/5 dark:bg-input"
+                : "text-muted-foreground",
+            )
+          }
+          end={item.end}
+          key={item.label}
+          preventScrollReset
+          to={item.to}
+          viewTransition
+        >
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
   )
+}
+
+function PlayReadySound() {
+  useReadySound()
+  return null
 }
 
 /** One corpus document: details, explorer tabs, and its lifecycle actions. */
 export default function CorpusDetailPage() {
   const { document, archive } = useLoaderData<typeof clientLoader>()
-  const [params, setParams] = useSearchParams()
+  const { pathname } = useLocation()
+  const [params] = useSearchParams()
 
   if (!document) return <NotFound />
 
-  const tab = parseExploreTab(params.get("tab"))
+  const tab = exploreTabFromPath(pathname, document.id)
   const sectionTitle = params.get("section")
   const tocSection = sectionByTitle(document.toc, sectionTitle)
-  const reading = tab === "documents" && (tocSection != null || Boolean(sectionTitle))
-
-  function setTab(next: string) {
-    const nextParams = new URLSearchParams(params)
-    const parsed = parseExploreTab(next)
-    if (parsed === "overview") nextParams.delete("tab")
-    else nextParams.set("tab", parsed)
-    if (parsed !== "documents") nextParams.delete("section")
-    setParams(nextParams, { replace: true, preventScrollReset: true })
-  }
-
-  function openSection(next: CorpusSection) {
-    const nextParams = new URLSearchParams(params)
-    nextParams.set("tab", "documents")
-    nextParams.set("section", next.title)
-    setParams(nextParams, { preventScrollReset: true })
-  }
+  const reading =
+    tab === "documents" && (tocSection != null || Boolean(sectionTitle))
 
   return (
-    <Tabs
-      className="flex flex-col gap-6"
-      onValueChange={setTab}
-      value={tab}
-    >
+    <div className="flex flex-col gap-6">
       <CorpusDetail.Header
         actions={
           <>
@@ -280,31 +311,29 @@ export default function CorpusDetailPage() {
         }
         document={document}
         hideMeta={Boolean(reading)}
-        tabs={
-          <TabsList>
-            <TabsTab value="overview">Overview</TabsTab>
-            <TabsTab value="documents">Documents</TabsTab>
-            <TabsTab value="structure">Structure</TabsTab>
-            <TabsTab value="analytics">Analytics</TabsTab>
-            <TabsTab value="activity">Activity</TabsTab>
-          </TabsList>
-        }
+        tabs={<ExploreTabs />}
         title={reading ? (tocSection?.title ?? sectionTitle ?? undefined) : undefined}
       />
 
       <Suspense fallback={<ArchiveFallback />}>
         <Await resolve={archive}>
           {(resolved) => (
-            <ExplorerPanels
-              archive={resolved}
-              document={document}
-              onAnalytics={() => setTab("analytics")}
-              onOpenSection={openSection}
-              sectionTitle={params.get("section")}
-            />
+            <>
+              <PlayReadySound />
+              <div
+                className="flex-1 outline-none animate-tab-panel-enter motion-reduce:animate-none"
+                key={tab}
+              >
+                <Outlet
+                  context={
+                    { archive: resolved, document } satisfies CorpusExplorerContext
+                  }
+                />
+              </div>
+            </>
           )}
         </Await>
       </Suspense>
-    </Tabs>
+    </div>
   )
 }

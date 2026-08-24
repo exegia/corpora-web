@@ -368,14 +368,32 @@ export interface CorpusNode {
   occurrences_in_section?: number
 }
 
+export type CorpusVersionFileKind = "added" | "modified" | "deleted"
+
+export interface CorpusVersionFile {
+  path: string
+  kind: CorpusVersionFileKind
+}
+
+export interface CorpusVersionActor {
+  sub: string | null
+  name?: string | null
+}
+
+/** GET …/versions row — history.yml. Extra fields are optional so older payloads type-check. */
 export interface CorpusVersion {
   id: string
-  sha: string | null
   label: string
   title: string
   at: string
   current: boolean
-  notes: string[]
+  snapshot_key?: string | null
+  /** Ignored; may be absent once history.yml replaces git. */
+  sha?: string | null
+  files?: CorpusVersionFile[]
+  author?: CorpusVersionActor | null
+  approved_by?: CorpusVersionActor | null
+  notes?: string[]
 }
 
 export interface VersionsResponse {
@@ -489,6 +507,49 @@ export async function fetchCorpusVersions(
 ): Promise<VersionsResponse> {
   const response = await apiFetch(`${exploreBase(ref)}/versions`)
   return (await response.json()) as VersionsResponse
+}
+
+/** POST /convert/{job_id}/restore — job-scoped only (issue #82 / py#148). */
+export async function restoreCorpusVersion(
+  ref: ExploreRef,
+  versionId: string,
+): Promise<VersionsResponse> {
+  if (ref.kind !== "job") {
+    throw new CorporaApiError(
+      "read-only",
+      "Restore is only available for converted library corpora.",
+    )
+  }
+  const response = await apiFetch(`${exploreBase(ref)}/restore`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version_id: versionId }),
+  })
+  return (await response.json()) as VersionsResponse
+}
+
+/** Editable subset of an archive's manifest (`ManifestUpdate` in corpora-py). */
+export interface ManifestUpdate {
+  name?: string
+  description?: string
+  language?: string
+  languageCode?: string
+}
+
+/** PATCH /convert/{job_id}/manifest — job-scoped only. */
+export async function patchJobManifest(
+  jobId: string,
+  updates: ManifestUpdate,
+): Promise<Record<string, unknown>> {
+  const response = await apiFetch(
+    `${exploreBase({ kind: "job", key: jobId })}/manifest`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    },
+  )
+  return (await response.json()) as Record<string, unknown>
 }
 
 /** GET {job|storage}/download */
