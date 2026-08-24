@@ -314,10 +314,32 @@ describe("corpora-api", () => {
     expect(String(fetchMock.mock.calls[2][0])).toContain("/convert/j1/nodes/1")
 
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(200, { versions: [{ id: "packaged", label: "v1.0" }] }),
+      jsonResponse(200, {
+        versions: [
+          {
+            id: "packaged",
+            label: "v1.0",
+            title: "Converted",
+            at: "2026-08-08T13:14:00Z",
+            current: true,
+            files: [{ path: "manifest.yml", kind: "added" }],
+            author: { sub: "u1", name: "Ada" },
+            approved_by: { sub: "u1", name: "Ada" },
+            notes: ["Initial package"],
+          },
+        ],
+      }),
     )
     const versions = await api.fetchCorpusVersions(job)
     expect(versions.versions[0]?.id).toBe("packaged")
+    expect(versions.versions[0]?.files).toEqual([
+      { path: "manifest.yml", kind: "added" },
+    ])
+    expect(versions.versions[0]?.author).toEqual({ sub: "u1", name: "Ada" })
+    expect(versions.versions[0]?.approved_by).toEqual({
+      sub: "u1",
+      name: "Ada",
+    })
     expect(String(fetchMock.mock.calls[3][0])).toContain("/convert/j1/versions")
 
     fetchMock.mockResolvedValueOnce(new Response("archive-bytes"))

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import type { CorpusVersionActor, CorpusVersionFile } from "@/lib/corpora-api"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 
 export type ExploreTab =
@@ -76,6 +77,9 @@ export interface VersionEntry {
   at: string
   current: boolean
   notes: string[]
+  files: CorpusVersionFile[]
+  author?: CorpusVersionActor | null
+  approved_by?: CorpusVersionActor | null
 }
 
 export interface ActivityEvent {

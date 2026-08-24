@@ -6,6 +6,7 @@ import { isCorpusDetailData } from "@/components/breadcrumb/utils"
 import {
   fetchCorpusContent,
   fetchCorpusNode,
+  fetchCorpusVersions,
   loadCorpusArchive,
 } from "@/lib/corpora-api"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
@@ -108,6 +109,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getCorpusDocument).mockResolvedValue(summa)
   vi.mocked(loadCorpusArchive).mockResolvedValue(null)
+  vi.mocked(fetchCorpusVersions).mockResolvedValue({ versions: [] })
 })
 
 describe("/corpus/:documentId detail", () => {
@@ -374,8 +376,41 @@ describe("/corpus/:documentId detail", () => {
     expect(
       await screen.findByRole("heading", { name: "Version history" }),
     ).toBeInTheDocument()
+    expect(screen.getByText("No version history yet.")).toBeInTheDocument()
+    expect(screen.queryByText("v1.1")).not.toBeInTheDocument()
+    expect(screen.queryByText("Initial upload")).not.toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Activity" })).toBeInTheDocument()
     expect(screen.getByText("Conversion succeeded")).toBeInTheDocument()
-    expect(screen.getByText("Initial upload")).toBeInTheDocument()
+    expect(screen.getByText("Upload received")).toBeInTheDocument()
+  })
+
+  it("renders Activity versions from the archive API, not minted labels", async () => {
+    const user = userEvent.setup()
+    vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
+    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+      versions: [
+        {
+          id: "v1",
+          label: "v1.0",
+          title: "Converted",
+          at: "2026-08-08T13:14:00Z",
+          current: true,
+          files: [{ path: "manifest.yml", kind: "added" }],
+          author: { sub: "u1", name: "Ada" },
+        },
+      ],
+    })
+    renderRoute()
+    await user.click(await screen.findByRole("tab", { name: "Activity" }))
+    expect(
+      await screen.findByRole("heading", { name: "Version history" }),
+    ).toBeInTheDocument()
+    expect(await screen.findByText("v1.0")).toBeInTheDocument()
+    expect(screen.getByText("manifest.yml")).toBeInTheDocument()
+    expect(screen.getByText("Ada")).toBeInTheDocument()
+    expect(screen.queryByText("Initial upload")).not.toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Activity" })).toBeInTheDocument()
+    expect(screen.getByText("Upload received")).toBeInTheDocument()
   })
 
   it("expands the structure tree from the job index", async () => {
