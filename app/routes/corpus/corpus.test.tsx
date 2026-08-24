@@ -409,7 +409,8 @@ describe("/corpus library", () => {
     vi.mocked(deleteCorpusDocument).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }))
+    await screen.findByRole("heading", { name: "peshitta" })
+    await user.click(screen.getByRole("button", { name: "Delete" }))
     expect(deleteCorpusDocument).not.toHaveBeenCalled()
 
     // Gated until DELETE is typed.
@@ -428,7 +429,8 @@ describe("/corpus library", () => {
     vi.mocked(deleteCorpusDocument).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }))
+    await screen.findByRole("heading", { name: "peshitta" })
+    await user.click(screen.getByRole("button", { name: "Delete" }))
     const confirm = screen.getByRole("button", { name: "Delete corpus" })
 
     // Wrong case must not unlock it — the friction is the point.
