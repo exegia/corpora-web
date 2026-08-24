@@ -6,15 +6,15 @@ export interface StatusPillProps {
   /** Set once the converted document is persisted — enables "View corpus". */
   documentId: string | null
   onOpen: () => void
+  onDismiss: () => void
 }
 
 export interface PanelProps {
   entry: ConversionEntry
   documentId: string | null
-  /** Collapse the shell panel without abandoning the run. */
-  onClose: () => void
-  onRetry: () => void
+  /** Clear the run and close the panel (View corpus). */
   onDismiss: () => void
+  onRetry: () => void
 }
 
 export interface ActionsProps {

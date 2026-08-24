@@ -243,7 +243,9 @@ export default function Activity({
     }
   }, [archive, archiveKey, restoreGen])
 
-  const versions = archive ? remote : []
+  const versions = archive
+    ? [...remote].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    : []
   const loading = Boolean(archive) && fetchedKey !== archiveKey
 
   return (

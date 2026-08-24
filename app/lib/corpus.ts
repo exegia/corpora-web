@@ -310,6 +310,59 @@ export async function createCorpusDocument(input: {
   return toDocument({ ...row, corpus_commits: [] })
 }
 
+/** Persist name / description / language (and licence) on the library row. */
+export async function updateCorpusDocument(
+  id: string,
+  patch: {
+    name?: string
+    description?: string | null
+    language?: string | null
+    licence?: string | null
+  },
+): Promise<CorpusDocument> {
+  const row: {
+    name?: string
+    description?: string | null
+    language?: string | null
+    licence?: string | null
+  } = {}
+  if (patch.name !== undefined) {
+    const name = patch.name.trim()
+    if (!name) {
+      throw new DataError("validation", "A corpus name is required.")
+    }
+    row.name = name
+  }
+  if (patch.description !== undefined) {
+    row.description = patch.description?.trim() || null
+  }
+  if (patch.language !== undefined) {
+    row.language = patch.language?.trim() || null
+  }
+  if (patch.licence !== undefined) {
+    row.licence = patch.licence?.trim() || null
+  }
+  if (Object.keys(row).length === 0) {
+    throw new DataError("validation", "Provide at least one field to update.")
+  }
+  const { data, error } = await getSupabase()
+    .from("corpus_documents")
+    .update(row)
+    .eq("id", id)
+    .select(DOCUMENT_COLUMNS)
+    .maybeSingle()
+  if (error) {
+    throw new DataError(
+      "unknown",
+      `Could not save the corpus: ${error.message ?? "unexpected error"}`,
+    )
+  }
+  if (!data) {
+    throw new DataError("not-found", "This corpus no longer exists.")
+  }
+  return toDocument(data as unknown as DocumentRow)
+}
+
 /**
  * Delete a document, its stored file, and (via cascade) its history.
  * Projects referencing it fall back to "no corpus" (FK on delete set null).

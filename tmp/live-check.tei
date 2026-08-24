@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+  <teiHeader>
+    <fileDesc>
+      <titleStmt>
+        <title>Live Check Epistle</title>
+      </titleStmt>
+      <publicationStmt>
+        <p>corpora-web live convert check</p>
+      </publicationStmt>
+      <sourceDesc>
+        <p>Synthetic TEI for explorer verification.</p>
+      </sourceDesc>
+    </fileDesc>
+  </teiHeader>
+  <text>
+    <body>
+      <div type="chapter">
+        <head>Greeting</head>
+        <p>In the beginning was the Word, and the Word was with God.</p>
+        <p>The light shines in the darkness, and the darkness has not overcome it.</p>
+      </div>
+    </body>
+  </text>
+</TEI>

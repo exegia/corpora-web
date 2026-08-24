@@ -1,6 +1,7 @@
 import {
   Card,
   CardFrame,
+  CardFrameAction,
   CardFrameHeader,
   CardFrameTitle,
   CardPanel,
@@ -11,15 +12,19 @@ import type { PanelProps } from "./types"
 /** Explorer section: the same CardFrame + Card + CardPanel stack as project Details. */
 export default function Panel({
   title,
+  actions,
   children,
   className,
   bodyClassName,
 }: PanelProps) {
   return (
     <CardFrame className={className}>
-      {title ? (
+      {title || actions ? (
         <CardFrameHeader>
-          <CardFrameTitle render={<h2 />}>{title}</CardFrameTitle>
+          {title ? (
+            <CardFrameTitle render={<h2 />}>{title}</CardFrameTitle>
+          ) : null}
+          {actions ? <CardFrameAction>{actions}</CardFrameAction> : null}
         </CardFrameHeader>
       ) : null}
       <Card>

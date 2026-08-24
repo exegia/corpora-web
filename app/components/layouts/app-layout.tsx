@@ -8,6 +8,7 @@ import { Blocks } from "@/components/blocks"
 import { Convert } from "@/components/corpus/convert"
 import { ConversionContext } from "@/components/corpus/convert/conversion-context"
 import { useConversion } from "@/components/corpus/convert/use-conversion"
+import { CONVERSION_PANEL_WIDTH } from "@/components/corpus/convert/utils"
 import { Sidebar } from "@/components/sidebar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ShellPanelsContext } from "./shell-panels"
@@ -19,7 +20,7 @@ export function AppLayout({ user }: { user?: SessionUser }) {
     // right panel, and the Convert/Upload actions survive route changes.
     const conversion = useConversion()
     const shell = useShellPanels()
-    const { openPanel, setOpen, open, providerProps } = shell
+    const { openPanel, setOpen, open, providerProps, resizePanel } = shell
 
     // The controller and the shell each hold an open flag: `panelOpen` is what
     // the workflow asked for, `open.right` is what the shell shows (its own
@@ -29,9 +30,11 @@ export function AppLayout({ user }: { user?: SessionUser }) {
     useEffect(() => {
         const was = requestedRef.current
         requestedRef.current = conversion.panelOpen
-        if (conversion.panelOpen && !was) openPanel("right", <Convert.PanelHost />)
-        else if (!conversion.panelOpen && was) setOpen(false, "right")
-    }, [conversion.panelOpen, openPanel, setOpen])
+        if (conversion.panelOpen && !was) {
+            resizePanel(CONVERSION_PANEL_WIDTH)
+            openPanel("right", <Convert.PanelHost />)
+        } else if (!conversion.panelOpen && was) setOpen(false, "right")
+    }, [conversion.panelOpen, openPanel, resizePanel, setOpen])
 
     // The way back: the shell's own trigger closed the panel, so the
     // controller must stand down too or its next `openPanel()` is a no-op.

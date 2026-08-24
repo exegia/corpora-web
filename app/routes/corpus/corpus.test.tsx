@@ -170,6 +170,11 @@ function renderRoute() {
           loader: clientLoader as never,
           action: clientAction as never,
         },
+        {
+          path: "/corpus/:documentId",
+          Component: () => <p>Corpus detail</p>,
+          HydrateFallback: () => null,
+        },
       ],
     },
   ])
@@ -301,19 +306,36 @@ describe("/corpus library", () => {
       new File(["<xml/>"], "summa.xml", { type: "text/xml" }),
     )
 
-    // The drawer opens itself; Base UI marks the page behind it aria-hidden,
-    // so assertions here go by text, never by role (and never a bare
-    // role="status" — the active step's Spinner is one).
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent("Converting")
+    expect(alert).toHaveTextContent("Validating source")
     expect(
-      (await screen.findAllByText("Converting")).length,
-    ).toBeGreaterThan(0)
-    expect(screen.getByText("summa.xml · Step 2 of 4")).toBeInTheDocument()
-    expect(screen.getByText("Validating source")).toBeInTheDocument()
-    expect(screen.getByText("In progress")).toBeInTheDocument()
-    expect(screen.getByText("> Parsing nodes…")).toBeInTheDocument()
-    // The pill in the (aria-hidden) header behind the drawer.
-    expect(document.body.textContent).toContain("Converting summa.xml")
+      screen.queryByRole("button", { name: "Dismiss" }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Show progress" }),
+    ).toBeInTheDocument()
+    // The panel stays closed until Show progress — no auto-open.
+    expect(
+      screen.queryByText("summa.xml · Step 2 of 4"),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText("In progress")).not.toBeInTheDocument()
+    expect(screen.queryByText("> Parsing nodes…")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Show progress" }))
+
+    // Open Base UI / shell panel may aria-hide the page — use body text.
+    expect(
+      await screen.findByText("summa.xml · Step 2 of 4"),
+    ).toBeInTheDocument()
+    expect(document.body.textContent).toContain("Validating source")
     expect(document.body.textContent).toContain("Step 2 of 4")
+    expect(document.body.textContent).toContain("In progress")
+    expect(document.body.textContent).toContain("> Parsing nodes…")
+    expect(
+      screen.queryByRole("button", { name: "Close conversion panel" }),
+    ).not.toBeInTheDocument()
+    expect(document.body.textContent).not.toContain("Dismiss")
   })
 
   it("persists a finished conversion with the archive's own metadata", async () => {
@@ -338,7 +360,15 @@ describe("/corpus library", () => {
       sections: [{ title: "Prima Pars", nodes: 8442, words: 312004 }],
     })
     vi.mocked(extractCorpusHistory).mockResolvedValue(commits)
-    vi.mocked(uploadCorpusFile).mockResolvedValue("d9/summa.corpus")
+    // Hold the persist so Show progress is still the trailing action after
+    // the pipeline finishes (View corpus replaces it once documentId is set).
+    let releaseUpload: (path: string) => void
+    vi.mocked(uploadCorpusFile).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseUpload = resolve
+        }),
+    )
     vi.mocked(createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
     renderRoute()
 
@@ -347,6 +377,23 @@ describe("/corpus library", () => {
       input,
       new File(["<xml/>"], "summa.xml", { type: "text/xml" }),
     )
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Conversion complete")
+    })
+    const alert = screen.getByRole("alert")
+    expect(alert).toHaveTextContent("Validating & finalizing")
+    expect(document.body.textContent).not.toContain("summa.xml converted")
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Dismiss conversion" }),
+    ).not.toBeInTheDocument()
+    // Document id is not set until persist returns — trailing is still Show progress.
+    await user.click(screen.getByRole("button", { name: "Show progress" }))
+    expect(
+      await screen.findByText("summa.xml · 4 of 4 steps"),
+    ).toBeInTheDocument()
+    releaseUpload!("d9/summa.corpus")
 
     await waitFor(() =>
       expect(createCorpusDocument).toHaveBeenCalledWith(
@@ -370,15 +417,19 @@ describe("/corpus library", () => {
     // The stored archive is the downloaded blob, renamed .corpus.
     const stored = vi.mocked(uploadCorpusFile).mock.calls[0][0]
     expect(stored.name).toBe("summa-theologiae.corpus")
-    expect(await screen.findByText("Conversion complete")).toBeInTheDocument()
-    // Both the header pill's link and the file card's link target the
-    // persisted row (the panel no longer aria-hides the header behind it).
+
+    // The in-page alert and the file card both link to the persisted row.
     const links = await screen.findAllByRole("link", { name: "View corpus" })
     expect(links).toHaveLength(2)
     for (const link of links) {
       expect(link).toHaveAttribute("href", "/corpus/d9")
     }
-    expect(document.body.textContent).toContain("summa.xml converted")
+
+    await user.click(links[0])
+    expect(await screen.findByText("Corpus detail")).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByText(/summa.xml ·/)).not.toBeInTheDocument()
+    })
   })
 
   it("marks the failed step and reruns the pipeline on Retry", async () => {
@@ -392,8 +443,22 @@ describe("/corpus library", () => {
       new File(["<xml/>"], "summa-fail.xml", { type: "text/xml" }),
     )
 
-    expect(await screen.findByText("Conversion failed")).toBeInTheDocument()
-    expect(screen.getByText("✗ IndexError — job j1")).toBeInTheDocument()
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent("Conversion failed")
+    expect(alert).toHaveTextContent("Converting to .corpus")
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Show progress" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Retry" }),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Show progress" }))
+
+    expect(
+      await screen.findByText("✗ IndexError — job j1"),
+    ).toBeInTheDocument()
     expect(
       screen.getByText("Conversion failed. See the failed step above."),
     ).toBeInTheDocument()
