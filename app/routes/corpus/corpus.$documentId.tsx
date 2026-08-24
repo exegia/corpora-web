@@ -20,7 +20,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
 import type { CorpusArchive } from "@/lib/corpora-api"
-import { downloadExploreCorpus, loadCorpusArchive } from "@/lib/corpora-api"
+import {
+  CorporaApiError,
+  downloadExploreCorpus,
+  loadCorpusArchive,
+  restoreCorpusVersion,
+} from "@/lib/corpora-api"
 import { sectionsFromIndex } from "@/lib/corpus-explore"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
@@ -47,11 +52,23 @@ export async function clientAction({ request }: ActionFunctionArgs) {
       case "delete-document":
         await deleteCorpusDocument(String(form.get("documentId") ?? ""))
         return redirect("/corpus")
+      case "restore-version": {
+        const jobId = String(form.get("jobId") ?? "")
+        const versionId = String(form.get("versionId") ?? "")
+        if (!jobId || !versionId) {
+          return { ok: false, error: "Missing version to restore." }
+        }
+        await restoreCorpusVersion({ kind: "job", key: jobId }, versionId)
+        return { ok: true }
+      }
       default:
         return { ok: false, error: "Unknown action." }
     }
   } catch (error) {
     if (error instanceof DataError) {
+      return { ok: false, error: error.message }
+    }
+    if (error instanceof CorporaApiError) {
       return { ok: false, error: error.message }
     }
     return { ok: false, error: "Something went wrong. Your change was not saved." }

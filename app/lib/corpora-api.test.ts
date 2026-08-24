@@ -161,6 +161,27 @@ describe("corpora-api", () => {
     })
   })
 
+  it("posts a job-scoped restore and rejects Hub archives", async () => {
+    const api = await freshApi()
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { versions: [{ id: "v1.3", label: "v1.3", current: true }] }),
+    )
+    const body = await api.restoreCorpusVersion({ kind: "job", key: "j1" }, "v1.0")
+    expect(body.versions[0].id).toBe("v1.3")
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/convert\/j1\/restore$/)
+    expect(init?.method).toBe("POST")
+    expect(JSON.parse(String(init?.body))).toEqual({ version_id: "v1.0" })
+
+    const hubError = await api
+      .restoreCorpusVersion({ kind: "hub", key: "summa.corpus" }, "v1.0")
+      .catch((error: unknown) => error)
+    expect(hubError).toBeInstanceOf(api.CorporaApiError)
+    expect((hubError as InstanceType<typeof api.CorporaApiError>).kind).toBe(
+      "read-only",
+    )
+  })
+
   it("downloads the archive as a blob", async () => {
     const api = await freshApi()
     fetchMock.mockResolvedValueOnce(new Response("corpus-bytes"))

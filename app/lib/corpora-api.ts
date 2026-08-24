@@ -509,6 +509,25 @@ export async function fetchCorpusVersions(
   return (await response.json()) as VersionsResponse
 }
 
+/** POST /convert/{job_id}/restore — job-scoped only (issue #82 / py#148). */
+export async function restoreCorpusVersion(
+  ref: ExploreRef,
+  versionId: string,
+): Promise<VersionsResponse> {
+  if (ref.kind !== "job") {
+    throw new CorporaApiError(
+      "read-only",
+      "Restore is only available for converted library corpora.",
+    )
+  }
+  const response = await apiFetch(`${exploreBase(ref)}/restore`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version_id: versionId }),
+  })
+  return (await response.json()) as VersionsResponse
+}
+
 /** GET {job|storage}/download */
 export async function downloadExploreCorpus(ref: ExploreRef): Promise<Blob> {
   const response = await apiFetch(`${exploreBase(ref)}/download`)

@@ -1,7 +1,10 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useFetchers } from "react-router"
+import { Blocks } from "@/components/blocks"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toastManager } from "@/components/ui/toast"
 import type { CorpusArchive, CorpusVersion } from "@/lib/corpora-api"
 import { fetchCorpusVersions } from "@/lib/corpora-api"
 import type { CorpusDocument } from "@/lib/corpus"
@@ -65,9 +68,16 @@ function actorName(
   return sub || null
 }
 
-function VersionRow({ version }: { version: VersionEntry }) {
+function VersionRow({
+  version,
+  jobId,
+}: {
+  version: VersionEntry
+  jobId: string | null
+}) {
   const author = actorName(version.author)
   const approver = actorName(version.approved_by)
+  const canRestore = Boolean(jobId) && !version.current
   return (
     <li className="relative flex gap-3 pb-6 last:pb-0">
       <span
@@ -86,11 +96,25 @@ function VersionRow({ version }: { version: VersionEntry }) {
               </Badge>
             )}
           </div>
-          {!version.current && (
-            <Button disabled size="sm" type="button" variant="link">
-              Restore
-            </Button>
-          )}
+          {!version.current &&
+            (canRestore && jobId ? (
+              <Blocks.ConfirmDelete
+                confirmLabel="Restore version"
+                confirmWord="RESTORE"
+                description={`This replaces the current archive with ${version.label}. Type RESTORE to confirm.`}
+                fields={{ jobId, versionId: version.id }}
+                intent="restore-version"
+                title={`Restore ${version.label}?`}
+                trigger={
+                  <Button size="sm" type="button" variant="link" />
+                }
+                triggerLabel="Restore"
+              />
+            ) : (
+              <Button disabled size="sm" type="button" variant="link">
+                Restore
+              </Button>
+            ))}
         </div>
         <p className="text-sm">{version.title}</p>
         <p className="text-muted-foreground text-xs">
@@ -168,8 +192,36 @@ export default function Activity({
 }) {
   const events = activityFor(document)
   const archiveKey = archive ? `${archive.kind}:${archive.key}` : ""
+  const jobId = archive?.kind === "job" ? archive.key : null
+  const fetchers = useFetchers()
+  const restoreFetcher = fetchers.find(
+    (fetcher) => fetcher.formData?.get("intent") === "restore-version",
+  )
+  const restoreGen =
+    restoreFetcher?.state === "idle" ? JSON.stringify(restoreFetcher.data ?? null) : ""
+  const toastedError = useRef<string | null>(null)
   const [fetchedKey, setFetchedKey] = useState<string | null>(null)
   const [remote, setRemote] = useState<VersionEntry[]>([])
+
+  useEffect(() => {
+    if (restoreFetcher?.state !== "idle") return
+    const error =
+      restoreFetcher.data &&
+      typeof restoreFetcher.data === "object" &&
+      "ok" in restoreFetcher.data &&
+      restoreFetcher.data.ok === false
+        ? String(
+            (restoreFetcher.data as { error?: string }).error ?? "Restore failed.",
+          )
+        : null
+    if (!error || toastedError.current === error) return
+    toastedError.current = error
+    toastManager.add({
+      type: "error",
+      title: "Restore failed",
+      description: error,
+    })
+  }, [restoreFetcher?.state, restoreFetcher?.data])
 
   useEffect(() => {
     if (!archive) return
@@ -189,7 +241,7 @@ export default function Activity({
     return () => {
       cancelled = true
     }
-  }, [archive, archiveKey])
+  }, [archive, archiveKey, restoreGen])
 
   const versions = archive ? remote : []
   const loading = Boolean(archive) && fetchedKey !== archiveKey
@@ -211,7 +263,7 @@ export default function Activity({
         ) : (
           <ol className="relative ms-1 border-s border-border ps-4">
             {versions.map((version) => (
-              <VersionRow key={version.id} version={version} />
+              <VersionRow jobId={jobId} key={version.id} version={version} />
             ))}
           </ol>
         )}
