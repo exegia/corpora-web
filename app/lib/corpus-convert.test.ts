@@ -13,6 +13,7 @@ import {
   deriveProgress,
   deriveSteps,
   formatBytes,
+  libraryTitle,
   runConversion,
 } from "@/lib/corpus-convert"
 import type { ConversionEntry } from "@/lib/corpus-convert"
@@ -47,6 +48,8 @@ function job(
     error,
     logs,
     last_log: logs.at(-1) ?? null,
+    display_name: status === "queued" ? null : "Summa Theologiae",
+    result_filename: "summa-theologiae.corpus",
     download_ready: status === "succeeded",
   }
 }
@@ -91,8 +94,10 @@ describe("corpus-convert transport", () => {
 
     expect(final.status).toBe("ready")
     expect(final.jobId).toBe("j1")
+    expect(final.displayName).toBe("Summa Theologiae")
+    expect(final.resultFilename).toBe("summa-theologiae.corpus")
     expect(final.corpusBlob).not.toBeNull()
-    expect(final.corpusName).toBe("summa-theologia.corpus")
+    expect(final.corpusName).toBe("summa-theologiae.corpus")
     expect(final.validation).toEqual({
       status: "valid",
       stats: { max_slot: 30_102 },
@@ -142,6 +147,23 @@ describe("corpus-convert transport", () => {
     ])
     expect(currentStep(final)).toEqual({ id: "convert", index: 3 })
     expect(downloadConversion).not.toHaveBeenCalled()
+  })
+
+  it("prefers the job display_name over a de-slugged filename stem", () => {
+    expect(
+      libraryTitle({
+        displayName: "Summa Theologiae",
+        manifestName: "summa-theologia-1200-ENG",
+        filenameStem: "summa-theologia-1200-ENG",
+      }),
+    ).toBe("Summa Theologiae")
+    expect(
+      libraryTitle({
+        displayName: null,
+        manifestName: null,
+        filenameStem: "summa-theologia-1200-ENG",
+      }),
+    ).toBe("summa theologia 1200 ENG")
   })
 
   it("rejects unsupported files before anything is uploaded", async () => {

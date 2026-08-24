@@ -1,12 +1,4 @@
-import {
-  type FileIconProps,
-  FileWordmarkCorpus,
-  FileWordmarkPdf,
-  FileWordmarkTei,
-  FileWordmarkTf,
-  FileWordmarkTxt,
-  FileWordmarkXml,
-} from "@exegia/corpora-ui"
+import { type FileIconProps, FileWordmarkCorpus } from "@exegia/corpora-ui"
 import type { ComponentType } from "react"
 import type { BadgeProps } from "@/components/ui/badge"
 import type { CorpusDocument, CorpusType } from "@/lib/corpus"
@@ -46,42 +38,26 @@ export function formatSize(bytes: number | null): string {
   return `${(bytes / 1024 ** 3).toFixed(1)} GB`
 }
 
-/** The "format · licence" subtitle, degrading for legacy rows. */
-/** The source format shown on the row's format badge ("tei", ".corpus"). */
-export function formatOf(document: CorpusDocument): string {
+function isCorpusObject(document: CorpusDocument): boolean {
   return (
-    document.sourceFormat ??
-    (document.source === "huggingface" ? "Hugging Face" : ".corpus")
+    document.source !== "huggingface" ||
+    Boolean(document.filename && /\.corpus$/i.test(document.filename))
   )
 }
 
+/** The file type shown on the library row and detail header. */
+export function formatOf(document: CorpusDocument): string {
+  return isCorpusObject(document) ? ".corpus" : "Hugging Face"
+}
+
 /**
- * The corpora-ui wordmark file icon for a document's format. Formats without
- * artwork (html, epub) return null so the row falls back to its initial.
+ * The corpora-ui wordmark for the library object. Converted and uploaded
+ * rows are always `.corpus` (source format lives on the details card).
  */
 export function fileIconFor(
   document: CorpusDocument,
 ): ComponentType<FileIconProps> | null {
-  switch (document.sourceFormat) {
-    case "tei":
-    case "tei_zip":
-      return FileWordmarkTei
-    case "text-fabric":
-    case "tf_zip":
-      return FileWordmarkTf
-    case "plain":
-      return FileWordmarkTxt
-    case "pdf":
-      return FileWordmarkPdf
-    case "xml":
-      return FileWordmarkXml
-    case null:
-    case undefined:
-      // No source format means the document *is* a .corpus archive.
-      return FileWordmarkCorpus
-    default:
-      return null
-  }
+  return isCorpusObject(document) ? FileWordmarkCorpus : null
 }
 
 export function subtitleOf(document: CorpusDocument): string {

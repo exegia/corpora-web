@@ -2,13 +2,18 @@ import { useRef, useState } from "react"
 import { useFetcher } from "react-router"
 import { uploadCorpusFile } from "@/lib/corpus"
 import {
+  asCorpusFilename,
   detectSourceFormat,
   fetchCapabilities,
   MAX_UPLOAD_BYTES,
   SUPPORTED_EXTENSIONS,
 } from "@/lib/corpora-api"
 import { readCorpusArchive } from "@/lib/corpus-archive"
-import { createConversionEntry, runConversion } from "@/lib/corpus-convert"
+import {
+  createConversionEntry,
+  libraryTitle,
+  runConversion,
+} from "@/lib/corpus-convert"
 import type { ConversionEntry, ConversionStepId } from "@/lib/corpus-convert"
 import { extractCorpusHistory } from "@/lib/corpus-history"
 
@@ -31,9 +36,8 @@ export interface ConversionController {
  * route's `convert-document` action once the archive is downloaded, stored,
  * and its manifest/toc/history read. No polling in loaders, no route
  * re-suspension (docs/data-loading.md). The hook mounts in AppLayout so the
- * run survives in-app navigation; a full reload still abandons tracking —
- * the backend cannot list or resume jobs yet (corpora-py#102), so resume is
- * deliberately out of scope.
+ * run survives in-app navigation. The persisted `job_id` is what the
+ * detail explorer uses after reload (`GET /convert/{job_id}/…`).
  */
 export function useConversion(): ConversionController {
   const persistFetcher = useFetcher<{
@@ -89,7 +93,10 @@ export function useConversion(): ConversionController {
     try {
       const blob = final.corpusBlob
       const baseName = file.name.replace(/\.[^.]+$/, "")
-      const corpusFile = new File([blob], `${baseName}.corpus`, {
+      const storedName = asCorpusFilename(
+        final.resultFilename ?? `${baseName}.corpus`,
+      )
+      const corpusFile = new File([blob], storedName, {
         type: "application/zip",
       })
       const [info, commits] = await Promise.all([
@@ -104,10 +111,15 @@ export function useConversion(): ConversionController {
       persistFetcher.submit(
         {
           intent: "convert-document",
-          name: info.name ?? baseName,
+          name: libraryTitle({
+            displayName: final.displayName,
+            manifestName: info.name,
+            filenameStem: baseName,
+          }),
           source: "upload",
           path,
           filename: corpusFile.name,
+          jobId: final.jobId ?? "",
           sourceFormat: final.sourceFormat ?? "",
           corpusType: info.corpusType ?? "text",
           language: info.language ?? "",
