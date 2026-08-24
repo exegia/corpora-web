@@ -2,43 +2,13 @@ import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { CorpusArchive } from "@/lib/corpora-api"
+import type { CorpusArchive, CorpusVersion } from "@/lib/corpora-api"
 import { fetchCorpusVersions } from "@/lib/corpora-api"
 import type { CorpusDocument } from "@/lib/corpus"
 import { formatSize } from "../list/utils"
 import Panel from "./panel"
 import { formatDateTime } from "./utils"
 import type { ActivityEvent, VersionEntry } from "./types"
-
-function versionsFor(document: CorpusDocument): VersionEntry[] {
-  const versions: VersionEntry[] = []
-  if (document.convertedAt) {
-    versions.push({
-      id: "converted",
-      label: "v1.1",
-      title: "Converted",
-      at: document.convertedAt,
-      current: true,
-      notes: document.sourceFormat
-        ? [`Source format ${document.sourceFormat}`]
-        : [],
-    })
-  }
-  versions.push({
-    id: "uploaded",
-    label: "v1.0",
-    title: "Initial upload",
-    at: document.uploadedAt,
-    current: !document.convertedAt,
-    notes: [
-      document.filename ? document.filename : "Uploaded to the library",
-      document.docsCount
-        ? `${document.docsCount.toLocaleString("en-US")} documents imported`
-        : null,
-    ].filter((note): note is string => Boolean(note)),
-  })
-  return versions
-}
 
 function activityFor(document: CorpusDocument): ActivityEvent[] {
   const events: ActivityEvent[] = []
@@ -85,7 +55,19 @@ function activityTimestamp(iso: string, now: Date = new Date()): string {
   })
 }
 
+function actorName(
+  actor: VersionEntry["author"] | VersionEntry["approved_by"],
+): string | null {
+  if (!actor) return null
+  const name = actor.name?.trim()
+  if (name) return name
+  const sub = actor.sub?.trim()
+  return sub || null
+}
+
 function VersionRow({ version }: { version: VersionEntry }) {
+  const author = actorName(version.author)
+  const approver = actorName(version.approved_by)
   return (
     <li className="relative flex gap-3 pb-6 last:pb-0">
       <span
@@ -121,6 +103,20 @@ function VersionRow({ version }: { version: VersionEntry }) {
             ))}
           </ul>
         )}
+        {version.files.length > 0 && (
+          <ul className="mt-2 flex flex-col gap-1 text-muted-foreground text-sm">
+            {version.files.map((file) => (
+              <li key={`${file.kind}:${file.path}`}>
+                {file.path}
+                <span className="ms-2">{file.kind}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {author ? <p className="text-muted-foreground text-sm">{author}</p> : null}
+        {approver ? (
+          <p className="text-muted-foreground text-sm">Approved by {approver}</p>
+        ) : null}
       </div>
     </li>
   )
@@ -148,14 +144,7 @@ function EventRow({ event }: { event: ActivityEvent }) {
   )
 }
 
-function toVersionEntry(row: {
-  id: string
-  label: string
-  title: string
-  at: string
-  current: boolean
-  notes: string[]
-}): VersionEntry {
+function toVersionEntry(row: CorpusVersion): VersionEntry {
   return {
     id: row.id,
     label: row.label,
@@ -163,10 +152,13 @@ function toVersionEntry(row: {
     at: row.at,
     current: row.current,
     notes: row.notes ?? [],
+    files: row.files ?? [],
+    author: row.author,
+    approved_by: row.approved_by,
   }
 }
 
-/** Activity tab: version timeline plus derived lifecycle events. */
+/** Activity tab: version timeline from GET …/versions plus derived lifecycle events. */
 export default function Activity({
   document,
   archive,
@@ -174,11 +166,10 @@ export default function Activity({
   document: CorpusDocument
   archive: CorpusArchive | null
 }) {
-  const fallback = versionsFor(document)
-  const [remote, setRemote] = useState<VersionEntry[] | null>(null)
-  const [pending, setPending] = useState(() => Boolean(archive))
   const events = activityFor(document)
   const archiveKey = archive ? `${archive.kind}:${archive.key}` : ""
+  const [fetchedKey, setFetchedKey] = useState<string | null>(null)
+  const [remote, setRemote] = useState<VersionEntry[]>([])
 
   useEffect(() => {
     if (!archive) return
@@ -186,22 +177,22 @@ export default function Activity({
     fetchCorpusVersions(archive)
       .then((body) => {
         if (cancelled) return
-        const rows = body.versions.map(toVersionEntry)
-        setRemote(rows.length > 0 ? rows : null)
+        setRemote((body.versions ?? []).map(toVersionEntry))
+        setFetchedKey(archiveKey)
       })
       .catch(() => {
-        if (!cancelled) setRemote(null)
-      })
-      .finally(() => {
-        if (!cancelled) setPending(false)
+        if (!cancelled) {
+          setRemote([])
+          setFetchedKey(archiveKey)
+        }
       })
     return () => {
       cancelled = true
     }
   }, [archive, archiveKey])
 
-  const versions = remote ?? fallback
-  const loading = Boolean(archive) && pending && remote == null
+  const versions = archive ? remote : []
+  const loading = Boolean(archive) && fetchedKey !== archiveKey
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
@@ -215,6 +206,8 @@ export default function Activity({
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-5/6" />
           </div>
+        ) : versions.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No version history yet.</p>
         ) : (
           <ol className="relative ms-1 border-s border-border ps-4">
             {versions.map((version) => (

@@ -368,14 +368,32 @@ export interface CorpusNode {
   occurrences_in_section?: number
 }
 
+export type CorpusVersionFileKind = "added" | "modified" | "deleted"
+
+export interface CorpusVersionFile {
+  path: string
+  kind: CorpusVersionFileKind
+}
+
+export interface CorpusVersionActor {
+  sub: string | null
+  name?: string | null
+}
+
+/** GET …/versions row — history.yml. Extra fields are optional so older payloads type-check. */
 export interface CorpusVersion {
   id: string
-  sha: string | null
   label: string
   title: string
   at: string
   current: boolean
-  notes: string[]
+  snapshot_key?: string | null
+  /** Ignored; may be absent once history.yml replaces git. */
+  sha?: string | null
+  files?: CorpusVersionFile[]
+  author?: CorpusVersionActor | null
+  approved_by?: CorpusVersionActor | null
+  notes?: string[]
 }
 
 export interface VersionsResponse {
