@@ -125,8 +125,9 @@ describe("/corpus/:documentId detail", () => {
     expect(screen.getByText("30,102")).toBeInTheDocument()
     expect(screen.getByText("613")).toBeInTheDocument()
     expect(screen.getByText("English")).toBeInTheDocument()
-    // Source format shows twice: the header's format badge and the card row.
-    expect(screen.getAllByText("text-fabric")).toHaveLength(2)
+    // Header file type is .corpus; source format stays on the details card.
+    expect(screen.getByText(".corpus")).toBeInTheDocument()
+    expect(screen.getByText("text-fabric")).toBeInTheDocument()
     // Header + details card both open the licence sheet.
     const licenceTriggers = screen.getAllByRole("button", { name: "CC BY-SA 4.0" })
     expect(licenceTriggers.length).toBeGreaterThanOrEqual(1)

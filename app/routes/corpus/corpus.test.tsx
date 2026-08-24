@@ -186,10 +186,11 @@ describe("/corpus library", () => {
     renderRoute()
     expect(await screen.findByText("peshitta")).toBeInTheDocument()
     expect(screen.getByText("septuagint")).toBeInTheDocument()
-    // Converted metadata renders; legacy rows degrade to fallbacks.
-    expect(screen.getByText("text-fabric")).toBeInTheDocument()
+    // Converted and uploaded rows both present as .corpus (source format
+    // is details-card metadata, not the list file type).
+    expect(screen.getAllByText(".corpus")).toHaveLength(2)
+    expect(screen.queryByText("text-fabric")).not.toBeInTheDocument()
     expect(screen.getByText("CC BY-SA 4.0")).toBeInTheDocument()
-    expect(screen.getByText(".corpus")).toBeInTheDocument()
     expect(screen.getByText("No licence")).toBeInTheDocument()
     expect(screen.getByText("Text")).toBeInTheDocument()
     expect(screen.getByText("Greek")).toBeInTheDocument()
