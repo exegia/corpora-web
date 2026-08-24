@@ -99,6 +99,7 @@ export default function Corpus() {
                 <Convert.StatusPill
                     documentId={conversion.documentId}
                     entry={conversion.entry}
+                    onDismiss={conversion.dismiss}
                     onOpen={conversion.openPanel}
                 />
             )}

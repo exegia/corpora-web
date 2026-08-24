@@ -1,9 +1,42 @@
 import type { ConversionEntry, LogTone } from "@/lib/corpus-convert"
 
+/** Right-panel width the conversion drawer opens at. */
+export const CONVERSION_PANEL_WIDTH = 468
+
 export const TONE_CLASSES: Record<LogTone, string> = {
   info: "text-muted-foreground",
-  success: "text-warning-foreground",
+  success: "text-success-foreground",
   error: "text-destructive",
+}
+
+export function conversionTone(state: "failed" | "completed" | "active"): {
+  text: string
+  fill: string
+  track: string
+  ring: string
+} {
+  if (state === "failed") {
+    return {
+      text: "text-destructive",
+      fill: "bg-destructive",
+      track: "bg-destructive/16",
+      ring: "border-destructive/48",
+    }
+  }
+  if (state === "completed") {
+    return {
+      text: "text-success-foreground",
+      fill: "bg-success",
+      track: "bg-success/16",
+      ring: "border-success/48",
+    }
+  }
+  return {
+    text: "text-warning-foreground",
+    fill: "bg-warning",
+    track: "bg-warning/16",
+    ring: "border-warning/48",
+  }
 }
 
 export function isDone(entry: ConversionEntry): boolean {

@@ -14,7 +14,6 @@ export default function PanelHost() {
         <Panel
             documentId={conversion.documentId}
             entry={conversion.entry}
-            onClose={conversion.closePanel}
             onDismiss={conversion.dismiss}
             onRetry={conversion.retry}
         />

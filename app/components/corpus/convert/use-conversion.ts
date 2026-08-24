@@ -64,7 +64,6 @@ export function useConversion(): ConversionController {
 
     const initial = createConversionEntry(file)
     setEntry(initial)
-    setPanelOpen(true)
 
     const final = await runConversion(
       file,
@@ -163,7 +162,6 @@ export function useConversion(): ConversionController {
           finishedAt: Date.now(),
           logs: [{ step: "receive", text: `✗ ${message}`, tone: "error" }],
         })
-        setPanelOpen(true)
       }
       if (!detectSourceFormat(file.name)) {
         reject(
