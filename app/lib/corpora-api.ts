@@ -528,6 +528,30 @@ export async function restoreCorpusVersion(
   return (await response.json()) as VersionsResponse
 }
 
+/** Editable subset of an archive's manifest (`ManifestUpdate` in corpora-py). */
+export interface ManifestUpdate {
+  name?: string
+  description?: string
+  language?: string
+  languageCode?: string
+}
+
+/** PATCH /convert/{job_id}/manifest — job-scoped only. */
+export async function patchJobManifest(
+  jobId: string,
+  updates: ManifestUpdate,
+): Promise<Record<string, unknown>> {
+  const response = await apiFetch(
+    `${exploreBase({ kind: "job", key: jobId })}/manifest`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    },
+  )
+  return (await response.json()) as Record<string, unknown>
+}
+
 /** GET {job|storage}/download */
 export async function downloadExploreCorpus(ref: ExploreRef): Promise<Blob> {
   const response = await apiFetch(`${exploreBase(ref)}/download`)

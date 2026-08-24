@@ -95,4 +95,11 @@ export interface PanelProps {
   children: ReactNode
   className?: string
   bodyClassName?: string
+  /** Rendered in the CardFrameHeader beside the title. */
+  actions?: ReactNode
+}
+
+export interface EditPanelProps {
+  document: CorpusDocument
+  onClose: () => void
 }
