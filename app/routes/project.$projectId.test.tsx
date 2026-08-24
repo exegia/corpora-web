@@ -194,6 +194,7 @@ beforeEach(() => {
     convertedAt: null,
     description: null,
     toc: null,
+    jobId: null,
   }
   vi.mocked(listCorpusDocuments).mockResolvedValue([
     {

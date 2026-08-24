@@ -8,9 +8,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { OverviewTableProps } from "./types"
+import { formatCount } from "./utils"
 
 /** The Overview tab's sections table (title, nodes, words). */
-export default function OverviewTable({ sections }: OverviewTableProps) {
+export default function OverviewTable({
+  sections,
+  onOpenSection,
+}: OverviewTableProps) {
   return (
     <div>
       <Table variant="card">
@@ -26,20 +30,32 @@ export default function OverviewTable({ sections }: OverviewTableProps) {
         </TableHeader>
         <TableBody>
           {sections.map((section) => (
-            <TableRow key={section.title}>
+            <TableRow
+              className={onOpenSection ? "group/row" : undefined}
+              key={section.title}
+            >
               <TableCell className="w-full max-w-0">
-                <span className="block truncate font-medium">
-                  {section.title}
-                </span>
+                {onOpenSection ? (
+                  <button
+                    className="block w-full truncate text-left font-medium outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:inset-ring-2 focus-visible:after:inset-ring-ring"
+                    onClick={() => onOpenSection(section)}
+                    type="button"
+                  >
+                    {section.title}
+                  </button>
+                ) : (
+                  <span className="block truncate font-medium">
+                    {section.title}
+                  </span>
+                )}
               </TableCell>
               <TableCell className="text-sm tabular-nums">
-                {section.nodes?.toLocaleString("en-US") ?? "—"}
+                {formatCount(section.nodes)}
               </TableCell>
               <TableCell className="text-sm tabular-nums">
-                {section.words?.toLocaleString("en-US") ?? "—"}
+                {formatCount(section.words)}
               </TableCell>
               <TableCell>
-                {/* Decorative for now — section reading is a later feature. */}
                 <ChevronRight
                   aria-hidden="true"
                   className="size-4 text-muted-foreground"
