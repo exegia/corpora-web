@@ -58,7 +58,11 @@ function scriptConversion(outcome: Outcome) {
       { status: "uploading" },
       { step: "receive", text: `> ${entry.name}`, tone: "info" },
     )
-    emit({ jobId: "j1" })
+    emit({
+      jobId: "j1",
+      displayName: "Summa Theologiae",
+      resultFilename: "summa-theologiae.corpus",
+    })
     emit(
       { status: "queued" },
       { step: "validate", text: "> Parsing nodes…", tone: "info" },
@@ -115,6 +119,7 @@ function doc(overrides: Partial<CorpusDocument> = {}): CorpusDocument {
     convertedAt: null,
     description: null,
     toc: null,
+    jobId: null,
     commits: [],
     ...overrides,
   }
@@ -181,10 +186,11 @@ describe("/corpus library", () => {
     renderRoute()
     expect(await screen.findByText("peshitta")).toBeInTheDocument()
     expect(screen.getByText("septuagint")).toBeInTheDocument()
-    // Converted metadata renders; legacy rows degrade to fallbacks.
-    expect(screen.getByText("text-fabric")).toBeInTheDocument()
+    // Converted and uploaded rows both present as .corpus (source format
+    // is details-card metadata, not the list file type).
+    expect(screen.getAllByText(".corpus")).toHaveLength(2)
+    expect(screen.queryByText("text-fabric")).not.toBeInTheDocument()
     expect(screen.getByText("CC BY-SA 4.0")).toBeInTheDocument()
-    expect(screen.getByText(".corpus")).toBeInTheDocument()
     expect(screen.getByText("No licence")).toBeInTheDocument()
     expect(screen.getByText("Text")).toBeInTheDocument()
     expect(screen.getByText("Greek")).toBeInTheDocument()
@@ -345,10 +351,11 @@ describe("/corpus library", () => {
     await waitFor(() =>
       expect(createCorpusDocument).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: "Summa Theologia",
+          name: "Summa Theologiae",
           source: "upload",
           path: "d9/summa.corpus",
-          filename: "summa.corpus",
+          filename: "summa-theologiae.corpus",
+          jobId: "j1",
           sourceFormat: "tei",
           corpusType: "text",
           language: "English",
@@ -362,7 +369,7 @@ describe("/corpus library", () => {
     )
     // The stored archive is the downloaded blob, renamed .corpus.
     const stored = vi.mocked(uploadCorpusFile).mock.calls[0][0]
-    expect(stored.name).toBe("summa.corpus")
+    expect(stored.name).toBe("summa-theologiae.corpus")
     expect(await screen.findByText("Conversion complete")).toBeInTheDocument()
     // Both the header pill's link and the file card's link target the
     // persisted row (the panel no longer aria-hides the header behind it).
@@ -402,7 +409,8 @@ describe("/corpus library", () => {
     vi.mocked(deleteCorpusDocument).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }))
+    await screen.findByRole("heading", { name: "peshitta" })
+    await user.click(screen.getByRole("button", { name: "Delete" }))
     expect(deleteCorpusDocument).not.toHaveBeenCalled()
 
     // Gated until DELETE is typed.
@@ -421,7 +429,8 @@ describe("/corpus library", () => {
     vi.mocked(deleteCorpusDocument).mockResolvedValue()
     renderRoute()
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }))
+    await screen.findByRole("heading", { name: "peshitta" })
+    await user.click(screen.getByRole("button", { name: "Delete" }))
     const confirm = screen.getByRole("button", { name: "Delete corpus" })
 
     // Wrong case must not unlock it — the friction is the point.

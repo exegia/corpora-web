@@ -167,4 +167,162 @@ describe("corpora-api", () => {
     const blob = await api.downloadConversion("j1")
     expect(await blob.text()).toBe("corpus-bytes")
   })
+
+  it("builds Hub filename candidates from the library document", async () => {
+    const api = await freshApi()
+    expect(
+      api.hubFilenameCandidates({
+        filename: "summa-theologia-1200-ENG.xml",
+        name: "Summa Theologia (1200, ENG)",
+      }),
+    ).toEqual([
+      "summa-theologia-1200-ENG.corpus",
+      "Summa Theologia (1200, ENG).corpus",
+    ])
+    expect(api.asCorpusFilename("BHSA.corpus")).toBe("BHSA.corpus")
+  })
+
+  it("loads a conversion job index and never lists Hub storage", async () => {
+    const api = await freshApi()
+    const index = {
+      toc: null,
+      sections: { levels: ["book"], items: [] },
+      node_types: [{ type: "word", count: 10, avg_slots: 1, is_slot: true }],
+    }
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, index))
+
+    const archive = await api.loadCorpusArchive({
+      jobId: "j-summa",
+      source: "upload",
+      filename: "summa-theologiae.corpus",
+      name: "Summa Theologiae",
+    })
+    expect(archive).toEqual({
+      kind: "job",
+      key: "j-summa",
+      index,
+    })
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(
+      /\/convert\/j-summa\/index$/,
+    )
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/storage"))).toBe(
+      false,
+    )
+  })
+
+  it("returns null for an expired job id without throwing", async () => {
+    const api = await freshApi()
+    fetchMock.mockResolvedValueOnce(jsonResponse(404, { detail: "Unknown job id" }))
+    await expect(
+      api.loadCorpusArchive({
+        jobId: "gone",
+        source: "upload",
+        filename: "summa.corpus",
+        name: "Summa",
+      }),
+    ).resolves.toBeNull()
+  })
+
+  it("does not list Hub storage for an upload without a job id", async () => {
+    const api = await freshApi()
+    await expect(
+      api.loadCorpusArchive({
+        jobId: null,
+        source: "upload",
+        filename: "summa.corpus",
+        name: "Summa",
+      }),
+    ).resolves.toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("lists Hub storage only for Hugging Face imports", async () => {
+    const api = await freshApi()
+    const index = {
+      toc: null,
+      sections: { levels: ["book"], items: [] },
+      node_types: [{ type: "word", count: 10 }],
+    }
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(200, [
+          {
+            filename: "BHSA.corpus",
+            size_bytes: 12,
+            repo_id: "exegia/corpora",
+            url: "https://huggingface.co/datasets/exegia/corpora",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, index))
+
+    const archive = await api.loadCorpusArchive({
+      source: "huggingface",
+      filename: "BHSA.corpus",
+      name: "BHSA",
+    })
+    expect(archive).toEqual({ kind: "hub", key: "BHSA.corpus", index })
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/storage$/)
+    expect(String(fetchMock.mock.calls[1][0])).toMatch(/\/storage\/BHSA.corpus\/index$/)
+  })
+
+  it("fetches index, content, and a node through job-scoped paths", async () => {
+    const api = await freshApi()
+    const job = { kind: "job" as const, key: "j1" }
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { toc: null, sections: null, node_types: [] }),
+    )
+    await api.fetchCorpusIndex(job)
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/convert/j1/index")
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        ref: "Genesis 1",
+        format: "text-orig-full",
+        passages: [
+          {
+            ref: "Genesis 1:1",
+            text: "in the beginning",
+            node: 3,
+            tokens: [{ text: "in", after: " ", node: 1 }],
+          },
+        ],
+        total: 1,
+        offset: 0,
+        limit: 20,
+        next_offset: null,
+      }),
+    )
+    const content = await api.fetchCorpusContent(job, {
+      ref: "Genesis 1",
+      limit: 20,
+    })
+    expect(content.passages[0]?.tokens?.[0]?.node).toBe(1)
+    expect(String(fetchMock.mock.calls[1][0])).toContain("ref=Genesis+1")
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        node: 1,
+        otype: "word",
+        features: {},
+        text: "in",
+        occurrences: 7,
+      }),
+    )
+    const node = await api.fetchCorpusNode(job, 1)
+    expect(node.occurrences).toBe(7)
+    expect(String(fetchMock.mock.calls[2][0])).toContain("/convert/j1/nodes/1")
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { versions: [{ id: "packaged", label: "v1.0" }] }),
+    )
+    const versions = await api.fetchCorpusVersions(job)
+    expect(versions.versions[0]?.id).toBe("packaged")
+    expect(String(fetchMock.mock.calls[3][0])).toContain("/convert/j1/versions")
+
+    fetchMock.mockResolvedValueOnce(new Response("archive-bytes"))
+    const blob = await api.downloadExploreCorpus(job)
+    expect(await blob.text()).toBe("archive-bytes")
+    expect(String(fetchMock.mock.calls[4][0])).toContain("/convert/j1/download")
+  })
 })

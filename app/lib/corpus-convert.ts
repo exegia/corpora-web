@@ -66,6 +66,10 @@ export interface ConversionEntry {
   logs: ConversionLog[]
   /** Server-assigned job id, set once POST /convert responds. */
   jobId: string | null
+  /** Source-derived library title from the job payload. */
+  displayName: string | null
+  /** Slug filename the service will use for the downloaded archive. */
+  resultFilename: string | null
   validation: ValidationOutcome | null
   corpusName: string | null
   corpusSize: number | null
@@ -91,6 +95,22 @@ export const CONVERSION_STEPS: ReadonlyArray<{
   { id: "convert", title: "Converting to .corpus" },
   { id: "index", title: "Validating & finalizing" },
 ]
+
+/** Library heading: job display_name, then manifest name, then a de-slugged stem. */
+export function libraryTitle(input: {
+  displayName?: string | null
+  manifestName?: string | null
+  filenameStem: string
+}): string {
+  const display = input.displayName?.trim()
+  if (display) return display
+  const manifest = input.manifestName?.trim()
+  if (manifest) return manifest
+  return (
+    input.filenameStem.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim() ||
+    input.filenameStem
+  )
+}
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -118,6 +138,8 @@ export function createConversionEntry(file: {
     sourceFormat: detectSourceFormat(file.name),
     logs: [],
     jobId: null,
+    displayName: null,
+    resultFilename: null,
     validation: null,
     corpusName: null,
     corpusSize: null,
@@ -359,9 +381,17 @@ export async function runConversion(
     if (job.status === "failed") {
       return fail("convert", job.error ?? "Conversion failed.")
     }
-    if (job.status === "running" && entry.status !== "converting") {
-      emit({ status: "converting" })
+    const named: Partial<ConversionEntry> = {}
+    if (job.display_name && job.display_name !== entry.displayName) {
+      named.displayName = job.display_name
     }
+    if (job.result_filename && job.result_filename !== entry.resultFilename) {
+      named.resultFilename = job.result_filename
+    }
+    if (job.status === "running" && entry.status !== "converting") {
+      named.status = "converting"
+    }
+    if (Object.keys(named).length > 0) emit(named)
     if (job.status === "succeeded") break
   }
 
@@ -412,7 +442,8 @@ export async function runConversion(
       status: "ready",
       finishedAt: Date.now(),
       corpusBlob: blob,
-      corpusName: entry.name.replace(/\.[^.]+$/, ".corpus"),
+      corpusName:
+        entry.resultFilename ?? entry.name.replace(/\.[^.]+$/, ".corpus"),
       corpusSize: blob.size,
     },
     { step: "index", text: "✓ Archive downloaded — corpus ready", tone: "success" },
