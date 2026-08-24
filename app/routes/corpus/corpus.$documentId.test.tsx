@@ -8,6 +8,7 @@ import {
   fetchCorpusNode,
   fetchCorpusVersions,
   loadCorpusArchive,
+  restoreCorpusVersion,
 } from "@/lib/corpora-api"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument } from "@/lib/corpus"
@@ -30,8 +31,16 @@ vi.mock("@/lib/corpora-api", () => ({
   fetchCorpusNode: vi.fn(),
   fetchCorpusSections: vi.fn(),
   fetchCorpusVersions: vi.fn(async () => ({ versions: [] })),
+  restoreCorpusVersion: vi.fn(),
   downloadExploreCorpus: vi.fn(),
   downloadStoredCorpus: vi.fn(),
+  CorporaApiError: class CorporaApiError extends Error {
+    kind: string
+    constructor(kind: string, message: string) {
+      super(message)
+      this.kind = kind
+    }
+  },
 }))
 
 const summa: CorpusDocument = {
@@ -442,5 +451,42 @@ describe("/corpus/:documentId detail", () => {
 
     await waitFor(() => expect(deleteCorpusDocument).toHaveBeenCalledWith("d2"))
     expect(await screen.findByText("Back at the library")).toBeInTheDocument()
+  })
+
+  it("restores a previous version after typing RESTORE", async () => {
+    const user = userEvent.setup()
+    vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
+    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+      versions: [
+        {
+          id: "v1.1",
+          label: "v1.1",
+          title: "Now",
+          at: "2026-08-09T10:00:00Z",
+          current: true,
+        },
+        {
+          id: "v1.0",
+          label: "v1.0",
+          title: "Converted",
+          at: "2026-08-08T13:14:00Z",
+          current: false,
+        },
+      ],
+    })
+    vi.mocked(restoreCorpusVersion).mockResolvedValue({ versions: [] })
+    renderRoute()
+    await user.click(await screen.findByRole("tab", { name: "Activity" }))
+    await user.click(await screen.findByRole("button", { name: "Restore" }))
+    const confirm = screen.getByRole("button", { name: "Restore version" })
+    expect(confirm).toBeDisabled()
+    await user.type(screen.getByRole("textbox"), "RESTORE")
+    await user.click(confirm)
+    await waitFor(() =>
+      expect(restoreCorpusVersion).toHaveBeenCalledWith(
+        { kind: "job", key: "j-summa" },
+        "v1.0",
+      ),
+    )
   })
 })

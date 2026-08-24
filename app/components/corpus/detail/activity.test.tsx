@@ -1,4 +1,6 @@
+import type { ReactElement } from "react"
 import { render, screen } from "@testing-library/react"
+import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fetchCorpusVersions } from "@/lib/corpora-api"
 import type { CorpusArchive, CorpusVersion, VersionsResponse } from "@/lib/corpora-api"
@@ -8,6 +10,18 @@ import Activity from "./activity"
 vi.mock("@/lib/corpora-api", () => ({
   fetchCorpusVersions: vi.fn(async () => ({ versions: [] })),
 }))
+
+function renderActivity(ui: ReactElement) {
+  const Stub = createRoutesStub([
+    {
+      path: "/",
+      Component: () => ui,
+      HydrateFallback: () => null,
+      action: async () => ({ ok: true }),
+    },
+  ])
+  return render(<Stub initialEntries={["/"]} />)
+}
 
 const document: CorpusDocument = {
   id: "d2",
@@ -45,7 +59,7 @@ beforeEach(() => {
 
 describe("Activity", () => {
   it("shows an empty Version history when there is no archive, not minted labels", () => {
-    render(<Activity archive={null} document={document} />)
+    renderActivity(<Activity archive={null} document={document} />)
     expect(
       screen.getByRole("heading", { name: "Version history" }),
     ).toBeInTheDocument()
@@ -75,7 +89,7 @@ describe("Activity", () => {
         resolve = next
       }),
     )
-    render(<Activity archive={archive} document={document} />)
+    renderActivity(<Activity archive={archive} document={document} />)
     expect(
       screen.getByRole("status", { name: "Loading version history" }),
     ).toBeInTheDocument()
@@ -91,7 +105,7 @@ describe("Activity", () => {
     expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument()
   })
 
-  it("keeps Restore disabled on a non-current version", async () => {
+  it("enables Restore on a non-current version for a job-scoped archive", async () => {
     vi.mocked(fetchCorpusVersions).mockResolvedValue({
       versions: [
         {
@@ -114,15 +128,43 @@ describe("Activity", () => {
         },
       ],
     })
-    render(<Activity archive={archive} document={document} />)
+    renderActivity(<Activity archive={archive} document={document} />)
     expect(await screen.findByText("v1.0")).toBeInTheDocument()
-    const restore = screen.getByRole("button", { name: "Restore" })
-    expect(restore).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Restore" })).toBeEnabled()
+  })
+
+  it("keeps Restore disabled on a Hub archive", async () => {
+    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+      versions: [
+        {
+          id: "v1",
+          label: "v1.0",
+          title: "Converted",
+          at: "2026-08-08T13:14:00Z",
+          current: false,
+        },
+        {
+          id: "v2",
+          label: "v1.1",
+          title: "Now",
+          at: "2026-08-09T10:00:00Z",
+          current: true,
+        },
+      ],
+    })
+    const hub: CorpusArchive = {
+      kind: "hub",
+      key: "summa.corpus",
+      index: { toc: null, sections: null, node_types: [] },
+    }
+    renderActivity(<Activity archive={hub} document={document} />)
+    expect(await screen.findByText("v1.0")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Restore" })).toBeDisabled()
   })
 
   it("shows the empty Version history when the versions fetch fails", async () => {
     vi.mocked(fetchCorpusVersions).mockRejectedValue(new Error("offline"))
-    render(<Activity archive={archive} document={document} />)
+    renderActivity(<Activity archive={archive} document={document} />)
     expect(
       await screen.findByText("No version history yet."),
     ).toBeInTheDocument()
