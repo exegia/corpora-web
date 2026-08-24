@@ -105,6 +105,33 @@ describe("Activity", () => {
     expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument()
   })
 
+  it("lists versions newest first", async () => {
+    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+      versions: [
+        {
+          id: "v1",
+          label: "v1.0",
+          title: "Converted",
+          at: "2026-08-08T13:14:00Z",
+          current: false,
+        },
+        {
+          id: "v2",
+          label: "v1.1",
+          title: "Now",
+          at: "2026-08-09T10:00:00Z",
+          current: true,
+        },
+      ],
+    })
+    renderActivity(<Activity archive={archive} document={document} />)
+    const newest = await screen.findByText("v1.1")
+    const oldest = screen.getByText("v1.0")
+    expect(
+      newest.compareDocumentPosition(oldest) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
   it("enables Restore on a non-current version for a job-scoped archive", async () => {
     vi.mocked(fetchCorpusVersions).mockResolvedValue({
       versions: [

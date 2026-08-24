@@ -16,6 +16,11 @@ import CorpusDetailRoute, {
   clientAction,
   clientLoader,
 } from "@/routes/corpus/corpus.$documentId"
+import CorpusOverviewRoute from "@/routes/corpus/corpus.$documentId._index"
+import CorpusActivityRoute from "@/routes/corpus/corpus.$documentId.activity"
+import CorpusAnalyticsRoute from "@/routes/corpus/corpus.$documentId.analytics"
+import CorpusDocumentsRoute from "@/routes/corpus/corpus.$documentId.documents"
+import CorpusStructureRoute from "@/routes/corpus/corpus.$documentId.structure"
 
 vi.mock("@/lib/corpus", () => ({
   listCorpusDocuments: vi.fn(),
@@ -69,7 +74,7 @@ const summa: CorpusDocument = {
   commits: [],
 }
 
-function renderRoute() {
+function renderRoute(entry = "/corpus/d2") {
   const Stub = createRoutesStub([
     {
       path: "/corpus/:documentId",
@@ -78,13 +83,40 @@ function renderRoute() {
       // biome-ignore lint: route module functions match at runtime
       loader: clientLoader as never,
       action: clientAction as never,
+      children: [
+        { index: true, Component: CorpusOverviewRoute },
+        {
+          path: "documents",
+          Component: CorpusDocumentsRoute,
+          // biome-ignore lint: route module functions match at runtime
+          action: clientAction as never,
+        },
+        {
+          path: "structure",
+          Component: CorpusStructureRoute,
+          // biome-ignore lint: route module functions match at runtime
+          action: clientAction as never,
+        },
+        {
+          path: "analytics",
+          Component: CorpusAnalyticsRoute,
+          // biome-ignore lint: route module functions match at runtime
+          action: clientAction as never,
+        },
+        {
+          path: "activity",
+          Component: CorpusActivityRoute,
+          // biome-ignore lint: route module functions match at runtime
+          action: clientAction as never,
+        },
+      ],
     },
     {
       path: "/corpus",
       Component: () => <p>Back at the library</p>,
     },
   ])
-  return render(<Stub initialEntries={["/corpus/d2"]} />)
+  return render(<Stub initialEntries={[entry]} />)
 }
 
 const hubIndex = {
@@ -147,10 +179,9 @@ describe("/corpus/:documentId detail", () => {
 
   it("shows the Overview sections and enables the explorer tabs", async () => {
     renderRoute()
-    expect(await screen.findByRole("tab", { name: "Overview" })).toBeEnabled()
+    expect(await screen.findByRole("link", { name: "Overview" })).toBeInTheDocument()
     for (const name of ["Documents", "Structure", "Analytics", "Activity"]) {
-      expect(screen.getByRole("tab", { name })).toBeEnabled()
-      expect(screen.getByRole("tab", { name })).not.toHaveAttribute("data-disabled")
+      expect(screen.getByRole("link", { name })).toBeInTheDocument()
     }
     const table = await screen.findByRole("table")
     expect(table).toHaveTextContent("Prima Pars")
@@ -187,6 +218,48 @@ describe("/corpus/:documentId detail", () => {
     expect(await data.archive).toBeNull()
   })
 
+  it("redirects leftover ?tab= query values onto nested explorer paths", async () => {
+    async function locationOf(url: string) {
+      try {
+        await clientLoader({
+          params: { documentId: "d2" },
+          request: new Request(url),
+          context: {},
+        } as never)
+        throw new Error("expected a redirect")
+      } catch (error) {
+        expect(error).toBeInstanceOf(Response)
+        return (error as Response).headers.get("Location")
+      }
+    }
+
+    expect(await locationOf("http://localhost/corpus/d2?tab=activity")).toBe(
+      "/corpus/d2/activity",
+    )
+    expect(await locationOf("http://localhost/corpus/d2?tab=overview")).toBe(
+      "/corpus/d2",
+    )
+    const documents = await locationOf(
+      "http://localhost/corpus/d2?tab=documents&section=Prima%20Pars",
+    )
+    expect(documents).toBeTruthy()
+    const documentsUrl = new URL(documents ?? "", "http://localhost")
+    expect(documentsUrl.pathname).toBe("/corpus/d2/documents")
+    expect(documentsUrl.searchParams.get("section")).toBe("Prima Pars")
+    expect(documentsUrl.searchParams.get("tab")).toBeNull()
+  })
+
+  it("opens Activity from a leftover ?tab=activity URL", async () => {
+    renderRoute("/corpus/d2?tab=activity")
+    expect(
+      await screen.findByRole("heading", { name: "Version history" }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Activity" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    )
+  })
+
   it("fills Overview and Analytics from a conversion job when toc is empty", async () => {
     const user = userEvent.setup()
     vi.mocked(getCorpusDocument).mockResolvedValue({ ...summa, toc: null })
@@ -198,7 +271,7 @@ describe("/corpus/:documentId detail", () => {
       screen.queryByText("No section data was captured for this corpus."),
     ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole("tab", { name: "Analytics" }))
+    await user.click(screen.getByRole("link", { name: "Analytics" }))
     expect(
       await screen.findByRole("heading", { name: "Nodes by type" }),
     ).toBeInTheDocument()
@@ -242,8 +315,9 @@ describe("/corpus/:documentId detail", () => {
         "No live archive is available for this corpus yet.",
       ),
     ).toBeInTheDocument()
-    expect(screen.getByRole("tab", { name: "Documents" })).toHaveAttribute(
-      "data-active",
+    expect(screen.getByRole("link", { name: "Documents" })).toHaveAttribute(
+      "aria-current",
+      "page",
     )
   })
 
@@ -357,9 +431,9 @@ describe("/corpus/:documentId detail", () => {
   it("renders structure, analytics, and activity from the explorer tabs", async () => {
     const user = userEvent.setup()
     renderRoute()
-    await screen.findByRole("tab", { name: "Overview" })
+    await screen.findByRole("link", { name: "Overview" })
 
-    await user.click(screen.getByRole("tab", { name: "Structure" }))
+    await user.click(screen.getByRole("link", { name: "Structure" }))
     expect(
       await screen.findByText(
         "No live archive is available for this corpus yet.",
@@ -369,7 +443,7 @@ describe("/corpus/:documentId detail", () => {
       screen.queryByRole("heading", { name: "Document hierarchy" }),
     ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole("tab", { name: "Analytics" }))
+    await user.click(screen.getByRole("link", { name: "Analytics" }))
     expect(
       await screen.findByRole("heading", { name: "Nodes by type" }),
     ).toBeInTheDocument()
@@ -381,7 +455,7 @@ describe("/corpus/:documentId detail", () => {
     ).toBeGreaterThan(0)
     expect(screen.queryByText("65.8 %")).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole("tab", { name: "Activity" }))
+    await user.click(screen.getByRole("link", { name: "Activity" }))
     expect(
       await screen.findByRole("heading", { name: "Version history" }),
     ).toBeInTheDocument()
@@ -410,7 +484,7 @@ describe("/corpus/:documentId detail", () => {
       ],
     })
     renderRoute()
-    await user.click(await screen.findByRole("tab", { name: "Activity" }))
+    await user.click(await screen.findByRole("link", { name: "Activity" }))
     expect(
       await screen.findByRole("heading", { name: "Version history" }),
     ).toBeInTheDocument()
@@ -426,7 +500,7 @@ describe("/corpus/:documentId detail", () => {
     const user = userEvent.setup()
     vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
     renderRoute()
-    await user.click(await screen.findByRole("tab", { name: "Structure" }))
+    await user.click(await screen.findByRole("link", { name: "Structure" }))
     expect(
       await screen.findByRole("heading", { name: "Document hierarchy" }),
     ).toBeInTheDocument()
@@ -476,7 +550,7 @@ describe("/corpus/:documentId detail", () => {
     })
     vi.mocked(restoreCorpusVersion).mockResolvedValue({ versions: [] })
     renderRoute()
-    await user.click(await screen.findByRole("tab", { name: "Activity" }))
+    await user.click(await screen.findByRole("link", { name: "Activity" }))
     await user.click(await screen.findByRole("button", { name: "Restore" }))
     const confirm = screen.getByRole("button", { name: "Restore version" })
     expect(confirm).toBeDisabled()
