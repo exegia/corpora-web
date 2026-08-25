@@ -1,5 +1,6 @@
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress"
-import Corpus, { CONVERSION_STEPS } from "@/lib/corpus"
+import Corpus from "@/lib/corpus"
+import { CONVERSION_STEPS } from "@/lib/corpus"
 import FileSummary from "./file-summary"
 import LogSteps from "./log-steps"
 import type { PanelProps } from "./types"
@@ -42,12 +43,7 @@ export default function Panel({ entry, documentId, onDismiss, onRetry }: PanelPr
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 pt-0">
                 <LogSteps entry={entry} />
-                <FileSummary
-                    documentId={documentId}
-                    entry={entry}
-                    onDismiss={onDismiss}
-                    onRetry={onRetry}
-                />
+                <FileSummary documentId={documentId} entry={entry} onDismiss={onDismiss} onRetry={onRetry} />
             </div>
         </div>
     )
