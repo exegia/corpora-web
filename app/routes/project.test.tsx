@@ -4,7 +4,7 @@ import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { formatRelativeTime } from "@/lib/format"
 import Project, { type ProjectSummary } from "@/lib/projects"
-import { listUsers } from "@/lib/user/users"
+import User from "@/lib/user"
 import ProjectsPage, { clientAction, clientLoader } from "@/routes/project"
 
 vi.mock("@/lib/projects", async (importOriginal) => {
@@ -26,7 +26,13 @@ vi.mock("@/lib/projects", async (importOriginal) => {
   }
 })
 
-vi.mock("@/lib/user/users", () => ({ listUsers: vi.fn() }))
+vi.mock("@/lib/user", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/user")>()
+  return {
+    ...original,
+    default: { ...original.default, listUsers: vi.fn() },
+  }
+})
 
 const summary: ProjectSummary = {
   id: "p1",
@@ -61,7 +67,7 @@ function renderRoute() {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(Project.Queries.listProjects).mockResolvedValue([])
-  vi.mocked(listUsers).mockResolvedValue(directoryUsers)
+  vi.mocked(User.listUsers).mockResolvedValue(directoryUsers)
 })
 
 describe("/project list", () => {
@@ -168,7 +174,7 @@ describe("/project list", () => {
 
   it("blocks creation and explains when the user directory is empty (FR-015)", async () => {
     const user = userEvent.setup()
-    vi.mocked(listUsers).mockResolvedValue([])
+    vi.mocked(User.listUsers).mockResolvedValue([])
     renderRoute()
 
     await user.click(

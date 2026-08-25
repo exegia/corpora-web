@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import Project from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
-import { listUsers } from "@/lib/user/users"
+import User from "@/lib/user"
 
 vi.mock("@/lib/supabase", () => ({ getSupabase: vi.fn() }))
 
@@ -28,22 +28,22 @@ describe("listUsers", () => {
     ]
     const { from, order } = mockQuery({ data: rows, error: null })
 
-    await expect(listUsers()).resolves.toEqual(rows)
+    await expect(User.listUsers()).resolves.toEqual(rows)
     expect(from).toHaveBeenCalledWith("user_directory")
     expect(order).toHaveBeenCalledWith("name", { ascending: true })
   })
 
   it("returns an empty list when the directory has no rows", async () => {
     mockQuery({ data: null, error: null })
-    await expect(listUsers()).resolves.toEqual([])
+    await expect(User.listUsers()).resolves.toEqual([])
   })
 
   it("surfaces failures as DataError, never silently", async () => {
     mockQuery({ data: null, error: { message: "boom" } })
-    await expect(listUsers()).rejects.toMatchObject({
+    await expect(User.listUsers()).rejects.toMatchObject({
       name: "DataError",
       code: "unknown",
     })
-    await expect(listUsers()).rejects.toBeInstanceOf(Project.Errors.DataError)
+    await expect(User.listUsers()).rejects.toBeInstanceOf(Project.Errors.DataError)
   })
 })

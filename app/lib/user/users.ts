@@ -1,17 +1,10 @@
-// Data-access layer for the seeded user directory (002, FR-018).
-// Contract: specs/002-project-detail/contracts/data-access.md
 // Read-only: reads `user_directory` (NOT `public.users`, which belongs to
-// corpora-auth — research R4). Route modules import ONLY from this module.
+// corpora-auth — research R4). Route modules import ONLY from the barrel
+// (index.ts), never this submodule.
 
 import Project, { SUPERADMIN_EMAIL } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
-
-export interface DirectoryUser {
-  id: string
-  name: string | null
-  username: string
-  email: string
-}
+import type { DirectoryUser } from "./types"
 
 export async function listUsers(): Promise<DirectoryUser[]> {
   const { data, error } = await getSupabase()

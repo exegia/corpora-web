@@ -6,7 +6,7 @@ import Corpus from "@/lib/corpus"
 import Licences from "@/lib/licenses"
 import Organization from "@/lib/organization"
 import Project, { type ProjectDetail } from "@/lib/projects"
-import { getSuperadmin } from "@/lib/user/users"
+import User from "@/lib/user"
 import WorkspaceRoute, {
   clientAction,
   clientLoader,
@@ -72,9 +72,13 @@ vi.mock("@/lib/organization", async (importOriginal) => {
   }
 })
 
-vi.mock("@/lib/user/users", () => ({
-  getSuperadmin: vi.fn(),
-}))
+vi.mock("@/lib/user", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/user")>()
+  return {
+    ...original,
+    default: { ...original.default, getSuperadmin: vi.fn() },
+  }
+})
 
 vi.mock("@/lib/corpus", async (importOriginal) => {
   // Spread the original so constant exports (TYPE_ICONS) stay real.
@@ -183,7 +187,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(Project.Queries.getProject).mockResolvedValue(detail)
   vi.mocked(Project.Mutations.assertEditable).mockResolvedValue()
-  vi.mocked(getSuperadmin).mockResolvedValue({
+  vi.mocked(User.getSuperadmin).mockResolvedValue({
     id: "u9",
     name: "Emmanuel",
     username: "manny",

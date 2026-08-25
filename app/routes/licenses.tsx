@@ -27,13 +27,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import Licences, { type CatalogLicence } from "@/lib/licenses"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import Project, { type LicenseStatus } from "@/lib/projects"
-import { getSuperadmin } from "@/lib/user/users"
+import User from "@/lib/user"
 
 export async function clientLoader() {
   // Deliberately not awaited (see routes/project.tsx): navigation completes
   // immediately and the component suspends on this promise, showing the
   // skeleton rows meanwhile.
-  const data = Promise.all([Licences.Catalog.listLicences(), getSuperadmin()]).then(
+  const data = Promise.all([Licences.Catalog.listLicences(), User.getSuperadmin()]).then(
     ([licences, superadmin]) => ({
       licences,
       // Pre-auth: the session acts as the superadmin when the directory has one.
@@ -50,7 +50,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
     switch (intent) {
       case "create-licence": {
         // Pre-auth guard (research R4): only the superadmin edits the catalog.
-        if ((await getSuperadmin()) === null) {
+        if ((await User.getSuperadmin()) === null) {
           return { ok: false, error: "Only the superadmin can create licences." }
         }
         const id = await Licences.Authoring.createLicence({

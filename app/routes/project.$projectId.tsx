@@ -26,7 +26,7 @@ import Project, {
     SCRIPTURAL_TYPES,
 } from "@/lib/projects"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
-import { getSuperadmin } from "@/lib/user/users"
+import User from "@/lib/user"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
     const projectId = params.projectId ?? ""
@@ -43,7 +43,7 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
                   Project.Queries.listCorpusOptions(projectId),
                   Licences.Catalog.listLicences(),
                   Organization.listOrganizations(),
-                  getSuperadmin(),
+                  User.getSuperadmin(),
                   Corpora.Documents.listCorpusDocuments(),
               ])
             : [[], [], [], null, []]
@@ -106,7 +106,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
                 if (!project) {
                     throw new Project.Errors.DataError("not-found", "This project no longer exists.")
                 }
-                const superadmin = (await getSuperadmin()) !== null
+                const superadmin = (await User.getSuperadmin()) !== null
                 await Project.Mutations.updateProjectStatus(project, String(form.get("status") ?? "") as ProjectStatus, superadmin)
                 return { ok: true, intent }
             }

@@ -12,12 +12,12 @@ import { formatRelativeTime } from "@/lib/format"
 import Project, { type ProjectSummary } from "@/lib/projects"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
-import { listUsers } from "@/lib/user/users"
+import User, { type DirectoryUser } from "@/lib/user"
 
 export async function clientLoader() {
     // Deliberately not awaited: navigation completes immediately, and the
     // component suspends on this promise, showing the skeleton meanwhile.
-    const data = Promise.all([Project.Queries.listProjects(), listUsers()]).then(([projects, users]) => ({ projects, users }))
+    const data = Promise.all([Project.Queries.listProjects(), User.listUsers()]).then(([projects, users]) => ({ projects, users }))
     return { data }
 }
 
@@ -231,7 +231,7 @@ function ProjectList({
     users,
 }: {
     projects: ProjectSummary[]
-    users: Awaited<ReturnType<typeof listUsers>>
+    users: DirectoryUser[]
 }) {
     useReadySound()
     const [creating, setCreating] = useState(false)

@@ -13,7 +13,7 @@ import {
 import { License } from "@/components/licenses"
 import Licences from "@/lib/licenses"
 import Project, { type LicenseStatus } from "@/lib/projects"
-import { getSuperadmin } from "@/lib/user/users"
+import User from "@/lib/user"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const licenceId = params.licenceId ?? ""
@@ -22,7 +22,7 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
   // the slow part and keeps its own boundary below.
   const [licence, superadmin] = await Promise.all([
     Licences.Catalog.getLicence(licenceId),
-    getSuperadmin(),
+    User.getSuperadmin(),
   ])
   return {
     licence,
@@ -40,7 +40,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
     switch (intent) {
       case "update-licence": {
         // Pre-auth guard (research R4): only the superadmin edits the catalog.
-        if ((await getSuperadmin()) === null) {
+        if ((await User.getSuperadmin()) === null) {
           return { ok: false, error: "Only the superadmin can edit licences." }
         }
         await Licences.Authoring.updateLicence(licenceId, {
@@ -59,7 +59,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
       }
       case "save-licence-text": {
         // Pre-auth guard (research R4): only the superadmin edits the catalog.
-        if ((await getSuperadmin()) === null) {
+        if ((await User.getSuperadmin()) === null) {
           return { ok: false, error: "Only the superadmin can edit licences." }
         }
         await Licences.Text.saveLicenceText(licenceId, String(form.get("text") ?? ""))
