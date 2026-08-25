@@ -2,14 +2,21 @@ import type { ReactElement } from "react"
 import { render, screen } from "@testing-library/react"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { fetchCorpusVersions } from "@/lib/corpora-api"
-import type { CorpusArchive, CorpusVersion, VersionsResponse } from "@/lib/corpora-api"
+import CorporaApi from "@/lib/api"
+import type { CorpusArchive, CorpusVersion, VersionsResponse } from "@/lib/api"
 import type { CorpusDocument } from "@/lib/corpus"
 import Activity from "./activity"
 
-vi.mock("@/lib/corpora-api", () => ({
-  fetchCorpusVersions: vi.fn(async () => ({ versions: [] })),
-}))
+vi.mock("@/lib/api", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/api")>()
+  return {
+    ...original,
+    default: {
+      ...original.default,
+      fetchCorpusVersions: vi.fn(async () => ({ versions: [] })),
+    },
+  }
+})
 
 function renderActivity(ui: ReactElement) {
   const Stub = createRoutesStub([
@@ -53,8 +60,8 @@ const archive: CorpusArchive = {
 }
 
 beforeEach(() => {
-  vi.mocked(fetchCorpusVersions).mockReset()
-  vi.mocked(fetchCorpusVersions).mockResolvedValue({ versions: [] })
+  vi.mocked(CorporaApi.fetchCorpusVersions).mockReset()
+  vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({ versions: [] })
 })
 
 describe("Activity", () => {
@@ -84,7 +91,7 @@ describe("Activity", () => {
       approved_by: { sub: "u2", name: "Grace" },
     }
     let resolve!: (body: VersionsResponse) => void
-    vi.mocked(fetchCorpusVersions).mockReturnValue(
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockReturnValue(
       new Promise((next) => {
         resolve = next
       }),
@@ -106,7 +113,7 @@ describe("Activity", () => {
   })
 
   it("lists versions newest first", async () => {
-    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
       versions: [
         {
           id: "v1",
@@ -133,7 +140,7 @@ describe("Activity", () => {
   })
 
   it("enables Restore on a non-current version for a job-scoped archive", async () => {
-    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
       versions: [
         {
           id: "v2",
@@ -161,7 +168,7 @@ describe("Activity", () => {
   })
 
   it("keeps Restore disabled on a Hub archive", async () => {
-    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
       versions: [
         {
           id: "v1",
@@ -190,7 +197,7 @@ describe("Activity", () => {
   })
 
   it("shows the empty Version history when the versions fetch fails", async () => {
-    vi.mocked(fetchCorpusVersions).mockRejectedValue(new Error("offline"))
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockRejectedValue(new Error("offline"))
     renderActivity(<Activity archive={archive} document={document} />)
     expect(
       await screen.findByText("No version history yet."),

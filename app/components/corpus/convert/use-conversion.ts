@@ -1,21 +1,15 @@
 import { useRef, useState } from "react"
 import { useFetcher } from "react-router"
-import { uploadCorpusFile } from "@/lib/corpus"
-import {
+import CorporaApi, {
   asCorpusFilename,
   detectSourceFormat,
-  fetchCapabilities,
   MAX_UPLOAD_BYTES,
   SUPPORTED_EXTENSIONS,
-} from "@/lib/corpora-api"
-import { readCorpusArchive } from "@/lib/corpus-archive"
-import {
-  createConversionEntry,
-  libraryTitle,
-  runConversion,
-} from "@/lib/corpus-convert"
-import type { ConversionEntry, ConversionStepId } from "@/lib/corpus-convert"
-import { extractCorpusHistory } from "@/lib/corpus-history"
+} from "@/lib/api"
+import Corpus, {
+  type ConversionEntry,
+  type ConversionStepId,
+} from "@/lib/corpus"
 
 export interface ConversionController {
   entry: ConversionEntry | null
@@ -62,10 +56,10 @@ export function useConversion(): ConversionController {
     abortRef.current = controller
     fileRef.current = file
 
-    const initial = createConversionEntry(file)
+    const initial = Corpus.Convert.createConversionEntry(file)
     setEntry(initial)
 
-    const final = await runConversion(
+    const final = await Corpus.Convert.runConversion(
       file,
       initial,
       (next) => {
@@ -99,18 +93,18 @@ export function useConversion(): ConversionController {
         type: "application/zip",
       })
       const [info, commits] = await Promise.all([
-        readCorpusArchive(blob),
+        Corpus.Archive.readCorpusArchive(blob),
         // History is best-effort — a corpus without a .git is still a corpus.
-        extractCorpusHistory(corpusFile).catch(() => null),
+        Corpus.History.extractCorpusHistory(corpusFile).catch(() => null),
       ])
       if (controller.signal.aborted) return
-      const path = await uploadCorpusFile(corpusFile)
+      const path = await Corpus.Documents.uploadCorpusFile(corpusFile)
       if (controller.signal.aborted) return
 
       persistFetcher.submit(
         {
           intent: "convert-document",
-          name: libraryTitle({
+          name: Corpus.Convert.libraryTitle({
             displayName: final.displayName,
             manifestName: info.name,
             filenameStem: baseName,
@@ -153,7 +147,7 @@ export function useConversion(): ConversionController {
       // Classify and size-check before anything is uploaded; a rejected file
       // never leaves the machine.
       const reject = (message: string) => {
-        const rejected = createConversionEntry(file)
+        const rejected = Corpus.Convert.createConversionEntry(file)
         setEntry({
           ...rejected,
           status: "error",
@@ -174,7 +168,7 @@ export function useConversion(): ConversionController {
         return
       }
       // Warm the capability posture (auth flag) once per session.
-      void fetchCapabilities()
+      void CorporaApi.fetchCapabilities()
       void run(file)
     },
     retry: () => {

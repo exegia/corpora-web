@@ -1,25 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import {
-  allowedStatusChanges,
-  assertEditable,
-  classifyProject,
-  createProject,
-  DataError,
-  deleteProject,
-  getProject,
-  isProjectReadOnly,
-  languageOptionsFor,
-  linkCorpus,
-  listCorpusOptions,
-  listProjects,
-  type ProjectDetail,
-  refuseStatusChange,
-  reviewIssues,
-  setProjectOrganization,
-  unlinkCorpus,
-  updateProject,
-  updateProjectStatus,
-} from "@/lib/projects"
+import Project, { languageOptionsFor, type ProjectDetail } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
 
 vi.mock("@/lib/supabase", () => ({ getSupabase: vi.fn() }))
@@ -93,7 +73,7 @@ beforeEach(() => {
 describe("listProjects", () => {
   it("maps rows to summaries ordered by updated_at desc", async () => {
     const { builders } = mockSupabase([{ data: [projectRow], error: null }])
-    const projects = await listProjects()
+    const projects = await Project.Queries.listProjects()
     expect(projects).toEqual([
       {
         id: "p1",
@@ -112,7 +92,7 @@ describe("listProjects", () => {
 
   it("wraps failures in DataError instead of failing silently", async () => {
     mockSupabase([{ data: null, error: { message: "connection refused" } }])
-    await expect(listProjects()).rejects.toMatchObject({
+    await expect(Project.Queries.listProjects()).rejects.toMatchObject({
       name: "DataError",
       code: "unknown",
       message: expect.stringContaining("Could not load projects"),
@@ -124,7 +104,7 @@ describe("createProject", () => {
   it("rejects an empty name before any network call", async () => {
     const { from } = mockSupabase([])
     await expect(
-      createProject({ name: "   ", userId: "u1" }),
+      Project.Mutations.createProject({ name: "   ", userId: "u1" }),
     ).rejects.toMatchObject({ code: "validation" })
     expect(from).not.toHaveBeenCalled()
   })
@@ -132,7 +112,7 @@ describe("createProject", () => {
   it("rejects a missing creator before any network call (FR-015)", async () => {
     const { from } = mockSupabase([])
     await expect(
-      createProject({ name: "Peshitta Study", userId: "  " }),
+      Project.Mutations.createProject({ name: "Peshitta Study", userId: "  " }),
     ).rejects.toMatchObject({
       code: "validation",
       message: expect.stringContaining("creator"),
@@ -142,7 +122,7 @@ describe("createProject", () => {
 
   it("inserts a trimmed name with the creating user and returns the summary", async () => {
     const { builders } = mockSupabase([{ data: projectRow, error: null }])
-    const project = await createProject({
+    const project = await Project.Mutations.createProject({
       name: "  Peshitta Study  ",
       userId: "u1",
     })
@@ -205,55 +185,55 @@ const readyDetail = makeDetail({
 
 describe("status workflow (003)", () => {
   it("lists every unmet review requirement", () => {
-    const issues = reviewIssues(makeDetail())
+    const issues = Project.Rules.reviewIssues(makeDetail())
     expect(issues).toHaveLength(3)
     expect(issues.join(" ")).toMatch(/licence/i)
     expect(issues.join(" ")).toMatch(/classify/i)
     expect(issues.join(" ")).toMatch(/corpus/i)
-    expect(reviewIssues(readyDetail)).toEqual([])
+    expect(Project.Rules.reviewIssues(readyDetail)).toEqual([])
   })
 
   it("offers ready-for-review only when the requirements pass", () => {
-    expect(allowedStatusChanges(makeDetail(), false)).toEqual([])
-    expect(allowedStatusChanges(readyDetail, false)).toEqual(["ready-for-review"])
+    expect(Project.Rules.allowedStatusChanges(makeDetail(), false)).toEqual([])
+    expect(Project.Rules.allowedStatusChanges(readyDetail, false)).toEqual(["ready-for-review"])
   })
 
   it("only returns legacy started/failed projects to draft", () => {
-    expect(allowedStatusChanges(makeDetail({ status: "started" }), false)).toEqual([
+    expect(Project.Rules.allowedStatusChanges(makeDetail({ status: "started" }), false)).toEqual([
       "draft",
     ])
-    expect(allowedStatusChanges(makeDetail({ status: "failed" }), false)).toEqual([
+    expect(Project.Rules.allowedStatusChanges(makeDetail({ status: "failed" }), false)).toEqual([
       "draft",
     ])
   })
 
   it("reserves review and publish decisions for the superadmin", () => {
     const inReview = makeDetail({ status: "ready-for-review" })
-    expect(allowedStatusChanges(inReview, false)).toEqual([])
-    expect(allowedStatusChanges(inReview, true)).toEqual(["published", "draft"])
+    expect(Project.Rules.allowedStatusChanges(inReview, false)).toEqual([])
+    expect(Project.Rules.allowedStatusChanges(inReview, true)).toEqual(["published", "draft"])
 
     const published = makeDetail({ status: "published" })
-    expect(allowedStatusChanges(published, false)).toEqual([])
-    expect(allowedStatusChanges(published, true)).toEqual(["draft"])
+    expect(Project.Rules.allowedStatusChanges(published, false)).toEqual([])
+    expect(Project.Rules.allowedStatusChanges(published, true)).toEqual(["draft"])
   })
 
   it("explains why a transition is refused", () => {
-    expect(refuseStatusChange(makeDetail(), "ready-for-review", false)).toMatch(
+    expect(Project.Rules.refuseStatusChange(makeDetail(), "ready-for-review", false)).toMatch(
       /not ready for review/i,
     )
     expect(
-      refuseStatusChange(makeDetail({ status: "ready-for-review" }), "published", false),
+      Project.Rules.refuseStatusChange(makeDetail({ status: "ready-for-review" }), "published", false),
     ).toMatch(/superadmin/i)
-    expect(refuseStatusChange(readyDetail, "ready-for-review", false)).toBeNull()
-    expect(refuseStatusChange(makeDetail(), "archived" as never, true)).toMatch(
+    expect(Project.Rules.refuseStatusChange(readyDetail, "ready-for-review", false)).toBeNull()
+    expect(Project.Rules.refuseStatusChange(makeDetail(), "archived" as never, true)).toMatch(
       /not a valid/i,
     )
   })
 
   it("marks only ready-for-review as read-only", () => {
-    expect(isProjectReadOnly("ready-for-review")).toBe(true)
-    expect(isProjectReadOnly("draft")).toBe(false)
-    expect(isProjectReadOnly("published")).toBe(false)
+    expect(Project.Rules.isProjectReadOnly("ready-for-review")).toBe(true)
+    expect(Project.Rules.isProjectReadOnly("draft")).toBe(false)
+    expect(Project.Rules.isProjectReadOnly("published")).toBe(false)
   })
 
   it("narrows the language vocabulary for quran and bible", () => {
@@ -274,7 +254,7 @@ describe("status workflow (003)", () => {
 describe("updateProjectStatus", () => {
   it("updates the status and touches updated_at", async () => {
     const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
-    await updateProjectStatus(readyDetail, "ready-for-review", false)
+    await Project.Mutations.updateProjectStatus(readyDetail, "ready-for-review", false)
     expect(builders[0].table).toBe("projects")
     expect(builders[0].update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -288,7 +268,7 @@ describe("updateProjectStatus", () => {
   it("rejects an unknown status before any network call", async () => {
     const { from } = mockSupabase([])
     await expect(
-      updateProjectStatus(makeDetail(), "archived" as never, true),
+      Project.Mutations.updateProjectStatus(makeDetail(), "archived" as never, true),
     ).rejects.toMatchObject({ code: "validation" })
     expect(from).not.toHaveBeenCalled()
   })
@@ -296,7 +276,7 @@ describe("updateProjectStatus", () => {
   it("rejects a non-superadmin publish before any network call", async () => {
     const { from } = mockSupabase([])
     await expect(
-      updateProjectStatus(
+      Project.Mutations.updateProjectStatus(
         makeDetail({ status: "ready-for-review" }),
         "published",
         false,
@@ -307,7 +287,7 @@ describe("updateProjectStatus", () => {
 
   it("lets the superadmin publish a project in review", async () => {
     const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
-    await updateProjectStatus(
+    await Project.Mutations.updateProjectStatus(
       makeDetail({ status: "ready-for-review" }),
       "published",
       true,
@@ -320,7 +300,7 @@ describe("updateProjectStatus", () => {
   it("maps a missing row to not-found", async () => {
     mockSupabase([{ data: null, error: null }])
     await expect(
-      updateProjectStatus(makeDetail({ id: "gone", status: "started" }), "draft", false),
+      Project.Mutations.updateProjectStatus(makeDetail({ id: "gone", status: "started" }), "draft", false),
     ).rejects.toMatchObject({ code: "not-found" })
   })
 })
@@ -328,12 +308,12 @@ describe("updateProjectStatus", () => {
 describe("assertEditable", () => {
   it("passes for a draft project", async () => {
     mockSupabase([{ data: { status: "draft" }, error: null }])
-    await expect(assertEditable("p1")).resolves.toBeUndefined()
+    await expect(Project.Mutations.assertEditable("p1")).resolves.toBeUndefined()
   })
 
   it("rejects edits while the project is in review", async () => {
     mockSupabase([{ data: { status: "ready-for-review" }, error: null }])
-    await expect(assertEditable("p1")).rejects.toMatchObject({
+    await expect(Project.Mutations.assertEditable("p1")).rejects.toMatchObject({
       code: "validation",
       message: expect.stringContaining("read-only"),
     })
@@ -341,7 +321,7 @@ describe("assertEditable", () => {
 
   it("maps a missing project to not-found", async () => {
     mockSupabase([{ data: null, error: null }])
-    await expect(assertEditable("gone")).rejects.toMatchObject({
+    await expect(Project.Mutations.assertEditable("gone")).rejects.toMatchObject({
       code: "not-found",
     })
   })
@@ -350,7 +330,7 @@ describe("assertEditable", () => {
 describe("updateProject", () => {
   it("maps a missing row to a not-found DataError", async () => {
     mockSupabase([{ data: null, error: null }])
-    await expect(updateProject("gone", { name: "X" })).rejects.toMatchObject({
+    await expect(Project.Mutations.updateProject("gone", { name: "X" })).rejects.toMatchObject({
       code: "not-found",
     })
   })
@@ -359,14 +339,14 @@ describe("updateProject", () => {
 describe("deleteProject", () => {
   it("deletes by id", async () => {
     const { builders } = mockSupabase([{ data: [{ id: "p1" }], error: null }])
-    await deleteProject("p1")
+    await Project.Mutations.deleteProject("p1")
     expect(builders[0].table).toBe("projects")
     expect(builders[0].eq).toHaveBeenCalledWith("id", "p1")
   })
 
   it("maps zero deleted rows to not-found", async () => {
     mockSupabase([{ data: [], error: null }])
-    await expect(deleteProject("gone")).rejects.toMatchObject({
+    await expect(Project.Mutations.deleteProject("gone")).rejects.toMatchObject({
       code: "not-found",
     })
   })
@@ -390,7 +370,7 @@ const detailRow = {
 describe("getProject", () => {
   it("returns null when the project is missing", async () => {
     mockSupabase([{ data: null, error: null }])
-    expect(await getProject("gone")).toBeNull()
+    expect(await Project.Queries.getProject("gone")).toBeNull()
   })
 
   it("surfaces stale corpora via available=false and tolerates missing corpus rows", async () => {
@@ -418,7 +398,7 @@ describe("getProject", () => {
         error: null,
       },
     ])
-    const project = await getProject("p1")
+    const project = await Project.Queries.getProject("p1")
     expect(project?.corpora).toHaveLength(2)
     expect(project?.corpora[0].corpus?.available).toBe(false)
     expect(project?.corpora[1].corpus).toBeNull()
@@ -453,7 +433,7 @@ describe("getProject", () => {
         error: null,
       },
     ])
-    const project = await getProject("p1")
+    const project = await Project.Queries.getProject("p1")
     expect(project?.creator).toEqual(creatorRow)
     expect(project?.organization?.name).toBe("Peshitta Institute")
     expect(project?.languages).toEqual(["aramaic"])
@@ -483,7 +463,7 @@ describe("classifyProject", () => {
     "writes %s atomically in one update",
     async (_label, classification, expected) => {
       const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
-      await classifyProject("p1", classification as never)
+      await Project.Mutations.classifyProject("p1", classification as never)
       expect(builders[0].table).toBe("projects")
       expect(builders[0].update).toHaveBeenCalledWith(
         expect.objectContaining({ ...expected, updated_at: expect.any(String) }),
@@ -498,7 +478,7 @@ describe("classifyProject", () => {
     ["unknown type", { type: "novel" }],
   ] as const)("rejects %s before any network call", async (_label, input) => {
     const { from } = mockSupabase([])
-    await expect(classifyProject("p1", input as never)).rejects.toMatchObject({
+    await expect(Project.Mutations.classifyProject("p1", input as never)).rejects.toMatchObject({
       code: "validation",
     })
     expect(from).not.toHaveBeenCalled()
@@ -507,7 +487,7 @@ describe("classifyProject", () => {
   it("maps a missing row to not-found", async () => {
     mockSupabase([{ data: null, error: null }])
     await expect(
-      classifyProject("gone", { type: "regular" }),
+      Project.Mutations.classifyProject("gone", { type: "regular" }),
     ).rejects.toMatchObject({ code: "not-found" })
   })
 })
@@ -515,7 +495,7 @@ describe("classifyProject", () => {
 describe("setProjectOrganization", () => {
   it("assigns an organization and touches updated_at", async () => {
     const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
-    await setProjectOrganization("p1", "o1")
+    await Project.Mutations.setProjectOrganization("p1", "o1")
     expect(builders[0].update).toHaveBeenCalledWith(
       expect.objectContaining({ organization_id: "o1", updated_at: expect.any(String) }),
     )
@@ -523,7 +503,7 @@ describe("setProjectOrganization", () => {
 
   it("clears the organization with null", async () => {
     const { builders } = mockSupabase([{ data: { id: "p1" }, error: null }])
-    await setProjectOrganization("p1", null)
+    await Project.Mutations.setProjectOrganization("p1", null)
     expect(builders[0].update).toHaveBeenCalledWith(
       expect.objectContaining({ organization_id: null }),
     )
@@ -531,7 +511,7 @@ describe("setProjectOrganization", () => {
 
   it("maps a missing row to not-found", async () => {
     mockSupabase([{ data: null, error: null }])
-    await expect(setProjectOrganization("gone", null)).rejects.toMatchObject({
+    await expect(Project.Mutations.setProjectOrganization("gone", null)).rejects.toMatchObject({
       code: "not-found",
     })
   })
@@ -549,7 +529,7 @@ describe("listCorpusOptions", () => {
       },
       { data: [{ corpus_id: "c2" }], error: null },
     ])
-    const options = await listCorpusOptions("p1")
+    const options = await Project.Queries.listCorpusOptions("p1")
     expect(options.map((o) => [o.id, o.alreadyLinked])).toEqual([
       ["c1", false],
       ["c2", true],
@@ -562,7 +542,7 @@ describe("linkCorpus", () => {
     const { from } = mockSupabase([
       { data: null, error: { code: "23505", message: "duplicate key" } },
     ])
-    await expect(linkCorpus("p1", "c1")).rejects.toMatchObject({
+    await expect(Project.Mutations.linkCorpus("p1", "c1")).rejects.toMatchObject({
       code: "already-linked",
     })
     expect(from).toHaveBeenCalledTimes(1)
@@ -573,7 +553,7 @@ describe("linkCorpus", () => {
       { data: null, error: null },
       { data: null, error: null },
     ])
-    await linkCorpus("p1", "c1")
+    await Project.Mutations.linkCorpus("p1", "c1")
     expect(builders[0].table).toBe("project_corpora")
     expect(builders[0].insert).toHaveBeenCalledWith({
       project_id: "p1",
@@ -590,7 +570,7 @@ describe("unlinkCorpus", () => {
       { data: null, error: null },
       { data: null, error: null },
     ])
-    await unlinkCorpus("p1", "c1")
+    await Project.Mutations.unlinkCorpus("p1", "c1")
     expect(builders[0].table).toBe("project_corpora")
     expect(builders[0].delete).toHaveBeenCalled()
     expect(from).not.toHaveBeenCalledWith("corpora")
@@ -636,7 +616,7 @@ describe("getProject corpus mapping (003)", () => {
         error: null,
       },
     ])
-    const project = await getProject("p1")
+    const project = await Project.Queries.getProject("p1")
     expect(project?.corpus).toEqual({
       id: "d1",
       name: "peshitta",
@@ -653,7 +633,7 @@ describe("getProject corpus mapping (003)", () => {
 
   it("returns a null corpus when no upload or URL is recorded", async () => {
     mockSupabase([{ data: detailRow, error: null }])
-    const project = await getProject("p1")
+    const project = await Project.Queries.getProject("p1")
     expect(project?.corpus).toBeNull()
     expect(project?.commits).toEqual([])
   })
@@ -661,7 +641,7 @@ describe("getProject corpus mapping (003)", () => {
 
 describe("DataError", () => {
   it("is an Error with a stable code", () => {
-    const error = new DataError("validation", "A title is required.")
+    const error = new Project.Errors.DataError("validation", "A title is required.")
     expect(error).toBeInstanceOf(Error)
     expect(error.code).toBe("validation")
   })

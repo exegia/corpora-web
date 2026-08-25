@@ -1,4 +1,4 @@
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
 import type { LicenceCreate, LicenceUpdate } from "./types"
 
@@ -7,10 +7,10 @@ export async function createLicence(input: LicenceCreate): Promise<string> {
   const id = input.id.trim()
   const title = input.title.trim()
   if (!id) {
-    throw new DataError("validation", "A licence identifier is required.")
+    throw new Project.Errors.DataError("validation", "A licence identifier is required.")
   }
   if (!title) {
-    throw new DataError("validation", "A licence title is required.")
+    throw new Project.Errors.DataError("validation", "A licence title is required.")
   }
   const { error } = await getSupabase().from("licences").insert({
     id,
@@ -25,12 +25,12 @@ export async function createLicence(input: LicenceCreate): Promise<string> {
   })
   if (error) {
     if (error.code === "23505") {
-      throw new DataError(
+      throw new Project.Errors.DataError(
         "validation",
         "A licence with this identifier already exists.",
       )
     }
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not create the licence: ${error.message ?? "unexpected error"}`,
     )
@@ -45,7 +45,7 @@ export async function updateLicence(
 ): Promise<void> {
   const title = input.title.trim()
   if (!title) {
-    throw new DataError("validation", "A licence title is required.")
+    throw new Project.Errors.DataError("validation", "A licence title is required.")
   }
   const { data, error } = await getSupabase()
     .from("licences")
@@ -64,12 +64,12 @@ export async function updateLicence(
     .select("id")
     .maybeSingle()
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not update the licence: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data) {
-    throw new DataError("not-found", "This licence no longer exists.")
+    throw new Project.Errors.DataError("not-found", "This licence no longer exists.")
   }
 }

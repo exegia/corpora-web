@@ -2,7 +2,7 @@ import { ArrowDown, Copy } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardFrame, CardFrameAction, CardFrameHeader, CardPanel, CardFrameTitle } from "@/components/ui/card"
-import { deriveSteps } from "@/lib/corpus-convert"
+import Corpus from "@/lib/corpus"
 import StepRow from "./step-row"
 import type { LogStepsProps } from "./types"
 import { CardFrameFooter } from "@exegia/corpora-ui"
@@ -14,13 +14,13 @@ import { estimateRemaining, formatElapsed, isDone } from "./utils"
  * user scrolled up.
  */
 export default function LogSteps({ entry }: LogStepsProps) {
-    const steps = deriveSteps(entry)
+    const steps = Corpus.Convert.deriveSteps(entry)
     const scrollRef = useRef<HTMLDivElement>(null)
     // Pinned = following the newest lines; scrolling up unpins.
     const [pinned, setPinned] = useState(true)
     const done = isDone(entry)
     const failed = entry.status === "error"
-    const completed = deriveSteps(entry).filter(step => step.state === "completed").length
+    const completed = Corpus.Convert.deriveSteps(entry).filter(step => step.state === "completed").length
 
     // biome-ignore lint: scrolling on log growth is the effect's whole point
     useEffect(() => {

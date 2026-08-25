@@ -38,7 +38,10 @@ afterEach(() => {
 
 async function freshApi() {
   vi.resetModules()
-  return import("@/lib/corpora-api")
+  const module = await import("@/lib/api")
+  // The barrel puts the request methods on the default export and the pure
+  // helpers/constants alongside it; these tests reach for both by name.
+  return { ...module, ...module.default }
 }
 
 describe("corpora-api", () => {

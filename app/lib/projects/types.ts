@@ -1,4 +1,46 @@
-import type { BookType, CategoryType, LanguageType, ProjectStatus } from "@/lib/projects/vocabulary"
+import type {
+  BOOK_TYPES,
+  CATEGORIZED_TYPES,
+  CATEGORY_TYPES,
+  LANGUAGE_TYPES,
+  PROJECT_STATUSES,
+  SCRIPTURAL_TYPES,
+} from "./constants"
+
+// ---- Vocabularies (002; mirrors the shared domain enums + DB CHECKs) ------
+// Derived from the constants rather than re-listed, so the two can never drift.
+// The import above is type-only in both directions — constants.ts annotates
+// against these names — so the cycle is erased and never exists at runtime.
+
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number]
+export type BookType = (typeof BOOK_TYPES)[number]
+export type LanguageType = (typeof LANGUAGE_TYPES)[number]
+export type CategoryType = (typeof CATEGORY_TYPES)[number]
+
+/** Types that require a source language (FR-006). */
+export type ScripturalType = (typeof SCRIPTURAL_TYPES)[number]
+
+/** Types that require a category (FR-007). */
+export type CategorizedType = (typeof CATEGORIZED_TYPES)[number]
+
+/** Discriminated classification value — illegal combinations are untypeable. */
+export type Classification =
+  | { type: ScripturalType; languages: LanguageType[] }
+  | { type: CategorizedType; category: CategoryType }
+  | { type: "lexicon" | "manuscript" | "regular" }
+  | null
+
+// ---- Errors ---------------------------------------------------------------
+
+export type DataErrorCode =
+  | "not-found"
+  | "already-linked"
+  | "already-attached"
+  | "validation"
+  | "unavailable"
+  | "unknown"
+
+// ---- Domain ---------------------------------------------------------------
 
 export interface ProjectSummary {
   id: string
@@ -100,4 +142,82 @@ export interface CorpusOption {
   type: string | null
   available: boolean
   alreadyLinked: boolean
+}
+
+// ---- Rows (the Supabase select shapes) ------------------------------------
+// Internal to this module: the barrel exports the domain types above, and
+// callers never see a snake_case row.
+
+export interface ProjectRow {
+  id: string
+  name: string
+  description: string | null
+  status: ProjectStatus
+  type: BookType | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CommitRow {
+  id: string
+  sha: string
+  message: string
+  author_name: string | null
+  author_email: string | null
+  branch: string | null
+  committed_at: string | null
+}
+
+export interface LicenseRow {
+  id: string
+  title: string
+  url: string | null
+  domain_content: boolean
+  domain_data: boolean
+  domain_software: boolean
+  family: string | null
+  maintainer: string | null
+  status: LicenseStatus
+}
+
+export interface CreatorRow {
+  id: string
+  name: string | null
+  username: string
+}
+
+export interface DocumentRow {
+  id: string
+  name: string
+  source: CorpusSource
+  path: string
+  filename: string | null
+  uploaded_at: string
+  corpus_commits: CommitRow[]
+}
+
+export interface ProjectDetailRow extends ProjectRow {
+  language: LanguageType[] | null
+  category: CategoryType | null
+  corpus_documents: DocumentRow | null
+  user_directory: CreatorRow | null
+  organizations: { id: string; name: string; website: string | null } | null
+  project_licences: {
+    agreed_at: string | null
+    licences: LicenseRow | null
+    user_directory: CreatorRow | null
+  }[]
+  project_corpora: {
+    corpus_id: string
+    linked_at: string
+    corpora: {
+      uid: string
+      name: string
+      language: string | null
+      type: string | null
+      category: string | null
+      version: string
+      available: boolean
+    } | null
+  }[]
 }

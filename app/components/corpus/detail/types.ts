@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import type { CorpusVersionActor, CorpusVersionFile } from "@/lib/corpora-api"
+import type { CorpusVersionActor, CorpusVersionFile } from "@/lib/api"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 
 export type ExploreTab =
