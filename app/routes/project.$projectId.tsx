@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import Corpora from "@/lib/corpus"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import Licences from "@/lib/licenses"
-import { createOrganization, listOrganizations } from "@/lib/organization/organizations"
+import Organization from "@/lib/organization"
 import Project, {
     type BookType,
     CATEGORIZED_TYPES,
@@ -42,7 +42,7 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
             ? await Promise.all([
                   Project.Queries.listCorpusOptions(projectId),
                   Licences.Catalog.listLicences(),
-                  listOrganizations(),
+                  Organization.listOrganizations(),
                   getSuperadmin(),
                   Corpora.Documents.listCorpusDocuments(),
               ])
@@ -137,7 +137,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
                 return { ok: true, intent }
             }
             case "create-organization": {
-                const organization = await createOrganization({
+                const organization = await Organization.createOrganization({
                     name: String(form.get("name") ?? ""),
                     website: String(form.get("website") ?? ""),
                 })

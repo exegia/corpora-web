@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import CorporaApi, { type CorpusArchive, CorporaApiError } from "@/lib/api"
-import { sectionsFromIndex } from "@/lib/corpus/explore"
+
 import Corpus from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import Project from "@/lib/projects"
@@ -83,7 +83,7 @@ export function explorerSections(
   return document.toc?.length
     ? document.toc
     : archive
-      ? sectionsFromIndex(archive.index)
+      ? Corpus.Explore.sectionsFromIndex(archive.index)
       : []
 }
 

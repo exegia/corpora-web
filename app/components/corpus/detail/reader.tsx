@@ -14,7 +14,7 @@ import CorporaApi, {
   type CorpusPassage,
   type PassageToken,
 } from "@/lib/api"
-import { findIndexItem, lemmaFromNode, slotForToken } from "@/lib/corpus/explore"
+import Corpus from "@/lib/corpus"
 import { cn } from "@/lib/utils"
 import Panel from "./panel"
 import WordPanel from "./word-panel"
@@ -43,9 +43,9 @@ async function inspectTokenNode(
   node: number,
 ): Promise<Lemma> {
   try {
-    return lemmaFromNode(await CorporaApi.fetchCorpusNode(archive, node), form)
+    return Corpus.Explore.lemmaFromNode(await CorporaApi.fetchCorpusNode(archive, node), form)
   } catch {
-    return lemmaFromNode(placeholderNode(form, passage, node), form)
+    return Corpus.Explore.lemmaFromNode(placeholderNode(form, passage, node), form)
   }
 }
 
@@ -56,21 +56,21 @@ async function inspectSplitToken(
   wordIndex: number,
 ): Promise<Lemma> {
   if (passage.node == null) {
-    return lemmaFromNode(placeholderNode(form, passage, 0), form)
+    return Corpus.Explore.lemmaFromNode(placeholderNode(form, passage, 0), form)
   }
   try {
     const container = await CorporaApi.fetchCorpusNode(archive, passage.node)
-    const slot = slotForToken(container, wordIndex)
+    const slot = Corpus.Explore.slotForToken(container, wordIndex)
     if (slot != null && slot !== container.node) {
       try {
-        return lemmaFromNode(await CorporaApi.fetchCorpusNode(archive, slot), form)
+        return Corpus.Explore.lemmaFromNode(await CorporaApi.fetchCorpusNode(archive, slot), form)
       } catch {
-        return lemmaFromNode(container, form)
+        return Corpus.Explore.lemmaFromNode(container, form)
       }
     }
-    return lemmaFromNode(container, form)
+    return Corpus.Explore.lemmaFromNode(container, form)
   } catch {
-    return lemmaFromNode(placeholderNode(form, passage, passage.node), form)
+    return Corpus.Explore.lemmaFromNode(placeholderNode(form, passage, passage.node), form)
   }
 }
 
@@ -190,7 +190,7 @@ function LiveReader({
   sectionTitle: string
   onViewOccurrences?: () => void
 }) {
-  const item = findIndexItem(archive.index, sectionTitle)
+  const item = Corpus.Explore.findIndexItem(archive.index, sectionTitle)
   const questions = item?.children.length
     ? item.children
     : item

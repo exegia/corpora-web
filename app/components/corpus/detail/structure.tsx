@@ -16,11 +16,7 @@ import {
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import CorporaApi, { type CorpusArchive } from "@/lib/api"
-import type { CorpusDocument } from "@/lib/corpus"
-import {
-  structureNodeFromSection,
-  structureRootFromIndex,
-} from "@/lib/corpus/explore"
+import Corpus, { type CorpusDocument } from "@/lib/corpus"
 import Panel from "./panel"
 import type { StructureNode } from "./types"
 import { formatCount } from "./utils"
@@ -140,7 +136,7 @@ async function loadChildren(
       limit: 50,
     })
     return page.items.map((item) =>
-      structureNodeFromSection(item, node.type),
+      Corpus.Explore.structureNodeFromSection(item, node.type),
     )
   }
   return []
@@ -155,7 +151,7 @@ export default function Structure({
   archive: CorpusArchive | null
 }) {
   const root = useMemo(
-    () => (archive ? structureRootFromIndex(document, archive.index) : null),
+    () => (archive ? Corpus.Explore.structureRootFromIndex(document, archive.index) : null),
     [document, archive],
   )
 

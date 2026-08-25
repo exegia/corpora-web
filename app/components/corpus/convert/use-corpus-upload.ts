@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useFetcher } from "react-router"
 import { toastManager } from "@/components/ui/toast"
 import Corpus from "@/lib/corpus"
-import { extractCorpusHistory } from "@/lib/corpus/history"
+
 import Project from "@/lib/projects"
 
 export interface CorpusUploadController {
@@ -35,7 +35,7 @@ export function useCorpusUpload(): CorpusUploadController {
     setUploading(true)
     try {
       // History first: an unreadable archive fails before anything is stored.
-      const history = await extractCorpusHistory(file)
+      const history = await Corpus.History.extractCorpusHistory(file)
       const path = await Corpus.Documents.uploadCorpusFile(file)
       fetcher.submit(
         {
