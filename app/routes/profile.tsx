@@ -44,12 +44,7 @@ import {
   getCurrentUser,
   listIdentities,
 } from "@/lib/auth"
-import {
-  getProfile,
-  TRADITIONS,
-  updateProfile,
-  VOCATIONS,
-} from "@/lib/profile/profile"
+import Profile, { TRADITIONS, VOCATIONS } from "@/lib/profile"
 import type { Route } from "./+types/profile"
 
 /**
@@ -60,7 +55,7 @@ import type { Route } from "./+types/profile"
  * what is slow").
  */
 export async function clientLoader() {
-  const [user, profile] = await Promise.all([getCurrentUser(), getProfile()])
+  const [user, profile] = await Promise.all([getCurrentUser(), Profile.GetSet.getProfile()])
   return {
     profile,
     email: user?.email ?? "",
@@ -95,7 +90,7 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
   }
 
   try {
-    await updateProfile({
+    await Profile.GetSet.updateProfile({
       name: field("name"),
       username: field("username").replace(/^@+/, ""),
       avatarUrl: field("avatarUrl"),
