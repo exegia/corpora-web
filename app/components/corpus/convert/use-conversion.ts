@@ -1,21 +1,21 @@
 import { useRef, useState } from "react"
 import { useFetcher } from "react-router"
-import { uploadCorpusFile } from "@/lib/corpus"
+import { uploadCorpusFile } from "@/lib/corpus/corpus"
 import {
   asCorpusFilename,
   detectSourceFormat,
   fetchCapabilities,
   MAX_UPLOAD_BYTES,
   SUPPORTED_EXTENSIONS,
-} from "@/lib/corpora-api"
-import { readCorpusArchive } from "@/lib/corpus-archive"
+} from "@/lib/api/methods"
+import { readCorpusArchive } from "@/lib/corpus/corpus-archive"
 import {
   createConversionEntry,
   libraryTitle,
   runConversion,
-} from "@/lib/corpus-convert"
-import type { ConversionEntry, ConversionStepId } from "@/lib/corpus-convert"
-import { extractCorpusHistory } from "@/lib/corpus-history"
+} from "@/lib/corpus/corpus-convert"
+import type { ConversionEntry, ConversionStepId } from "@/lib/corpus/corpus-convert"
+import { extractCorpusHistory } from "@/lib/corpus/corpus-history"
 
 export interface ConversionController {
   entry: ConversionEntry | null

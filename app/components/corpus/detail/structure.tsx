@@ -15,13 +15,13 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { CorpusArchive } from "@/lib/corpora-api"
-import { fetchCorpusSections } from "@/lib/corpora-api"
-import type { CorpusDocument } from "@/lib/corpus"
+import type { CorpusArchive } from "@/lib/api/methods"
+import { fetchCorpusSections } from "@/lib/api/methods"
+import type { CorpusDocument } from "@/lib/corpus/corpus"
 import {
   structureNodeFromSection,
   structureRootFromIndex,
-} from "@/lib/corpus-explore"
+} from "@/lib/corpus/corpus-explore"
 import Panel from "./panel"
 import type { StructureNode } from "./types"
 import { formatCount } from "./utils"

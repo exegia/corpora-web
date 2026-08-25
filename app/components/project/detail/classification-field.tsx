@@ -1,6 +1,6 @@
 import { Blocks } from "@/components/blocks"
 import type { ClassificationFieldProps } from "@/components/project/detail/types"
-import { TYPE_ICONS } from "@/lib/corpus";
+import { TYPE_ICONS } from "@/lib/corpus/corpus";
 
 /** The type / languages / category summary, with its edit affordance. */
 export default function ClassificationField({ project, readOnly, onEdit }: ClassificationFieldProps) {

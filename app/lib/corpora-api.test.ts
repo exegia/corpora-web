@@ -38,7 +38,7 @@ afterEach(() => {
 
 async function freshApi() {
   vi.resetModules()
-  return import("@/lib/corpora-api")
+  return import("@/lib/api/methods")
 }
 
 describe("corpora-api", () => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { getProfile, updateProfile } from "@/lib/profile"
+import { getProfile, updateProfile } from "@/lib/profile/profile"
 
 // Same one-mock boundary as auth.test.ts: the module reaches Supabase only
 // through `getSupabase`.

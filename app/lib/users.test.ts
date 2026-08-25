@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { DataError } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
-import { listUsers } from "@/lib/users"
+import { listUsers } from "@/lib/user/users"
 
 vi.mock("@/lib/supabase", () => ({ getSupabase: vi.fn() }))
 

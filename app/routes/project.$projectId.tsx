@@ -11,10 +11,10 @@ import { Card } from "@/components/ui/card"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
-import { attachCorpusToProject, detachCorpusFromProject, listCorpusDocuments } from "@/lib/corpus"
+import { attachCorpusToProject, detachCorpusFromProject, listCorpusDocuments } from "@/lib/corpus/corpus"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import { agreeLicence, attachLicence, detachLicence, listLicences } from "@/lib/licenses"
-import { createOrganization, listOrganizations } from "@/lib/organizations"
+import { createOrganization, listOrganizations } from "@/lib/organization/organizations"
 import {
     assertEditable,
     type BookType,
@@ -37,7 +37,7 @@ import {
     updateProjectStatus,
 } from "@/lib/projects"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
-import { getSuperadmin } from "@/lib/users"
+import { getSuperadmin } from "@/lib/user/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
     const projectId = params.projectId ?? ""

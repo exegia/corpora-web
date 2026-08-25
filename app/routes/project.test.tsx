@@ -10,7 +10,7 @@ import {
   listProjects,
   type ProjectSummary,
 } from "@/lib/projects"
-import { listUsers } from "@/lib/users"
+import { listUsers } from "@/lib/user/users"
 import ProjectRoute, { clientAction, clientLoader } from "@/routes/project"
 
 vi.mock("@/lib/projects", async (importOriginal) => {

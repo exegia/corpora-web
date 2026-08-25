@@ -1,4 +1,4 @@
-import type { DirectoryUser } from "@/lib/users"
+import type { DirectoryUser } from "@/lib/user/users"
 
 export interface FormDialogProps {
     open: boolean

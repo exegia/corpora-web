@@ -1,6 +1,6 @@
 import { Check, X } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
-import type { ConversionStep } from "@/lib/corpus-convert"
+import type { ConversionStep } from "@/lib/corpus/corpus-convert"
 import { conversionTone, TONE_CLASSES } from "./utils"
 
 const STATE_LABELS = {

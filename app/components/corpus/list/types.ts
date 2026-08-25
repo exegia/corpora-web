@@ -1,4 +1,4 @@
-import type { CorpusDocument, CorpusType } from "@/lib/corpus"
+import type { CorpusDocument, CorpusType } from "@/lib/corpus/corpus"
 
 export type DateFilter = "any" | "7d" | "30d" | "year"
 

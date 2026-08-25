@@ -1,6 +1,6 @@
 import { Link } from "react-router"
 import { Blocks } from "@/components/blocks"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"@/lib/corpus/corpus-convert
 import { CONVERSION_STEPS, currentStep } from "@/lib/corpus-convert"
 import type { StatusPillProps } from "./types"
 import { isDone } from "./utils"

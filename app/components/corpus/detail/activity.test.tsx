@@ -2,9 +2,9 @@ import type { ReactElement } from "react"
 import { render, screen } from "@testing-library/react"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { fetchCorpusVersions } from "@/lib/corpora-api"
-import type { CorpusArchive, CorpusVersion, VersionsResponse } from "@/lib/corpora-api"
-import type { CorpusDocument } from "@/lib/corpus"
+import { fetchCorpusVersions } from "@/lib/api/methods"
+import type { CorpusArchive, CorpusVersion, VersionsResponse } from "@/lib/api/methods"
+import type { CorpusDocument } from "@/lib/corpus/corpus"
 import Activity from "./activity"
 
 vi.mock("@/lib/corpora-api", () => ({

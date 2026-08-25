@@ -15,8 +15,8 @@ import {
   getConversion,
   SUPPORTED_EXTENSIONS,
   validateConversion,
-} from "@/lib/corpora-api"
-import type { JobStatusMessage } from "@/lib/corpora-api"
+} from "@/lib/api/methods"
+import type { JobStatusMessage } from "@/lib/api/methods"
 
 /** Mirrors corpora-py's UploadStatus verbatim. */
 export type ConversionStatus =

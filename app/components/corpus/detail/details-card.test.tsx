@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ShellPanelsContext } from "@/components/layouts/shell-panels"
-import type { CorpusDocument } from "@/lib/corpus"
+import type { CorpusDocument } from "@/lib/corpus/corpus"
 import DetailsCard from "./details-card"
 
 const panels = {

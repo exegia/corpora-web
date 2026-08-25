@@ -31,7 +31,7 @@ import {
 } from "@/lib/licenses"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import { DataError, type LicenseStatus } from "@/lib/projects"
-import { getSuperadmin } from "@/lib/users"
+import { getSuperadmin } from "@/lib/user/users"
 
 export async function clientLoader() {
   // Deliberately not awaited (see routes/project.tsx): navigation completes

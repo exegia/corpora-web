@@ -1,4 +1,4 @@
-import type { ConversionEntry, LogTone } from "@/lib/corpus-convert"
+import type { ConversionEntry, LogTone } from "@/lib/corpus/corpus-convert"
 
 /** Right-panel width the conversion drawer opens at. */
 export const CONVERSION_PANEL_WIDTH = 468

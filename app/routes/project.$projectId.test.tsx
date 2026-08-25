@@ -6,7 +6,7 @@ import {
   attachCorpusToProject,
   detachCorpusFromProject,
   listCorpusDocuments,
-} from "@/lib/corpus"
+} from "@/lib/corpus/corpus"
 import {
   agreeLicence,
   attachLicence,
@@ -15,7 +15,7 @@ import {
   listLicences,
   resolveLicenceText,
 } from "@/lib/licenses"
-import { createOrganization, listOrganizations } from "@/lib/organizations"
+import { createOrganization, listOrganizations } from "@/lib/organization/organizations"
 import {
   assertEditable,
   classifyProject,
@@ -30,7 +30,7 @@ import {
   updateProject,
   updateProjectStatus,
 } from "@/lib/projects"
-import { getSuperadmin } from "@/lib/users"
+import { getSuperadmin } from "@/lib/user/users"
 import WorkspaceRoute, {
   clientAction,
   clientLoader,
@@ -75,7 +75,7 @@ vi.mock("@/lib/users", () => ({
 
 vi.mock("@/lib/corpus", async (importOriginal) => {
   // Spread the original so constant exports (TYPE_ICONS) stay real.
-  const original = await importOriginal<typeof import("@/lib/corpus")>()
+  const original = await importOriginal<typeof import("@/lib/corpus/corpus")>()
   return {
     ...original,
     attachCorpusToProject: vi.fn(),

@@ -22,19 +22,19 @@ import { Button } from "@/components/ui/button"
 import {
   Empty,
   EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
+  EmptyHeader,@/lib/corpus/corpus
+  EmptyMedia,@/lib/corpus/corpus
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { CorpusArchive } from "@/lib/corpora-api"
+import type { CorpusArchive } from "@/lib/api/methods"
 import {
   CorporaApiError,
   downloadExploreCorpus,
   loadCorpusArchive,
   restoreCorpusVersion,
-} from "@/lib/corpora-api"
-import { sectionsFromIndex } from "@/lib/corpus-explore"
+} from "@/lib/api/methods"
+import { sectionsFromIndex } from "@/lib/corpus/corpus-explore"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import { DataError } from "@/lib/projects"

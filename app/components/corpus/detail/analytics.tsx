@@ -1,6 +1,6 @@
-import type { CorpusArchive } from "@/lib/corpora-api"
-import type { CorpusDocument } from "@/lib/corpus"
-import { nodeTypeStatsFromIndex, sectionsFromIndex } from "@/lib/corpus-explore"
+import type { CorpusArchive } from "@/lib/api/methods"
+import type { CorpusDocument } from "@/lib/corpus/corpus"
+import { nodeTypeStatsFromIndex, sectionsFromIndex } from "@/lib/corpus/corpus-explore"
 import Panel from "./panel"
 import { abbreviateSection, formatCompact, formatCount } from "./utils"
 

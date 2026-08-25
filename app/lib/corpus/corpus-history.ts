@@ -7,8 +7,8 @@
 
 import { Buffer } from "buffer"
 import git from "isomorphic-git"
-import type { CorpusCommitInput } from "@/lib/corpus"
-import { unzipCorpusArchive } from "@/lib/corpus-archive"
+import type { CorpusCommitInput } from "@/lib/corpus/corpus"
+import { unzipCorpusArchive } from "@/lib/corpus/corpus-archive"
 import { DataError } from "@/lib/projects"
 
 // isomorphic-git assumes the Node Buffer global; browsers don't have one and

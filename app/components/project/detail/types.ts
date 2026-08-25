@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import type { useFetcher } from "react-router"
 import type { ActionResult } from "@/components/project/types"
 import type { CatalogLicence } from "@/lib/licenses"
-import type { Organization } from "@/lib/organizations"
+import type { Organization } from "@/lib/organization/organizations"
 import type { BookType, CategoryType, LanguageType, ProjectCreator, ProjectDetail } from "@/lib/projects"
 
 export type StatusFetcher = ReturnType<typeof useFetcher<ActionResult>>

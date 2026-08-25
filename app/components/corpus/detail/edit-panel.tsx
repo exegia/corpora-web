@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Spinner } from "@/components/ui/spinner"
-import { patchJobManifest, type ManifestUpdate } from "@/lib/corpora-api"
-import { updateCorpusDocument } from "@/lib/corpus"
+import { patchJobManifest, type ManifestUpdate } from "@/lib/api/methods"
+import { updateCorpusDocument } from "@/lib/corpus/corpus"
 import type { EditPanelProps } from "./types"
 
 /** Right-panel form for ManifestUpdate-safe corpus metadata. */

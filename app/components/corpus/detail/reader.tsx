@@ -13,9 +13,9 @@ import type {
   CorpusNode,
   CorpusPassage,
   PassageToken,
-} from "@/lib/corpora-api"
-import { fetchCorpusContent, fetchCorpusNode } from "@/lib/corpora-api"
-import { findIndexItem, lemmaFromNode, slotForToken } from "@/lib/corpus-explore"
+} from "@/lib/api/methods"
+import { fetchCorpusContent, fetchCorpusNode } from "@/lib/api/methods"
+import { findIndexItem, lemmaFromNode, slotForToken } from "@/lib/corpus/corpus-explore"
 import { cn } from "@/lib/utils"
 import Panel from "./panel"
 import WordPanel from "./word-panel"

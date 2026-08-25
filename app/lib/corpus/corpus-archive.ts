@@ -6,7 +6,7 @@
 
 import { unzipSync } from "fflate"
 import { parse } from "yaml"
-import type { CorpusSection, CorpusType } from "@/lib/corpus"
+import type { CorpusSection, CorpusType } from "@/lib/corpus/corpus"
 import { DataError } from "@/lib/projects"
 
 export type { CorpusSection }

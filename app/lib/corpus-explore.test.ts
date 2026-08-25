@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { CorpusIndex, CorpusNode } from "@/lib/corpora-api"
-import type { CorpusDocument } from "@/lib/corpus"
+import type { CorpusIndex, CorpusNode } from "@/lib/api/methods"
+import type { CorpusDocument } from "@/lib/corpus/corpus"
 import {
   findIndexItem,
   lemmaFromNode,
@@ -8,7 +8,7 @@ import {
   sectionsFromIndex,
   slotForToken,
   structureRootFromIndex,
-} from "@/lib/corpus-explore"
+} from "@/lib/corpus/corpus-explore"
 
 const index: CorpusIndex = {
   toc: null,

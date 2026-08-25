@@ -49,7 +49,7 @@ import {
   TRADITIONS,
   updateProfile,
   VOCATIONS,
-} from "@/lib/profile"
+} from "@/lib/profile/profile"
 import type { Route } from "./+types/profile"
 
 /**

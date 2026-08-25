@@ -5,8 +5,8 @@ import {
   downloadConversion,
   getConversion,
   validateConversion,
-} from "@/lib/corpora-api"
-import type { JobStatusMessage } from "@/lib/corpora-api"
+} from "@/lib/api/methods"
+import type { JobStatusMessage } from "@/lib/api/methods"
 import {
   createConversionEntry,
   currentStep,
@@ -15,13 +15,13 @@ import {
   formatBytes,
   libraryTitle,
   runConversion,
-} from "@/lib/corpus-convert"
-import type { ConversionEntry } from "@/lib/corpus-convert"
+} from "@/lib/corpus/corpus-convert"
+import type { ConversionEntry } from "@/lib/corpus/corpus-convert"
 
 // The transport is mocked at the corpora-api seam; the derivations stay
 // real, so these tests exercise exactly what the drawer will render.
 vi.mock("@/lib/corpora-api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/corpora-api")>()),
+  ...(await importOriginal<typeof import("@/lib/api/methods")>()),
   createConversion: vi.fn(),
   getConversion: vi.fn(),
   downloadConversion: vi.fn(),

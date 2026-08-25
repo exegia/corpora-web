@@ -1,6 +1,6 @@
 
 import type { TypeLabelProps } from "@/components/project/detail/types"
-import { TYPE_ICONS } from "@/lib/corpus"
+import { TYPE_ICONS } from "@/lib/corpus/corpus"
 
 /** A book type with its icon, or the unclassified placeholder. */
 export default function TypeLabel({ type }: TypeLabelProps) {

@@ -1,7 +1,7 @@
 import { type FileIconProps, FileWordmarkCorpus } from "@exegia/corpora-ui"
 import type { ComponentType } from "react"
 import type { BadgeProps } from "@/components/ui/badge"
-import type { CorpusDocument, CorpusType } from "@/lib/corpus"
+import type { CorpusDocument, CorpusType } from "@/lib/corpus/corpus"
 import type { CorpusFilters, DateFilter } from "./types"
 
 export const PAGE_SIZE = 6

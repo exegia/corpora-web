@@ -18,7 +18,7 @@ import {
   updateLicence,
 } from "@/lib/licenses"
 import { DataError, type LicenseStatus } from "@/lib/projects"
-import { getSuperadmin } from "@/lib/users"
+import { getSuperadmin } from "@/lib/user/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
   const licenceId = params.licenceId ?? ""

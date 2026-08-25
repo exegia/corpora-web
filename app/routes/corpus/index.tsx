@@ -3,7 +3,7 @@ import { Await, useLoaderData, useOutletContext, type ActionFunctionArgs } from 
 import { Convert } from "@/components/corpus/convert"
 import type { ConversionController } from "@/components/corpus/convert/use-conversion"
 import { List } from "@/components/corpus/list"
-import { createCorpusDocument, deleteCorpusDocument, listCorpusDocuments, type CorpusType } from "@/lib/corpus"
+import { createCorpusDocument, deleteCorpusDocument, listCorpusDocuments, type CorpusType } from "@/lib/corpus/corpus"
 import { DataError, type CorpusSource } from "@/lib/projects"
 import { parseCommits, parseToc } from "./utils"
 

@@ -19,7 +19,7 @@ import {
 } from "@/lib/projects"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
-import { listUsers } from "@/lib/users"
+import { listUsers } from "@/lib/user/users"
 
 export async function clientLoader() {
     // Deliberately not awaited: navigation completes immediately, and the

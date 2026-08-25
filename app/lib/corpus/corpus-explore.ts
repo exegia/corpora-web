@@ -4,8 +4,8 @@ import type {
   CorpusNode,
   IndexItem,
   SectionEntry,
-} from "@/lib/corpora-api"
-import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
+} from "@/lib/api/methods"
+import type { CorpusDocument, CorpusSection } from "@/lib/corpus/corpus"
 import type {
   Lemma,
   NodeTypeStat,

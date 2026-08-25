@@ -1,7 +1,7 @@
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress"
 import { CONVERSION_STEPS, currentStep, deriveProgress } from "@/lib/corpus-convert"
 import FileSummary from "./file-summary"
-import LogSteps from "./log-steps"
+import LogSteps from "./log-steps"@/lib/corpus/corpus-convert
 import type { PanelProps } from "./types"
 import { conversionTone, isDone } from "./utils"
 

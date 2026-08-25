@@ -8,8 +8,8 @@ import {
   fetchCorpusNode,
   fetchCorpusVersions,
   loadCorpusArchive,
-  restoreCorpusVersion,
-} from "@/lib/corpora-api"
+  restoreCorpusVersion,@/lib/corpus/corpus
+} from "@/lib/corpora-api"@/lib/corpus/corpus
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument } from "@/lib/corpus"
 import CorpusDetailRoute, {
