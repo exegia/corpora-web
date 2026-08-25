@@ -1,7 +1,7 @@
 import { Check, X } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import type { ConversionStep } from "@/lib/corpus-convert"
-import { TONE_CLASSES } from "./utils"
+import { conversionTone, TONE_CLASSES } from "./utils"
 
 const STATE_LABELS = {
   pending: "Pending",
@@ -12,18 +12,22 @@ const STATE_LABELS = {
 
 /** One pipeline step in the Logs card: icon, title, status, its log lines. */
 export default function StepRow({ step }: { step: ConversionStep }) {
+  const tone =
+    step.state === "pending"
+      ? null
+      : conversionTone(step.state === "failed" ? "failed" : step.state === "completed" ? "completed" : "active")
   return (
     <li className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2.5">
         {step.state === "completed" ? (
-          <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full border border-warning-foreground/48 text-warning-foreground">
+          <span className={`flex size-4.5 shrink-0 items-center justify-center rounded-full border ${tone?.ring} ${tone?.text}`}>
             <Check aria-hidden="true" className="size-3" />
           </span>
         ) : step.state === "active" ? (
           // Spinner carries role="status" itself — tests query steps by text.
-          <Spinner className="size-4.5 shrink-0 text-warning-foreground" />
+          <Spinner className={`size-4.5 shrink-0 ${tone?.text}`} />
         ) : step.state === "failed" ? (
-          <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full border border-destructive/48 text-destructive">
+          <span className={`flex size-4.5 shrink-0 items-center justify-center rounded-full border ${tone?.ring} ${tone?.text}`}>
             <X aria-hidden="true" className="size-3" />
           </span>
         ) : (
@@ -41,11 +45,7 @@ export default function StepRow({ step }: { step: ConversionStep }) {
         </span>
         <span
           className={`text-xs ${
-            step.state === "failed"
-              ? "text-destructive"
-              : step.state === "pending"
-                ? "text-muted-foreground/72"
-                : "text-warning-foreground"
+            tone?.text ?? "text-muted-foreground/72"
           }`}
         >
           {STATE_LABELS[step.state]}

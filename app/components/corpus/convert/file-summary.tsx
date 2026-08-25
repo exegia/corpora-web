@@ -1,4 +1,4 @@
-import { FileText, RotateCw, X } from "lucide-react"
+import { FileText, RotateCw } from "lucide-react"
 import { Link } from "react-router"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,7 @@ import {
 import { formatBytes } from "@/lib/corpus-convert"
 import { formatDate } from "@/lib/format"
 import type { FileSummaryProps } from "./types"
-import { extensionBadge, isDone } from "./utils"
+import { conversionTone, extensionBadge, isDone } from "./utils"
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
@@ -43,6 +43,7 @@ export default function FileSummary({
 }: FileSummaryProps) {
   const done = isDone(entry)
   const failed = entry.status === "error"
+  const tone = conversionTone(failed ? "failed" : done ? "completed" : "active")
 
   return (
     <CardFrame>
@@ -61,9 +62,7 @@ export default function FileSummary({
                 {extensionBadge(entry)}
               </Badge>
               <span
-                className={`flex items-center gap-1.5 text-xs ${
-                  failed ? "text-destructive" : "text-warning-foreground"
-                }`}
+                className={`flex items-center gap-1.5 text-xs ${tone.text}`}
               >
                 <span
                   aria-hidden="true"
@@ -77,7 +76,13 @@ export default function FileSummary({
         <CardFrameAction className="flex items-center gap-1">
           {done && documentId && (
             <Button
-              render={<Link to={`/corpus/${documentId}`} viewTransition />}
+              render={
+                <Link
+                  onClick={onDismiss}
+                  to={`/corpus/${documentId}`}
+                  viewTransition
+                />
+              }
               size="sm"
               variant="outline"
             >
@@ -95,15 +100,6 @@ export default function FileSummary({
               <RotateCw /> Retry
             </Button>
           )}
-          <Button
-            aria-label="Dismiss conversion"
-            onClick={onDismiss}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-          >
-            <X />
-          </Button>
         </CardFrameAction>
       </CardFrameHeader>
       <Card>

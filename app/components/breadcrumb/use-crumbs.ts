@@ -45,7 +45,7 @@ export function useCrumbs(): Crumb[] {
         if (sectionTitle) {
             crumbs.push({
                 label: sectionTitle,
-                href: `${pathname}?tab=documents&section=${encodeURIComponent(sectionTitle)}`,
+                href: `/corpus/${segments[1]}/documents?section=${encodeURIComponent(sectionTitle)}`,
             })
         }
     }
