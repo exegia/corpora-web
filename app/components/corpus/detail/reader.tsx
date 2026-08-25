@@ -8,6 +8,9 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import { useCorporaApi } from "@/hooks"
+// Still imported directly: inspectTokenNode/inspectSplitToken below are
+// module-scope, where a hook cannot be called.
 import CorporaApi, {
   type CorpusArchive,
   type CorpusNode,
@@ -200,12 +203,17 @@ function LiveReader({
   const [lemma, setLemma] = useState<Lemma | null>(null)
   const [passages, setPassages] = useState<CorpusPassage[]>([])
   const [loading, setLoading] = useState(Boolean(selected))
+  const api = useCorporaApi()
 
   useEffect(() => {
     if (!selected) return
+    // Guards against a stale response, not against unmount: clicking question A
+    // then B must not let A's slower reply overwrite B's. The flag belongs to
+    // this run of the effect, which is why it cannot be hoisted into a hook.
     let cancelled = false
     setLoading(true)
-    CorporaApi.fetchCorpusContent(archive, { ref: selected, limit: 20 })
+    api
+      .fetchCorpusContent(archive, { ref: selected, limit: 20 })
       .then((content) => {
         if (!cancelled) setPassages(content.passages)
       })
@@ -218,7 +226,7 @@ function LiveReader({
     return () => {
       cancelled = true
     }
-  }, [archive, selected])
+  }, [api, archive, selected])
 
   const heading = questions.find((question) => question.ref === selected)?.title ?? sectionTitle
 
