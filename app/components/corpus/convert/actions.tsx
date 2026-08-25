@@ -14,7 +14,7 @@ import { useAppShellPanels } from "@/components/layouts/shell-panels"
  * layout header so a run stays reachable from every route.
  */
 export default function Actions({ conversion }: ActionsProps) {
-    const upload = useCorpusUpload()
+    const { busy, pick, inputRef, uploading, handleFile } = useCorpusUpload()
     const [, convertPicker] = useFileUpload({
         accept: SUPPORTED_EXTENSIONS.join(","),
         onFilesAdded: added => {
@@ -37,9 +37,9 @@ export default function Actions({ conversion }: ActionsProps) {
                 "right",
                 <div className="p-4 text-sm text-muted-foreground">
                     Opened through <code>openPanel</code> — any component passed here replaces the panel's content.
-                </div>,
+                </div>
             ),
-        [openPanel],
+        [openPanel]
     )
 
     return (
@@ -69,13 +69,13 @@ export default function Actions({ conversion }: ActionsProps) {
                 className="sr-only"
                 onChange={event => {
                     const file = event.currentTarget.files?.[0]
-                    if (file) void upload.handleFile(file)
+                    if (file) void handleFile(file)
                 }}
-                ref={upload.inputRef}
+                ref={inputRef}
                 type="file"
             />
-            <Button disabled={upload.busy} onClick={upload.pick} type="button">
-                <Upload /> {upload.uploading ? "Uploading…" : "Upload"}
+            <Button disabled={busy} onClick={pick} type="button">
+                <Upload /> {uploading ? "Uploading…" : "Upload"}
             </Button>
         </>
     )
