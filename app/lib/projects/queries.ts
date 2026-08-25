@@ -1,16 +1,14 @@
 import { getSupabase } from "@/lib/supabase"
-import type { CorpusOption, ProjectDetail, ProjectSummary } from "./types"
-import {
-    fail,
-    type LicenseRow,
-    PROJECT_COLUMNS,
-    PROJECT_DETAIL_COLUMNS,
-    type ProjectDetailRow,
-    type ProjectRow,
-    toCommit,
-    toSummary,
-    UNKNOWN_CREATOR,
-} from "./rows"
+import { PROJECT_COLUMNS, PROJECT_DETAIL_COLUMNS, UNKNOWN_CREATOR } from "./constants"
+import type {
+    CorpusOption,
+    LicenseRow,
+    ProjectDetail,
+    ProjectDetailRow,
+    ProjectRow,
+    ProjectSummary,
+} from "./types"
+import { fail, toCommit, toSummary } from "./utils"
 
 // ---- Projects (US1) -------------------------------------------------------
 

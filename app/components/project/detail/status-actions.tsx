@@ -41,7 +41,7 @@ export function statusActions(project: ProjectDetail, superadmin: boolean, fetch
         {
             label: "Ready for review",
             icon: <Send aria-hidden="true" />,
-            disabled: busy || reviewIssues(project).length > 0,
+            disabled: busy || Project.Rules.reviewIssues(project).length > 0,
             onClick: () => submit("ready-for-review"),
         },
         ...(project.status !== "draft" ? [toDraft] : []),
@@ -67,7 +67,7 @@ export function statusSummary(project: ProjectDetail, superadmin: boolean): { ti
                   description: "Waiting for the superadmin to approve.",
               }
     }
-    return reviewIssues(project).length > 0
+    return Project.Rules.reviewIssues(project).length > 0
         ? {
               title: "Unpublished project",
               description: "Complete every requirement before submitting.",
