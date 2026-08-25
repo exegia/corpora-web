@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Spinner } from "@/components/ui/spinner"
-import { patchJobManifest, type ManifestUpdate } from "@/lib/api/methods"
-import { updateCorpusDocument } from "@/lib/corpus/corpus"
+import CorporaApi, { type ManifestUpdate } from "@/lib/api"
+import Corpus from "@/lib/corpus"
 import type { EditPanelProps } from "./types"
 
 /** Right-panel form for ManifestUpdate-safe corpus metadata. */
@@ -33,8 +33,8 @@ export default function EditPanel({ document, onClose }: EditPanelProps) {
       const updates: ManifestUpdate = { name, description, language }
       if (languageCode) updates.languageCode = languageCode
       const jobId = document.jobId?.trim()
-      if (jobId) await patchJobManifest(jobId, updates)
-      await updateCorpusDocument(document.id, {
+      if (jobId) await CorporaApi.patchJobManifest(jobId, updates)
+      await Corpus.Documents.updateCorpusDocument(document.id, {
         name,
         description: description || null,
         language: language || null,

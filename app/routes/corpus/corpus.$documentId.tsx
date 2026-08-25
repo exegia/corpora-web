@@ -22,20 +22,14 @@ import { Button } from "@/components/ui/button"
 import {
   Empty,
   EmptyDescription,
-  EmptyHeader,@/lib/corpus/corpus
-  EmptyMedia,@/lib/corpus/corpus
+  EmptyHeader,
+  EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { CorpusArchive } from "@/lib/api/methods"
-import {
-  CorporaApiError,
-  downloadExploreCorpus,
-  loadCorpusArchive,
-  restoreCorpusVersion,
-} from "@/lib/api/methods"
+import CorporaApi, { type CorpusArchive, CorporaApiError } from "@/lib/api"
 import { sectionsFromIndex } from "@/lib/corpus/explore"
-import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
+import Corpus from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import Project from "@/lib/projects"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
@@ -98,11 +92,11 @@ export async function clientLoader({ params, request }: LoaderFunctionArgs) {
   if (legacy) throw redirect(legacy)
   // Awaited: the breadcrumb reads `document` off loaderData synchronously
   // (components/breadcrumb), and it is one indexed row.
-  const document = await getCorpusDocument(params.documentId ?? "")
+  const document = await Corpus.Documents.getCorpusDocument(params.documentId ?? "")
   // Job (or Hub-import) index is the slow follow-up; defer so the header
   // paints immediately. The breadcrumb only needs `document`.
   const archive = document
-    ? loadCorpusArchive(document)
+    ? CorporaApi.loadCorpusArchive(document)
     : Promise.resolve(null)
   return { document, archive }
 }
@@ -113,7 +107,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
   try {
     switch (intent) {
       case "delete-document":
-        await deleteCorpusDocument(String(form.get("documentId") ?? ""))
+        await Corpus.Documents.deleteCorpusDocument(String(form.get("documentId") ?? ""))
         return redirect("/corpus")
       case "restore-version": {
         const jobId = String(form.get("jobId") ?? "")
@@ -121,7 +115,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
         if (!jobId || !versionId) {
           return { ok: false, error: "Missing version to restore." }
         }
-        await restoreCorpusVersion({ kind: "job", key: jobId }, versionId)
+        await CorporaApi.restoreCorpusVersion({ kind: "job", key: jobId }, versionId)
         return { ok: true }
       }
       default:
@@ -170,12 +164,12 @@ function saveDownload(blob: Blob, filename: string) {
  */
 async function exportDocument(document: CorpusDocument) {
   try {
-    const archive = await loadCorpusArchive(document)
+    const archive = await CorporaApi.loadCorpusArchive(document)
     if (archive) {
       const filename =
         document.filename ??
         (archive.kind === "hub" ? archive.key : `${document.name}.corpus`)
-      saveDownload(await downloadExploreCorpus(archive), filename)
+      saveDownload(await CorporaApi.downloadExploreCorpus(archive), filename)
       return
     }
   } catch {

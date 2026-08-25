@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { CorpusType } from "@/lib/corpus/corpus"
+import type { CorpusType } from "@/lib/corpus"
 import type { CorpusFilters, DateFilter, ToolbarProps } from "./types"
 import { TYPE_LABELS } from "./utils"
 

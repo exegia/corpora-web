@@ -24,11 +24,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  type CatalogLicence,
-  createLicence,
-  listLicences,
-} from "@/lib/licenses"
+import Licences, { type CatalogLicence } from "@/lib/licenses"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import Project, { type LicenseStatus } from "@/lib/projects"
 import { getSuperadmin } from "@/lib/user/users"
@@ -37,7 +33,7 @@ export async function clientLoader() {
   // Deliberately not awaited (see routes/project.tsx): navigation completes
   // immediately and the component suspends on this promise, showing the
   // skeleton rows meanwhile.
-  const data = Promise.all([listLicences(), getSuperadmin()]).then(
+  const data = Promise.all([Licences.Catalog.listLicences(), getSuperadmin()]).then(
     ([licences, superadmin]) => ({
       licences,
       // Pre-auth: the session acts as the superadmin when the directory has one.
@@ -57,7 +53,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
         if ((await getSuperadmin()) === null) {
           return { ok: false, error: "Only the superadmin can create licences." }
         }
-        const id = await createLicence({
+        const id = await Licences.Authoring.createLicence({
           id: String(form.get("id") ?? ""),
           title: String(form.get("title") ?? ""),
           url: String(form.get("url") ?? "") || null,

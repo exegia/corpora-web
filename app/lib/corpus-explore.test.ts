@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import type { CorpusIndex, CorpusNode } from "@/lib/api/methods"
-import type { CorpusDocument } from "@/lib/corpus/corpus"
+import type { CorpusIndex, CorpusNode } from "@/lib/api"
+import type { CorpusDocument } from "@/lib/corpus"
 import {
   findIndexItem,
   lemmaFromNode,

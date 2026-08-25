@@ -15,9 +15,8 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { CorpusArchive } from "@/lib/api/methods"
-import { fetchCorpusSections } from "@/lib/api/methods"
-import type { CorpusDocument } from "@/lib/corpus/corpus"
+import CorporaApi, { type CorpusArchive } from "@/lib/api"
+import type { CorpusDocument } from "@/lib/corpus"
 import {
   structureNodeFromSection,
   structureRootFromIndex,
@@ -136,7 +135,7 @@ async function loadChildren(
 ): Promise<StructureNode[]> {
   if (node.children?.length) return node.children
   if (archive && node.ref) {
-    const page = await fetchCorpusSections(archive, {
+    const page = await CorporaApi.fetchCorpusSections(archive, {
       parent: node.ref,
       limit: 50,
     })

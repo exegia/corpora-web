@@ -2,49 +2,47 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import {
-  createCorpusDocument,
-  deleteCorpusDocument,
-  listCorpusDocuments,
-  uploadCorpusFile,
-} from "@/lib/corpus/corpus"
-import type { CorpusDocument } from "@/lib/corpus/corpus"
-import { readCorpusArchive } from "@/lib/corpus/archive"
-import { runConversion } from "@/lib/corpus/convert"
-import type { ConversionEntry, ConversionLog } from "@/lib/corpus/convert"
-import { extractCorpusHistory } from "@/lib/corpus/history"
+import Corpus, {
+  type ConversionEntry,
+  type ConversionLog,
+  type CorpusDocument,
+} from "@/lib/corpus"
 import { AppLayout } from "@/components/layouts/app-layout"
 import CorpusRoute, { clientAction, clientLoader } from "@/routes/corpus/index"
 
-vi.mock("@/lib/corpus", () => ({
-  listCorpusDocuments: vi.fn(),
-  createCorpusDocument: vi.fn(),
-  deleteCorpusDocument: vi.fn(),
-  getCorpusDocument: vi.fn(),
-  uploadCorpusFile: vi.fn(),
-}))
-
-// Only the transport is scripted; the pure derivations stay real so the
-// drawer renders exactly what a real run would.
-vi.mock("@/lib/corpus-convert", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/corpus/convert")>()),
-  runConversion: vi.fn(),
-}))
-
-vi.mock("@/lib/corpus-archive", () => ({
-  readCorpusArchive: vi.fn(),
-}))
-
-vi.mock("@/lib/corpus-history", () => ({
-  extractCorpusHistory: vi.fn(),
-  fetchHuggingFaceHistory: vi.fn(),
-}))
+// One mock for the whole barrel — persistence, transport, archive and history
+// all live behind it now. Only those are scripted; the pure derivations stay
+// real so the drawer renders exactly what a real run would.
+vi.mock("@/lib/corpus", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/corpus")>()
+  return {
+    ...original,
+    default: {
+      ...original.default,
+      Documents: {
+        ...original.default.Documents,
+        listCorpusDocuments: vi.fn(),
+        createCorpusDocument: vi.fn(),
+        deleteCorpusDocument: vi.fn(),
+        getCorpusDocument: vi.fn(),
+        uploadCorpusFile: vi.fn(),
+      },
+      Convert: { ...original.default.Convert, runConversion: vi.fn() },
+      Archive: { ...original.default.Archive, readCorpusArchive: vi.fn() },
+      History: {
+        ...original.default.History,
+        extractCorpusHistory: vi.fn(),
+        fetchHuggingFaceHistory: vi.fn(),
+      },
+    },
+  }
+})
 
 type Outcome = "queued" | "ready" | "error"
 
 /** Instant scripted transport walking the entry to the given outcome. */
 function scriptConversion(outcome: Outcome) {
-  vi.mocked(runConversion).mockImplementation(async (_file, initial, onChange) => {
+  vi.mocked(Corpus.Convert.runConversion).mockImplementation(async (_file, initial, onChange) => {
     let entry = initial
     const emit = (patch: Partial<ConversionEntry>, log?: ConversionLog) => {
       entry = {
@@ -183,7 +181,7 @@ function renderRoute() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(listCorpusDocuments).mockResolvedValue([peshitta, septuagint])
+  vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([peshitta, septuagint])
 })
 
 describe("/corpus library", () => {
@@ -210,7 +208,7 @@ describe("/corpus library", () => {
   })
 
   it("shows the empty state when nothing is uploaded", async () => {
-    vi.mocked(listCorpusDocuments).mockResolvedValue([])
+    vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([])
     renderRoute()
     expect(
       await screen.findByText("The corpus library is empty"),
@@ -241,7 +239,7 @@ describe("/corpus library", () => {
   })
 
   it("paginates past six documents", async () => {
-    vi.mocked(listCorpusDocuments).mockResolvedValue(
+    vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue(
       Array.from({ length: 8 }, (_, i) =>
         doc({ id: `p${i}`, name: `corpus-${i}` }),
       ),
@@ -273,9 +271,9 @@ describe("/corpus library", () => {
         committedAt: "2026-07-01T00:00:00.000Z",
       },
     ]
-    vi.mocked(extractCorpusHistory).mockResolvedValue(commits)
-    vi.mocked(uploadCorpusFile).mockResolvedValue("d9/genesis.corpus")
-    vi.mocked(createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
+    vi.mocked(Corpus.History.extractCorpusHistory).mockResolvedValue(commits)
+    vi.mocked(Corpus.Documents.uploadCorpusFile).mockResolvedValue("d9/genesis.corpus")
+    vi.mocked(Corpus.Documents.createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
     renderRoute()
 
     const input = await screen.findByLabelText("Upload .corpus file")
@@ -285,7 +283,7 @@ describe("/corpus library", () => {
     await user.upload(input, file)
 
     await waitFor(() =>
-      expect(createCorpusDocument).toHaveBeenCalledWith({
+      expect(Corpus.Documents.createCorpusDocument).toHaveBeenCalledWith({
         name: "genesis",
         source: "upload",
         path: "d9/genesis.corpus",
@@ -351,7 +349,7 @@ describe("/corpus library", () => {
         committedAt: "2026-08-01T00:00:00.000Z",
       },
     ]
-    vi.mocked(readCorpusArchive).mockResolvedValue({
+    vi.mocked(Corpus.Archive.readCorpusArchive).mockResolvedValue({
       name: "Summa Theologia",
       description: "The Summa, converted from TEI.",
       language: "English",
@@ -359,17 +357,17 @@ describe("/corpus library", () => {
       version: "1.0",
       sections: [{ title: "Prima Pars", nodes: 8442, words: 312004 }],
     })
-    vi.mocked(extractCorpusHistory).mockResolvedValue(commits)
+    vi.mocked(Corpus.History.extractCorpusHistory).mockResolvedValue(commits)
     // Hold the persist so Show progress is still the trailing action after
     // the pipeline finishes (View corpus replaces it once documentId is set).
     let releaseUpload: (path: string) => void
-    vi.mocked(uploadCorpusFile).mockImplementation(
+    vi.mocked(Corpus.Documents.uploadCorpusFile).mockImplementation(
       () =>
         new Promise((resolve) => {
           releaseUpload = resolve
         }),
     )
-    vi.mocked(createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
+    vi.mocked(Corpus.Documents.createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
     renderRoute()
 
     const input = await screen.findByLabelText("Convert source file")
@@ -396,7 +394,7 @@ describe("/corpus library", () => {
     releaseUpload!("d9/summa.corpus")
 
     await waitFor(() =>
-      expect(createCorpusDocument).toHaveBeenCalledWith(
+      expect(Corpus.Documents.createCorpusDocument).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "Summa Theologiae",
           source: "upload",
@@ -415,7 +413,7 @@ describe("/corpus library", () => {
       ),
     )
     // The stored archive is the downloaded blob, renamed .corpus.
-    const stored = vi.mocked(uploadCorpusFile).mock.calls[0][0]
+    const stored = vi.mocked(Corpus.Documents.uploadCorpusFile).mock.calls[0][0]
     expect(stored.name).toBe("summa-theologiae.corpus")
 
     // The in-page alert and the file card both link to the persisted row.
@@ -462,21 +460,21 @@ describe("/corpus library", () => {
     expect(
       screen.getByText("Conversion failed. See the failed step above."),
     ).toBeInTheDocument()
-    expect(createCorpusDocument).not.toHaveBeenCalled()
+    expect(Corpus.Documents.createCorpusDocument).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole("button", { name: "Retry" }))
-    await waitFor(() => expect(runConversion).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(Corpus.Convert.runConversion).toHaveBeenCalledTimes(2))
   })
 
   it("deletes a document after a confirmation step", async () => {
     const user = userEvent.setup()
-    vi.mocked(listCorpusDocuments).mockResolvedValue([peshitta])
-    vi.mocked(deleteCorpusDocument).mockResolvedValue()
+    vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([peshitta])
+    vi.mocked(Corpus.Documents.deleteCorpusDocument).mockResolvedValue()
     renderRoute()
 
     await screen.findByRole("heading", { name: "peshitta" })
     await user.click(screen.getByRole("button", { name: "Delete" }))
-    expect(deleteCorpusDocument).not.toHaveBeenCalled()
+    expect(Corpus.Documents.deleteCorpusDocument).not.toHaveBeenCalled()
 
     // Gated until DELETE is typed.
     const confirm = screen.getByRole("button", { name: "Delete corpus" })
@@ -485,13 +483,13 @@ describe("/corpus library", () => {
     expect(confirm).toBeEnabled()
     await user.click(confirm)
 
-    await waitFor(() => expect(deleteCorpusDocument).toHaveBeenCalledWith("d1"))
+    await waitFor(() => expect(Corpus.Documents.deleteCorpusDocument).toHaveBeenCalledWith("d1"))
   })
 
   it("refuses to delete a document until DELETE is typed exactly", async () => {
     const user = userEvent.setup()
-    vi.mocked(listCorpusDocuments).mockResolvedValue([peshitta])
-    vi.mocked(deleteCorpusDocument).mockResolvedValue()
+    vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([peshitta])
+    vi.mocked(Corpus.Documents.deleteCorpusDocument).mockResolvedValue()
     renderRoute()
 
     await screen.findByRole("heading", { name: "peshitta" })
@@ -506,6 +504,6 @@ describe("/corpus library", () => {
     await user.type(screen.getByRole("textbox"), "DELET")
     expect(confirm).toBeDisabled()
 
-    expect(deleteCorpusDocument).not.toHaveBeenCalled()
+    expect(Corpus.Documents.deleteCorpusDocument).not.toHaveBeenCalled()
   })
 })

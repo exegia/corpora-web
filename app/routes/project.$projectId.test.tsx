@@ -2,20 +2,9 @@ import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import {
-  attachCorpusToProject,
-  detachCorpusFromProject,
-  listCorpusDocuments,
-} from "@/lib/corpus/corpus"
-import {
-  agreeLicence,
-  attachLicence,
-  detachLicence,
-  getLicence,
-  listLicences,
-  resolveLicenceText,
-} from "@/lib/licenses"
-import { createOrganization, listOrganizations } from "@/lib/organization/organizations"
+import Corpus from "@/lib/corpus"
+import Licences from "@/lib/licenses"
+import Organization from "@/lib/organization"
 import Project, { type ProjectDetail } from "@/lib/projects"
 import { getSuperadmin } from "@/lib/user/users"
 import WorkspaceRoute, {
@@ -51,34 +40,56 @@ vi.mock("@/lib/projects", async (importOriginal) => {
   }
 })
 
-vi.mock("@/lib/licenses", () => ({
-  listLicences: vi.fn(),
-  attachLicence: vi.fn(),
-  agreeLicence: vi.fn(),
-  detachLicence: vi.fn(),
-  // Only reached when the View dialog opens, but the module mock replaces the
-  // whole module — leaving these out makes them undefined at call time.
-  getLicence: vi.fn(),
-  resolveLicenceText: vi.fn(),
-}))
+vi.mock("@/lib/licenses", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/licenses")>()
+  return {
+    ...original,
+    default: {
+      ...original.default,
+      // getLicence/resolveLicenceText are only reached when the View dialog
+      // opens, but replacing a namespace drops whatever it leaves out.
+      Catalog: { ...original.default.Catalog, listLicences: vi.fn(), getLicence: vi.fn() },
+      Text: { ...original.default.Text, resolveLicenceText: vi.fn() },
+      Attachment: {
+        ...original.default.Attachment,
+        attachLicence: vi.fn(),
+        agreeLicence: vi.fn(),
+        detachLicence: vi.fn(),
+      },
+    },
+  }
+})
 
-vi.mock("@/lib/organization/organizations", () => ({
-  listOrganizations: vi.fn(),
-  createOrganization: vi.fn(),
-}))
+vi.mock("@/lib/organization", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/organization")>()
+  return {
+    ...original,
+    default: {
+      ...original.default,
+      listOrganizations: vi.fn(),
+      createOrganization: vi.fn(),
+    },
+  }
+})
 
 vi.mock("@/lib/user/users", () => ({
   getSuperadmin: vi.fn(),
 }))
 
-vi.mock("@/lib/corpus/corpus", async (importOriginal) => {
+vi.mock("@/lib/corpus", async (importOriginal) => {
   // Spread the original so constant exports (TYPE_ICONS) stay real.
-  const original = await importOriginal<typeof import("@/lib/corpus/corpus")>()
+  const original = await importOriginal<typeof import("@/lib/corpus")>()
   return {
     ...original,
-    attachCorpusToProject: vi.fn(),
-    detachCorpusFromProject: vi.fn(),
-    listCorpusDocuments: vi.fn(),
+    default: {
+      ...original.default,
+      Documents: {
+        ...original.default.Documents,
+        attachCorpusToProject: vi.fn(),
+        detachCorpusFromProject: vi.fn(),
+        listCorpusDocuments: vi.fn(),
+      },
+    },
   }
 })
 
@@ -178,7 +189,7 @@ beforeEach(() => {
     username: "manny",
     email: "manny.defreitas7@gmail.com",
   })
-  vi.mocked(listLicences).mockResolvedValue([catalogLicense, softwareLicense])
+  vi.mocked(Licences.Catalog.listLicences).mockResolvedValue([catalogLicense, softwareLicense])
   const noMetadata = {
     corpusType: null,
     sourceFormat: null,
@@ -194,7 +205,7 @@ beforeEach(() => {
     toc: null,
     jobId: null,
   }
-  vi.mocked(listCorpusDocuments).mockResolvedValue([
+  vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([
     {
       id: "d1",
       name: "peshitta",
@@ -216,7 +227,7 @@ beforeEach(() => {
       ...noMetadata,
     },
   ])
-  vi.mocked(listOrganizations).mockResolvedValue([
+  vi.mocked(Organization.listOrganizations).mockResolvedValue([
     { id: "o1", name: "Peshitta Institute", website: null },
   ])
   vi.mocked(Project.Queries.listCorpusOptions).mockResolvedValue([
@@ -581,9 +592,9 @@ describe("details panel — value-as-trigger rows", () => {
 describe("details panel — licences (US3)", () => {
   it("defaults to content licences and attaches after an agreement step", async () => {
     const user = userEvent.setup()
-    vi.mocked(attachLicence).mockResolvedValue()
-    vi.mocked(getLicence).mockResolvedValue({} as never)
-    vi.mocked(resolveLicenceText).mockResolvedValue("# CC BY 4.0")
+    vi.mocked(Licences.Attachment.attachLicence).mockResolvedValue()
+    vi.mocked(Licences.Catalog.getLicence).mockResolvedValue({} as never)
+    vi.mocked(Licences.Text.resolveLicenceText).mockResolvedValue("# CC BY 4.0")
     renderRoute()
 
     expect(await screen.findByText(/no licences attached/i)).toBeInTheDocument()
@@ -602,13 +613,13 @@ describe("details panel — licences (US3)", () => {
         name: "View Creative Commons Attribution 4.0 (CC-BY-4.0)",
       }),
     )
-    expect(attachLicence).not.toHaveBeenCalled()
+    expect(Licences.Attachment.attachLicence).not.toHaveBeenCalled()
     await user.click(
       await screen.findByRole("button", { name: "Agree & attach" }),
     )
 
     await waitFor(() =>
-      expect(attachLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0", "u1"),
+      expect(Licences.Attachment.attachLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0", "u1"),
     )
   })
 
@@ -660,7 +671,7 @@ describe("details panel — licences (US3)", () => {
       ...detail,
       licenses: [attachedLicence],
     })
-    vi.mocked(listLicences).mockResolvedValue([
+    vi.mocked(Licences.Catalog.listLicences).mockResolvedValue([
       catalogLicense,
       { ...catalogLicense, id: "CC-BY-4.0-legacy", status: "retired" },
     ])
@@ -690,11 +701,11 @@ describe("details panel — licences (US3)", () => {
   })
 
   // Attached and agreed are separate states — the DB pairs agreed_at with
-  // agreed_by, and `agreeLicence` can settle an older attachment on its own.
+  // agreed_by, and `Licences.Attachment.agreeLicence` can settle an older attachment on its own.
   it("marks only agreed catalog rows as Agreed and detaches from the row", async () => {
     const user = userEvent.setup()
-    vi.mocked(detachLicence).mockResolvedValue()
-    vi.mocked(listLicences).mockResolvedValue([
+    vi.mocked(Licences.Attachment.detachLicence).mockResolvedValue()
+    vi.mocked(Licences.Catalog.listLicences).mockResolvedValue([
       catalogLicense,
       { ...catalogLicense, id: "CC0-1.0", title: "CC0 Public Domain" },
     ])
@@ -728,14 +739,14 @@ describe("details panel — licences (US3)", () => {
 
     await user.click(remove)
     await waitFor(() =>
-      expect(detachLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0"),
+      expect(Licences.Attachment.detachLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0"),
     )
-    expect(detachLicence).toHaveBeenCalledTimes(1)
+    expect(Licences.Attachment.detachLicence).toHaveBeenCalledTimes(1)
   })
 
   it("lists attached licences with agreement info and detaches one row only", async () => {
     const user = userEvent.setup()
-    vi.mocked(detachLicence).mockResolvedValue()
+    vi.mocked(Licences.Attachment.detachLicence).mockResolvedValue()
     vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       licenses: [
@@ -763,14 +774,14 @@ describe("details panel — licences (US3)", () => {
       within(row).getByRole("button", { name: "Remove CC0 Public Domain" }),
     )
     await waitFor(() =>
-      expect(detachLicence).toHaveBeenCalledWith("p1", "CC0-1.0"),
+      expect(Licences.Attachment.detachLicence).toHaveBeenCalledWith("p1", "CC0-1.0"),
     )
-    expect(detachLicence).toHaveBeenCalledTimes(1)
+    expect(Licences.Attachment.detachLicence).toHaveBeenCalledTimes(1)
   })
 
   it("leads with a pending attachment and records the agreement", async () => {
     const user = userEvent.setup()
-    vi.mocked(agreeLicence).mockResolvedValue()
+    vi.mocked(Licences.Attachment.agreeLicence).mockResolvedValue()
     vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       licenses: [
@@ -789,7 +800,7 @@ describe("details panel — licences (US3)", () => {
 
     await user.click(screen.getByRole("button", { name: "Review & Agree" }))
     await waitFor(() =>
-      expect(agreeLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0", "u1"),
+      expect(Licences.Attachment.agreeLicence).toHaveBeenCalledWith("p1", "CC-BY-4.0", "u1"),
     )
   })
 
@@ -813,8 +824,8 @@ describe("details panel — licences (US3)", () => {
   it("opens the licence text in a modal from the row's View control", async () => {
     const user = userEvent.setup()
     const detailLicence = { ...catalogLicense, fullText: "## Section 1" }
-    vi.mocked(getLicence).mockResolvedValue(detailLicence as never)
-    vi.mocked(resolveLicenceText).mockResolvedValue(
+    vi.mocked(Licences.Catalog.getLicence).mockResolvedValue(detailLicence as never)
+    vi.mocked(Licences.Text.resolveLicenceText).mockResolvedValue(
       "You are free to share and adapt.",
     )
     vi.mocked(Project.Queries.getProject).mockResolvedValue({
@@ -832,12 +843,12 @@ describe("details panel — licences (US3)", () => {
     expect(
       await screen.findByText("You are free to share and adapt."),
     ).toBeInTheDocument()
-    expect(getLicence).toHaveBeenCalledWith("CC-BY-4.0")
+    expect(Licences.Catalog.getLicence).toHaveBeenCalledWith("CC-BY-4.0")
   })
 
   it("explains an unseeded catalog", async () => {
     const user = userEvent.setup()
-    vi.mocked(listLicences).mockResolvedValue([])
+    vi.mocked(Licences.Catalog.listLicences).mockResolvedValue([])
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Add licence" }))
@@ -850,7 +861,7 @@ describe("details panel — licences (US3)", () => {
   // unseeded one — the fix is a toggle, not a migration.
   it("distinguishes a filtered-empty catalog from an unseeded one", async () => {
     const user = userEvent.setup()
-    vi.mocked(listLicences).mockResolvedValue([softwareLicense])
+    vi.mocked(Licences.Catalog.listLicences).mockResolvedValue([softwareLicense])
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Add licence" }))
@@ -866,7 +877,7 @@ describe("details panel — licences (US3)", () => {
 describe("corpus section (003)", () => {
   it("imports a corpus from the library and marks the imported one", async () => {
     const user = userEvent.setup()
-    vi.mocked(attachCorpusToProject).mockResolvedValue()
+    vi.mocked(Corpus.Documents.attachCorpusToProject).mockResolvedValue()
     renderRoute()
 
     await user.click(
@@ -877,13 +888,13 @@ describe("corpus section (003)", () => {
 
     await user.click(within(dialog).getAllByRole("button", { name: "Import" })[0])
     await waitFor(() =>
-      expect(attachCorpusToProject).toHaveBeenCalledWith("p1", "d1"),
+      expect(Corpus.Documents.attachCorpusToProject).toHaveBeenCalledWith("p1", "d1"),
     )
   })
 
   it("points at the Corpus page when the library is empty", async () => {
     const user = userEvent.setup()
-    vi.mocked(listCorpusDocuments).mockResolvedValue([])
+    vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([])
     renderRoute()
 
     await user.click(
@@ -900,7 +911,7 @@ describe("corpus section (003)", () => {
 
   it("shows the version history and detaches without deleting the document", async () => {
     const user = userEvent.setup()
-    vi.mocked(detachCorpusFromProject).mockResolvedValue()
+    vi.mocked(Corpus.Documents.detachCorpusFromProject).mockResolvedValue()
     vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...readyDetail,
       commits: [
@@ -928,7 +939,7 @@ describe("corpus section (003)", () => {
     if (!remove) throw new Error("corpus remove button not found")
     await user.click(remove)
     await waitFor(() =>
-      expect(detachCorpusFromProject).toHaveBeenCalledWith("p1"),
+      expect(Corpus.Documents.detachCorpusFromProject).toHaveBeenCalledWith("p1"),
     )
   })
 })
@@ -959,7 +970,7 @@ describe("details panel — organization & creator (US4)", () => {
 
   it("creates an organization inline and assigns it", async () => {
     const user = userEvent.setup()
-    vi.mocked(createOrganization).mockResolvedValue({
+    vi.mocked(Organization.createOrganization).mockResolvedValue({
       id: "o2",
       name: "New Org",
       website: null,
@@ -975,7 +986,7 @@ describe("details panel — organization & creator (US4)", () => {
     await user.click(screen.getByRole("button", { name: "Create & assign" }))
 
     await waitFor(() =>
-      expect(createOrganization).toHaveBeenCalledWith(
+      expect(Organization.createOrganization).toHaveBeenCalledWith(
         expect.objectContaining({ name: "New Org" }),
       ),
     )

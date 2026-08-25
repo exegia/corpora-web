@@ -11,9 +11,10 @@ import { Card } from "@/components/ui/card"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
-import { attachCorpusToProject, detachCorpusFromProject, listCorpusDocuments } from "@/lib/corpus/corpus"
+// `Corpus` is the UI namespace above, so the data layer comes in as `Corpora`.
+import Corpora from "@/lib/corpus"
 import { formatDate, formatRelativeTime } from "@/lib/format"
-import { agreeLicence, attachLicence, detachLicence, listLicences } from "@/lib/licenses"
+import Licences from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organization/organizations"
 import Project, {
     type BookType,
@@ -40,10 +41,10 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
         const [corpusOptions, licenseCatalog, organizations, superadmin, documents] = project
             ? await Promise.all([
                   Project.Queries.listCorpusOptions(projectId),
-                  listLicences(),
+                  Licences.Catalog.listLicences(),
                   listOrganizations(),
                   getSuperadmin(),
-                  listCorpusDocuments(),
+                  Corpora.Documents.listCorpusDocuments(),
               ])
             : [[], [], [], null, []]
         return {
@@ -113,7 +114,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
                 await Project.Mutations.classifyProject(projectId, parseClassification(form))
                 return { ok: true, intent }
             case "attach-license":
-                await attachLicence(
+                await Licences.Attachment.attachLicence(
                     projectId,
                     String(form.get("licenseId") ?? ""),
                     // Pre-auth: the project's creator is the agreeing user (plan Constraints)
@@ -121,14 +122,14 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
                 )
                 return { ok: true, intent }
             case "agree-license":
-                await agreeLicence(
+                await Licences.Attachment.agreeLicence(
                     projectId,
                     String(form.get("licenseId") ?? ""),
                     String(form.get("agreedByUserId") ?? "")
                 )
                 return { ok: true, intent }
             case "detach-license":
-                await detachLicence(projectId, String(form.get("licenseId") ?? ""))
+                await Licences.Attachment.detachLicence(projectId, String(form.get("licenseId") ?? ""))
                 return { ok: true, intent }
             case "set-organization": {
                 const organizationId = String(form.get("organizationId") ?? "")
@@ -150,10 +151,10 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
                 await Project.Mutations.unlinkCorpus(projectId, String(form.get("corpusId") ?? ""))
                 return { ok: true, intent }
             case "attach-corpus":
-                await attachCorpusToProject(projectId, String(form.get("documentId") ?? ""))
+                await Corpora.Documents.attachCorpusToProject(projectId, String(form.get("documentId") ?? ""))
                 return { ok: true, intent }
             case "detach-corpus":
-                await detachCorpusFromProject(projectId)
+                await Corpora.Documents.detachCorpusFromProject(projectId)
                 return { ok: true, intent }
             default:
                 return { ok: false, error: "Unknown action." }

@@ -8,13 +8,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import type {
-  CorpusArchive,
-  CorpusNode,
-  CorpusPassage,
-  PassageToken,
-} from "@/lib/api/methods"
-import { fetchCorpusContent, fetchCorpusNode } from "@/lib/api/methods"
+import CorporaApi, {
+  type CorpusArchive,
+  type CorpusNode,
+  type CorpusPassage,
+  type PassageToken,
+} from "@/lib/api"
 import { findIndexItem, lemmaFromNode, slotForToken } from "@/lib/corpus/explore"
 import { cn } from "@/lib/utils"
 import Panel from "./panel"
@@ -44,7 +43,7 @@ async function inspectTokenNode(
   node: number,
 ): Promise<Lemma> {
   try {
-    return lemmaFromNode(await fetchCorpusNode(archive, node), form)
+    return lemmaFromNode(await CorporaApi.fetchCorpusNode(archive, node), form)
   } catch {
     return lemmaFromNode(placeholderNode(form, passage, node), form)
   }
@@ -60,11 +59,11 @@ async function inspectSplitToken(
     return lemmaFromNode(placeholderNode(form, passage, 0), form)
   }
   try {
-    const container = await fetchCorpusNode(archive, passage.node)
+    const container = await CorporaApi.fetchCorpusNode(archive, passage.node)
     const slot = slotForToken(container, wordIndex)
     if (slot != null && slot !== container.node) {
       try {
-        return lemmaFromNode(await fetchCorpusNode(archive, slot), form)
+        return lemmaFromNode(await CorporaApi.fetchCorpusNode(archive, slot), form)
       } catch {
         return lemmaFromNode(container, form)
       }
@@ -206,7 +205,7 @@ function LiveReader({
     if (!selected) return
     let cancelled = false
     setLoading(true)
-    fetchCorpusContent(archive, { ref: selected, limit: 20 })
+    CorporaApi.fetchCorpusContent(archive, { ref: selected, limit: 20 })
       .then((content) => {
         if (!cancelled) setPassages(content.passages)
       })

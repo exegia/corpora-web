@@ -1,4 +1,4 @@
-import type { CorpusSection } from "@/lib/corpus/corpus"
+import type { CorpusSection } from "@/lib/corpus"
 import type { ExploreTab } from "./types"
 
 export const EXPLORE_TABS = [

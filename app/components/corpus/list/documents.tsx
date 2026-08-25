@@ -1,4 +1,4 @@
-import type { CorpusDocument } from "@/lib/corpus/corpus"
+import type { CorpusDocument } from "@/lib/corpus"
 import { useReadySound } from "@/lib/sounds"
 import { collectLanguages, DEFAULT_FILTERS, filterDocuments, PAGE_SIZE, paginate } from "./utils"
 import type { CorpusFilters } from "./types"

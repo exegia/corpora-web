@@ -1,5 +1,6 @@
+import { parse } from "yaml";
 import type { CorpusCommit } from "../projects";
-import type { CorpusDocument, CommitRow, DocumentRow } from "./types";
+import type { CorpusDocument, CommitRow, CorpusSection, DocumentRow } from "./types";
 
 
 export function toCommit(row: CommitRow): CorpusCommit {

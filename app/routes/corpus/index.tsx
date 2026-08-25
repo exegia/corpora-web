@@ -3,7 +3,7 @@ import { Await, useLoaderData, useOutletContext, type ActionFunctionArgs } from 
 import { Convert } from "@/components/corpus/convert"
 import type { ConversionController } from "@/components/corpus/convert/use-conversion"
 import { List } from "@/components/corpus/list"
-import { createCorpusDocument, deleteCorpusDocument, listCorpusDocuments, type CorpusType } from "@/lib/corpus/corpus"
+import Corpus, { type CorpusType } from "@/lib/corpus"
 import Project, { type CorpusSource } from "@/lib/projects"
 import { parseCommits, parseToc } from "./utils"
 
@@ -11,7 +11,7 @@ export async function clientLoader() {
     // Deliberately not awaited (see routes/project.tsx): navigation completes
     // immediately, the upload controls stay interactive, and the list suspends
     // on this promise, showing the skeleton meanwhile.
-    const documents = listCorpusDocuments()
+    const documents = Corpus.Documents.listCorpusDocuments()
     return { documents }
 }
 
@@ -21,7 +21,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
     try {
         switch (intent) {
             case "create-document":
-                await createCorpusDocument({
+                await Corpus.Documents.createCorpusDocument({
                     name: String(form.get("name") ?? ""),
                     source: String(form.get("source") ?? "upload") as CorpusSource,
                     path: String(form.get("path") ?? ""),
@@ -36,7 +36,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
                     const value = Number(form.get(name))
                     return Number.isFinite(value) && value > 0 ? value : null
                 }
-                const created = await createCorpusDocument({
+                const created = await Corpus.Documents.createCorpusDocument({
                     name: String(form.get("name") ?? ""),
                     source: "upload",
                     path: String(form.get("path") ?? ""),
@@ -56,7 +56,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
                 return { ok: true, intent, documentId: created.id }
             }
             case "delete-document":
-                await deleteCorpusDocument(String(form.get("documentId") ?? ""))
+                await Corpus.Documents.deleteCorpusDocument(String(form.get("documentId") ?? ""))
                 return { ok: true, intent }
             default:
                 return { ok: false, error: "Unknown action." }
@@ -76,7 +76,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
  * through the outlet context; the pill and the Convert/Upload actions render
  * here, on the page's own header row.
  */
-export default function Corpus() {
+export default function CorpusPage() {
     const { documents } = useLoaderData<typeof clientLoader>()
     const conversion = useOutletContext<ConversionController>()
 

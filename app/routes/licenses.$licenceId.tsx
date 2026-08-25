@@ -11,12 +11,7 @@ import {
   CardPanel,
 } from "@/components/ui/card"
 import { License } from "@/components/licenses"
-import {
-  getLicence,
-  resolveLicenceText,
-  saveLicenceText,
-  updateLicence,
-} from "@/lib/licenses"
+import Licences from "@/lib/licenses"
 import Project, { type LicenseStatus } from "@/lib/projects"
 import { getSuperadmin } from "@/lib/user/users"
 
@@ -26,12 +21,12 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
   // (components/breadcrumb), and these are two cheap reads. The licence text is
   // the slow part and keeps its own boundary below.
   const [licence, superadmin] = await Promise.all([
-    getLicence(licenceId),
+    Licences.Catalog.getLicence(licenceId),
     getSuperadmin(),
   ])
   return {
     licence,
-    text: resolveLicenceText(licence),
+    text: Licences.Text.resolveLicenceText(licence),
     // Pre-auth: the session acts as the superadmin when the directory has one.
     superadmin: superadmin !== null,
   }
@@ -48,7 +43,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
         if ((await getSuperadmin()) === null) {
           return { ok: false, error: "Only the superadmin can edit licences." }
         }
-        await updateLicence(licenceId, {
+        await Licences.Authoring.updateLicence(licenceId, {
           title: String(form.get("title") ?? ""),
           url: String(form.get("url") ?? "") || null,
           family: String(form.get("family") ?? "") || null,
@@ -67,7 +62,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
         if ((await getSuperadmin()) === null) {
           return { ok: false, error: "Only the superadmin can edit licences." }
         }
-        await saveLicenceText(licenceId, String(form.get("text") ?? ""))
+        await Licences.Text.saveLicenceText(licenceId, String(form.get("text") ?? ""))
         return { ok: true, intent }
       }
       default:

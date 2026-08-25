@@ -1,4 +1,4 @@
-import type { ConversionEntry } from "@/lib/corpus/convert"
+import type { ConversionEntry } from "@/lib/corpus"
 import type { ConversionController } from "./use-conversion"
 
 export interface StatusPillProps {

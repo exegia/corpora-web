@@ -1,4 +1,4 @@
-import type { CorpusDocument } from "@/lib/corpus/corpus"
+import type { CorpusDocument } from "@/lib/corpus"
 import type { CorpusCommit, CorpusLink, CorpusOption, ProjectCorpus } from "@/lib/projects"
 
 export interface SectionProps {

@@ -1,6 +1,6 @@
 import { FileWordmarkCorpus } from "@exegia/corpora-ui"
 import { describe, expect, it } from "vitest"
-import type { CorpusDocument } from "@/lib/corpus/corpus"
+import type { CorpusDocument } from "@/lib/corpus"
 import { fileIconFor, formatOf } from "./utils"
 
 function doc(overrides: Partial<CorpusDocument> = {}): CorpusDocument {

@@ -1,6 +1,6 @@
 import { useNavigate, useOutletContext } from "react-router"
 import { CorpusDetail } from "@/components/corpus/detail"
-import type { CorpusSection } from "@/lib/corpus/corpus"
+import type { CorpusSection } from "@/lib/corpus"
 import {
   EmptySections,
   explorerSections,

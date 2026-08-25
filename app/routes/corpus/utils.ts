@@ -1,4 +1,4 @@
-import type { CorpusCommitInput, CorpusSection } from "@/lib/corpus/corpus"
+import type { CorpusCommitInput, CorpusSection } from "@/lib/corpus"
 
 export function parseCommits(raw: string): CorpusCommitInput[] {
     try {
