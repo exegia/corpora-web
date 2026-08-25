@@ -1,4 +1,4 @@
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
 import type { LicenceDetail } from "./types"
 
@@ -49,13 +49,13 @@ export async function saveLicenceText(id: string, text: string): Promise<void> {
     .select("id")
     .maybeSingle()
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not save the licence text: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data) {
-    throw new DataError("not-found", "This licence no longer exists.")
+    throw new Project.Errors.DataError("not-found", "This licence no longer exists.")
   }
 }
 

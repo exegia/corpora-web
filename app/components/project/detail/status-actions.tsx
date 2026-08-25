@@ -1,6 +1,6 @@
 import { Send, ShieldCheck, Undo2 } from "lucide-react"
 import type { StatusAction, StatusFetcher } from "@/components/project/detail/types"
-import { type ProjectDetail, type ProjectStatus, reviewIssues } from "@/lib/projects"
+import Project, { type ProjectDetail, type ProjectStatus } from "@/lib/projects"
 
 /**
  * The status workflow as contextual actions instead of a select: the
@@ -41,7 +41,7 @@ export function statusActions(project: ProjectDetail, superadmin: boolean, fetch
         {
             label: "Ready for review",
             icon: <Send aria-hidden="true" />,
-            disabled: busy || reviewIssues(project).length > 0,
+            disabled: busy || Project.Rules.reviewIssues(project).length > 0,
             onClick: () => submit("ready-for-review"),
         },
         ...(project.status !== "draft" ? [toDraft] : []),
@@ -67,7 +67,7 @@ export function statusSummary(project: ProjectDetail, superadmin: boolean): { ti
                   description: "Waiting for the superadmin to approve.",
               }
     }
-    return reviewIssues(project).length > 0
+    return Project.Rules.reviewIssues(project).length > 0
         ? {
               title: "Unpublished project",
               description: "Complete every requirement before submitting.",

@@ -24,20 +24,16 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  type CatalogLicence,
-  createLicence,
-  listLicences,
-} from "@/lib/licenses"
+import Licences, { type CatalogLicence } from "@/lib/licenses"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
-import { DataError, type LicenseStatus } from "@/lib/projects"
-import { getSuperadmin } from "@/lib/users"
+import Project, { type LicenseStatus } from "@/lib/projects"
+import User from "@/lib/user"
 
 export async function clientLoader() {
   // Deliberately not awaited (see routes/project.tsx): navigation completes
   // immediately and the component suspends on this promise, showing the
   // skeleton rows meanwhile.
-  const data = Promise.all([listLicences(), getSuperadmin()]).then(
+  const data = Promise.all([Licences.Catalog.listLicences(), User.getSuperadmin()]).then(
     ([licences, superadmin]) => ({
       licences,
       // Pre-auth: the session acts as the superadmin when the directory has one.
@@ -54,10 +50,10 @@ export async function clientAction({ request }: ActionFunctionArgs) {
     switch (intent) {
       case "create-licence": {
         // Pre-auth guard (research R4): only the superadmin edits the catalog.
-        if ((await getSuperadmin()) === null) {
+        if ((await User.getSuperadmin()) === null) {
           return { ok: false, error: "Only the superadmin can create licences." }
         }
-        const id = await createLicence({
+        const id = await Licences.Authoring.createLicence({
           id: String(form.get("id") ?? ""),
           title: String(form.get("title") ?? ""),
           url: String(form.get("url") ?? "") || null,
@@ -76,7 +72,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
         return { ok: false, error: "Unknown action." }
     }
   } catch (error) {
-    if (error instanceof DataError) {
+    if (error instanceof Project.Errors.DataError) {
       return { ok: false, error: error.message }
     }
     return { ok: false, error: "Something went wrong. Your change was not saved." }

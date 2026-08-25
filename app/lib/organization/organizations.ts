@@ -3,16 +3,10 @@
 // Pick-or-create records; not accounts or access-control boundaries.
 // Route modules import ONLY from this module — never supabase-js directly.
 
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
-
-export interface Organization {
-  id: string
-  name: string
-  website: string | null
-}
-
-const ORGANIZATION_COLUMNS = "id, name, website"
+import type { Organization } from "./types";
+import { ORGANIZATION_COLUMNS } from "./constants";
 
 export async function listOrganizations(): Promise<Organization[]> {
   const { data, error } = await getSupabase()
@@ -20,7 +14,7 @@ export async function listOrganizations(): Promise<Organization[]> {
     .select(ORGANIZATION_COLUMNS)
     .order("name", { ascending: true })
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not load organizations: ${error.message ?? "unexpected error"}`,
     )
@@ -34,7 +28,7 @@ export async function createOrganization(input: {
 }): Promise<Organization> {
   const name = input.name.trim()
   if (!name) {
-    throw new DataError("validation", "An organization name is required.")
+    throw new Project.Errors.DataError("validation", "An organization name is required.")
   }
   const { data, error } = await getSupabase()
     .from("organizations")
@@ -42,7 +36,7 @@ export async function createOrganization(input: {
     .select(ORGANIZATION_COLUMNS)
     .single()
   if (error || !data) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not create the organization: ${error?.message ?? "unexpected error"}`,
     )
