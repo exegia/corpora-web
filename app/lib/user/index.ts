@@ -6,6 +6,8 @@ import * as users from "./users"
 
 export type { DirectoryUser } from "./types"
 
+export * from "./constants"
+
 const User = { ...users }
 
 export default User

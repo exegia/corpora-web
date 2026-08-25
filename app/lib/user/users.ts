@@ -2,21 +2,18 @@
 // corpora-auth — research R4). Route modules import ONLY from the barrel
 // (index.ts), never this submodule.
 
-import Project, { SUPERADMIN_EMAIL } from "@/lib/projects"
+import { SUPERADMIN_EMAIL } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
+import { DIRECTORY_COLUMNS } from "./constants"
 import type { DirectoryUser } from "./types"
+import { fail } from "./utils"
 
 export async function listUsers(): Promise<DirectoryUser[]> {
   const { data, error } = await getSupabase()
     .from("user_directory")
-    .select("id, name, username, email")
+    .select(DIRECTORY_COLUMNS)
     .order("name", { ascending: true })
-  if (error) {
-    throw new Project.Errors.DataError(
-      "unknown",
-      `Could not load the user directory: ${error.message ?? "unexpected error"}`,
-    )
-  }
+  if (error) fail("Could not load the user directory", error)
   return (data ?? []) as DirectoryUser[]
 }
 
@@ -28,14 +25,9 @@ export async function listUsers(): Promise<DirectoryUser[]> {
 export async function getSuperadmin(): Promise<DirectoryUser | null> {
   const { data, error } = await getSupabase()
     .from("user_directory")
-    .select("id, name, username, email")
+    .select(DIRECTORY_COLUMNS)
     .eq("email", SUPERADMIN_EMAIL)
     .maybeSingle()
-  if (error) {
-    throw new Project.Errors.DataError(
-      "unknown",
-      `Could not load the superadmin: ${error.message ?? "unexpected error"}`,
-    )
-  }
+  if (error) fail("Could not load the superadmin", error)
   return (data as DirectoryUser | null) ?? null
 }
