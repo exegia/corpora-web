@@ -1,5 +1,6 @@
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress"
-import { CONVERSION_STEPS, currentStep, deriveProgress } from "@/lib/corpus-convert"
+import Corpus from "@/lib/corpus"
+import { CONVERSION_STEPS } from "@/lib/corpus"
 import FileSummary from "./file-summary"
 import LogSteps from "./log-steps"
 import type { PanelProps } from "./types"
@@ -14,8 +15,8 @@ import { conversionTone, isDone } from "./utils"
 export default function Panel({ entry, documentId, onDismiss, onRetry }: PanelProps) {
     const done = isDone(entry)
     const failed = entry.status === "error"
-    const { index } = currentStep(entry)
-    const progress = deriveProgress(entry)
+    const { index } = Corpus.Convert.currentStep(entry)
+    const progress = Corpus.Convert.deriveProgress(entry)
     const tone = conversionTone(failed ? "failed" : done ? "completed" : "active")
     const stepLabel = done
         ? `${CONVERSION_STEPS.length} of ${CONVERSION_STEPS.length} steps`
@@ -42,12 +43,7 @@ export default function Panel({ entry, documentId, onDismiss, onRetry }: PanelPr
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 pt-0">
                 <LogSteps entry={entry} />
-                <FileSummary
-                    documentId={documentId}
-                    entry={entry}
-                    onDismiss={onDismiss}
-                    onRetry={onRetry}
-                />
+                <FileSummary documentId={documentId} entry={entry} onDismiss={onDismiss} onRetry={onRetry} />
             </div>
         </div>
     )

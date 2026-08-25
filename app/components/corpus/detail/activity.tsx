@@ -5,8 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toastManager } from "@/components/ui/toast"
-import type { CorpusArchive, CorpusVersion } from "@/lib/corpora-api"
-import { fetchCorpusVersions } from "@/lib/corpora-api"
+import CorporaApi, { type CorpusArchive, type CorpusVersion } from "@/lib/api"
 import type { CorpusDocument } from "@/lib/corpus"
 import { formatSize } from "../list/utils"
 import Panel from "./panel"
@@ -226,7 +225,7 @@ export default function Activity({
   useEffect(() => {
     if (!archive) return
     let cancelled = false
-    fetchCorpusVersions(archive)
+    CorporaApi.fetchCorpusVersions(archive)
       .then((body) => {
         if (cancelled) return
         setRemote((body.versions ?? []).map(toVersionEntry))

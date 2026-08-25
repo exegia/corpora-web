@@ -1,14 +1,11 @@
 // Catalog reads. The catalog is seeded out of band (FR-011); reads are open.
 // Contract: specs/002-project-detail/contracts/data-access.md
 
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
 import type { CatalogLicence, CatalogRow, DetailRow, LicenceDetail } from "./types"
+import { CATALOG_COLUMNS, DETAIL_COLUMNS } from "./constants";
 
-const CATALOG_COLUMNS =
-  "id, title, url, domain_content, domain_data, domain_software, family, maintainer, status"
-
-const DETAIL_COLUMNS = `${CATALOG_COLUMNS}, is_generic, legacy_ids, od_conformance, osd_conformance, created_at, updated_at, full_text`
 
 function toCatalogLicence(row: CatalogRow): CatalogLicence {
   return {
@@ -33,7 +30,7 @@ export async function listLicences(): Promise<CatalogLicence[]> {
     .select(CATALOG_COLUMNS)
     .order("title", { ascending: true })
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not load the licence catalog: ${error.message ?? "unexpected error"}`,
     )
@@ -69,7 +66,7 @@ export async function getLicence(id: string): Promise<LicenceDetail | null> {
     .eq("id", id)
     .maybeSingle()
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not load the licence: ${error.message ?? "unexpected error"}`,
     )

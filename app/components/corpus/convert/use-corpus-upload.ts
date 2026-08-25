@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { useFetcher } from "react-router"
 import { toastManager } from "@/components/ui/toast"
-import { uploadCorpusFile } from "@/lib/corpus"
-import { extractCorpusHistory } from "@/lib/corpus-history"
-import { DataError } from "@/lib/projects"
+import Corpus from "@/lib/corpus"
+
+import Project from "@/lib/projects"
 
 export interface CorpusUploadController {
   inputRef: React.RefObject<HTMLInputElement | null>
@@ -35,8 +35,8 @@ export function useCorpusUpload(): CorpusUploadController {
     setUploading(true)
     try {
       // History first: an unreadable archive fails before anything is stored.
-      const history = await extractCorpusHistory(file)
-      const path = await uploadCorpusFile(file)
+      const history = await Corpus.History.extractCorpusHistory(file)
+      const path = await Corpus.Documents.uploadCorpusFile(file)
       fetcher.submit(
         {
           intent: "create-document",
@@ -52,7 +52,7 @@ export function useCorpusUpload(): CorpusUploadController {
       toastManager.add({
         title: "Upload failed",
         description:
-          error instanceof DataError
+          error instanceof Project.Errors.DataError
             ? error.message
             : "Something went wrong while uploading the corpus.",
       })

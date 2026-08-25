@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import DetailView from "./detail-view"
-import { findLicenceByLabel, resolveLicenceText } from "@/lib/licenses"
+import Licences from "@/lib/licenses"
 import type { LicenceDetail } from "@/lib/licenses"
 
 /** The p-frame-2 collapsible section, minus that particle's delete action. */
@@ -59,10 +59,10 @@ export default function LicenceDetailSheet({ label }: { label: string }) {
     const handleOpenChange = (open: boolean) => {
         if (!open || state.status !== "idle") return
         setState({ status: "loading" })
-        findLicenceByLabel(label)
+        Licences.Catalog.findLicenceByLabel(label)
             .then(async licence => {
                 if (!licence) return setState({ status: "missing" })
-                const text = await resolveLicenceText(licence)
+                const text = await Licences.Text.resolveLicenceText(licence)
                 setState({ status: "ready", licence, text })
             })
             .catch(() => setState({ status: "missing" }))
