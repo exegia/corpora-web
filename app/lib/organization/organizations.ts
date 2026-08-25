@@ -5,14 +5,8 @@
 
 import { DataError } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
-
-export interface Organization {
-  id: string
-  name: string
-  website: string | null
-}
-
-const ORGANIZATION_COLUMNS = "id, name, website"
+import type { Organization } from "./types";
+import { ORGANIZATION_COLUMNS } from "./constants";
 
 export async function listOrganizations(): Promise<Organization[]> {
   const { data, error } = await getSupabase()
