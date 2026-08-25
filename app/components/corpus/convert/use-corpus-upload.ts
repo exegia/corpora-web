@@ -3,7 +3,7 @@ import { useFetcher } from "react-router"
 import { toastManager } from "@/components/ui/toast"
 import { uploadCorpusFile } from "@/lib/corpus/corpus"
 import { extractCorpusHistory } from "@/lib/corpus/history"
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 
 export interface CorpusUploadController {
   inputRef: React.RefObject<HTMLInputElement | null>
@@ -52,7 +52,7 @@ export function useCorpusUpload(): CorpusUploadController {
       toastManager.add({
         title: "Upload failed",
         description:
-          error instanceof DataError
+          error instanceof Project.Errors.DataError
             ? error.message
             : "Something went wrong while uploading the corpus.",
       })

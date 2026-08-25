@@ -37,7 +37,7 @@ import {
 import { sectionsFromIndex } from "@/lib/corpus/explore"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import { cn } from "@/lib/utils"
 
@@ -128,7 +128,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
         return { ok: false, error: "Unknown action." }
     }
   } catch (error) {
-    if (error instanceof DataError) {
+    if (error instanceof Project.Errors.DataError) {
       return { ok: false, error: error.message }
     }
     if (error instanceof CorporaApiError) {

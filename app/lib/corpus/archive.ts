@@ -4,7 +4,7 @@
 // so we read them in the browser at conversion time. Parsing degrades
 // field-by-field — only an unreadable zip throws.
 import { unzipSync } from "fflate"
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 import { MANIFEST_TYPE_MAP } from "./constants";
 import type { CorpusArchiveInfo } from "./types";
 import { asString, extractSections, findEntry, parseYamlEntry } from "./utils";
@@ -18,7 +18,7 @@ export async function unzipCorpusArchive(
   try {
     return unzipSync(new Uint8Array(await file.arrayBuffer()))
   } catch {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "validation",
       "This does not look like a valid .corpus archive.",
     )

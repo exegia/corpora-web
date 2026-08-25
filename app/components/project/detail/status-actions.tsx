@@ -1,6 +1,6 @@
 import { Send, ShieldCheck, Undo2 } from "lucide-react"
 import type { StatusAction, StatusFetcher } from "@/components/project/detail/types"
-import { type ProjectDetail, type ProjectStatus, reviewIssues } from "@/lib/projects"
+import Project, { type ProjectDetail, type ProjectStatus } from "@/lib/projects"
 
 /**
  * The status workflow as contextual actions instead of a select: the

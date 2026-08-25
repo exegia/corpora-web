@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase"
-import type { CorpusOption, ProjectDetail, ProjectSummary } from "@/lib/projects/types"
+import type { CorpusOption, ProjectDetail, ProjectSummary } from "./types"
 import {
     fail,
     type LicenseRow,
@@ -10,7 +10,7 @@ import {
     toCommit,
     toSummary,
     UNKNOWN_CREATOR,
-} from "@/lib/projects/rows"
+} from "./rows"
 
 // ---- Projects (US1) -------------------------------------------------------
 

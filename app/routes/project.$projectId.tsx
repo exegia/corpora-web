@@ -15,26 +15,14 @@ import { attachCorpusToProject, detachCorpusFromProject, listCorpusDocuments } f
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import { agreeLicence, attachLicence, detachLicence, listLicences } from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organization/organizations"
-import {
-    assertEditable,
+import Project, {
     type BookType,
     CATEGORIZED_TYPES,
     type CategoryType,
     type Classification,
-    classifyProject,
-    DataError,
-    deleteProject,
-    getProject,
-    isProjectReadOnly,
     type LanguageType,
-    linkCorpus,
-    listCorpusOptions,
     type ProjectStatus,
     SCRIPTURAL_TYPES,
-    setProjectOrganization,
-    unlinkCorpus,
-    updateProject,
-    updateProjectStatus,
 } from "@/lib/projects"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import { getSuperadmin } from "@/lib/user/users"
@@ -44,14 +32,14 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
     // Awaited: the breadcrumb reads `project` off loaderData synchronously
     // (components/breadcrumb), so deferring it there leaves the trail showing
     // "Project" instead of the name. It is one indexed row.
-    const project = await getProject(projectId)
+    const project = await Project.Queries.getProject(projectId)
     // Deliberately not awaited (see routes/project.tsx): the five queries below
     // are the slow part, so the workspace suspends on this promise and shows the
     // skeleton meanwhile.
     const data = (async () => {
         const [corpusOptions, licenseCatalog, organizations, superadmin, documents] = project
             ? await Promise.all([
-                  listCorpusOptions(projectId),
+                  Project.Queries.listCorpusOptions(projectId),
                   listLicences(),
                   listOrganizations(),
                   getSuperadmin(),
@@ -100,29 +88,29 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
         // A project in review is read-only for everything except the status
         // decision itself (superadmin approve / return).
         if (intent !== "set-status") {
-            await assertEditable(projectId)
+            await Project.Mutations.assertEditable(projectId)
         }
         switch (intent) {
             case "update-project":
-                await updateProject(projectId, {
+                await Project.Mutations.updateProject(projectId, {
                     name: String(form.get("name") ?? ""),
                     description: String(form.get("description") ?? ""),
                 })
                 return { ok: true, intent }
             case "delete-project":
-                await deleteProject(projectId)
+                await Project.Mutations.deleteProject(projectId)
                 return redirect("/project")
             case "set-status": {
-                const project = await getProject(projectId)
+                const project = await Project.Queries.getProject(projectId)
                 if (!project) {
-                    throw new DataError("not-found", "This project no longer exists.")
+                    throw new Project.Errors.DataError("not-found", "This project no longer exists.")
                 }
                 const superadmin = (await getSuperadmin()) !== null
-                await updateProjectStatus(project, String(form.get("status") ?? "") as ProjectStatus, superadmin)
+                await Project.Mutations.updateProjectStatus(project, String(form.get("status") ?? "") as ProjectStatus, superadmin)
                 return { ok: true, intent }
             }
             case "classify":
-                await classifyProject(projectId, parseClassification(form))
+                await Project.Mutations.classifyProject(projectId, parseClassification(form))
                 return { ok: true, intent }
             case "attach-license":
                 await attachLicence(
@@ -144,7 +132,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
                 return { ok: true, intent }
             case "set-organization": {
                 const organizationId = String(form.get("organizationId") ?? "")
-                await setProjectOrganization(projectId, organizationId || null)
+                await Project.Mutations.setProjectOrganization(projectId, organizationId || null)
                 return { ok: true, intent }
             }
             case "create-organization": {
@@ -152,14 +140,14 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
                     name: String(form.get("name") ?? ""),
                     website: String(form.get("website") ?? ""),
                 })
-                await setProjectOrganization(projectId, organization.id)
+                await Project.Mutations.setProjectOrganization(projectId, organization.id)
                 return { ok: true, intent }
             }
             case "link-corpus":
-                await linkCorpus(projectId, String(form.get("corpusId") ?? ""))
+                await Project.Mutations.linkCorpus(projectId, String(form.get("corpusId") ?? ""))
                 return { ok: true, intent }
             case "unlink-corpus":
-                await unlinkCorpus(projectId, String(form.get("corpusId") ?? ""))
+                await Project.Mutations.unlinkCorpus(projectId, String(form.get("corpusId") ?? ""))
                 return { ok: true, intent }
             case "attach-corpus":
                 await attachCorpusToProject(projectId, String(form.get("documentId") ?? ""))
@@ -171,7 +159,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
                 return { ok: false, error: "Unknown action." }
         }
     } catch (error) {
-        if (error instanceof DataError) {
+        if (error instanceof Project.Errors.DataError) {
             return { ok: false, error: error.message }
         }
         return {
@@ -242,7 +230,7 @@ function WorkspacePanels({
 
     if (!project) return null
 
-    const readOnly = isProjectReadOnly(project.status)
+    const readOnly = Project.Rules.isProjectReadOnly(project.status)
 
     return (
         <>
@@ -270,7 +258,7 @@ export default function ProjectWorkspace() {
 
     if (!project) return <ProjectNotFound />
 
-    const readOnly = isProjectReadOnly(project.status)
+    const readOnly = Project.Rules.isProjectReadOnly(project.status)
 
     return (
         <section className="flex flex-col gap-6">

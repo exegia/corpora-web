@@ -16,20 +16,7 @@ import {
   resolveLicenceText,
 } from "@/lib/licenses"
 import { createOrganization, listOrganizations } from "@/lib/organization/organizations"
-import {
-  assertEditable,
-  classifyProject,
-  DataError,
-  deleteProject,
-  getProject,
-  linkCorpus,
-  listCorpusOptions,
-  type ProjectDetail,
-  setProjectOrganization,
-  unlinkCorpus,
-  updateProject,
-  updateProjectStatus,
-} from "@/lib/projects"
+import Project, { type ProjectDetail } from "@/lib/projects"
 import { getSuperadmin } from "@/lib/user/users"
 import WorkspaceRoute, {
   clientAction,
@@ -38,18 +25,29 @@ import WorkspaceRoute, {
 
 vi.mock("@/lib/projects", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/projects")>()
+  // Only the namespaced members the route calls are replaced; `Errors` is
+  // spread by reference so `instanceof Project.Errors.DataError` still holds.
   return {
     ...original,
-    getProject: vi.fn(),
-    listCorpusOptions: vi.fn(),
-    updateProject: vi.fn(),
-    updateProjectStatus: vi.fn(),
-    classifyProject: vi.fn(),
-    setProjectOrganization: vi.fn(),
-    deleteProject: vi.fn(),
-    linkCorpus: vi.fn(),
-    unlinkCorpus: vi.fn(),
-    assertEditable: vi.fn(),
+    default: {
+      ...original.default,
+      Queries: {
+        ...original.default.Queries,
+        getProject: vi.fn(),
+        listCorpusOptions: vi.fn(),
+      },
+      Mutations: {
+        ...original.default.Mutations,
+        updateProject: vi.fn(),
+        updateProjectStatus: vi.fn(),
+        classifyProject: vi.fn(),
+        setProjectOrganization: vi.fn(),
+        deleteProject: vi.fn(),
+        linkCorpus: vi.fn(),
+        unlinkCorpus: vi.fn(),
+        assertEditable: vi.fn(),
+      },
+    },
   }
 })
 
@@ -64,16 +62,16 @@ vi.mock("@/lib/licenses", () => ({
   resolveLicenceText: vi.fn(),
 }))
 
-vi.mock("@/lib/organizations", () => ({
+vi.mock("@/lib/organization/organizations", () => ({
   listOrganizations: vi.fn(),
   createOrganization: vi.fn(),
 }))
 
-vi.mock("@/lib/users", () => ({
+vi.mock("@/lib/user/users", () => ({
   getSuperadmin: vi.fn(),
 }))
 
-vi.mock("@/lib/corpus", async (importOriginal) => {
+vi.mock("@/lib/corpus/corpus", async (importOriginal) => {
   // Spread the original so constant exports (TYPE_ICONS) stay real.
   const original = await importOriginal<typeof import("@/lib/corpus/corpus")>()
   return {
@@ -172,8 +170,8 @@ function renderRoute() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(getProject).mockResolvedValue(detail)
-  vi.mocked(assertEditable).mockResolvedValue()
+  vi.mocked(Project.Queries.getProject).mockResolvedValue(detail)
+  vi.mocked(Project.Mutations.assertEditable).mockResolvedValue()
   vi.mocked(getSuperadmin).mockResolvedValue({
     id: "u9",
     name: "Emmanuel",
@@ -221,7 +219,7 @@ beforeEach(() => {
   vi.mocked(listOrganizations).mockResolvedValue([
     { id: "o1", name: "Peshitta Institute", website: null },
   ])
-  vi.mocked(listCorpusOptions).mockResolvedValue([
+  vi.mocked(Project.Queries.listCorpusOptions).mockResolvedValue([
     {
       id: "c1",
       name: "Peshitta OT",
@@ -254,7 +252,7 @@ describe("/project/:projectId workspace", () => {
   })
 
   it("shows the no-longer-exists state when the project is gone", async () => {
-    vi.mocked(getProject).mockResolvedValue(null)
+    vi.mocked(Project.Queries.getProject).mockResolvedValue(null)
     renderRoute()
     expect(
       await screen.findByText("This project no longer exists"),
@@ -263,7 +261,7 @@ describe("/project/:projectId workspace", () => {
 
   it("renames the project via the edit dialog", async () => {
     const user = userEvent.setup()
-    vi.mocked(updateProject).mockResolvedValue({ ...detail, name: "Renamed" })
+    vi.mocked(Project.Mutations.updateProject).mockResolvedValue({ ...detail, name: "Renamed" })
     renderRoute()
 
     await screen.findByRole("heading", { level: 1, name: "Peshitta Study" })
@@ -274,7 +272,7 @@ describe("/project/:projectId workspace", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }))
 
     await waitFor(() =>
-      expect(updateProject).toHaveBeenCalledWith("p1", {
+      expect(Project.Mutations.updateProject).toHaveBeenCalledWith("p1", {
         name: "Renamed",
         description: "Aramaic OT sources",
       }),
@@ -283,7 +281,7 @@ describe("/project/:projectId workspace", () => {
 
   it("deletes the project after confirmation and redirects to the list", async () => {
     const user = userEvent.setup()
-    vi.mocked(deleteProject).mockResolvedValue()
+    vi.mocked(Project.Mutations.deleteProject).mockResolvedValue()
     renderRoute()
 
     await screen.findByRole("heading", { level: 1, name: "Peshitta Study" })
@@ -293,7 +291,7 @@ describe("/project/:projectId workspace", () => {
     await user.type(screen.getByRole("textbox"), "DELETE")
     await user.click(confirm)
 
-    await waitFor(() => expect(deleteProject).toHaveBeenCalledWith("p1"))
+    await waitFor(() => expect(Project.Mutations.deleteProject).toHaveBeenCalledWith("p1"))
     expect(
       await screen.findByRole("heading", { name: "Projects list" }),
     ).toBeInTheDocument()
@@ -303,7 +301,7 @@ describe("/project/:projectId workspace", () => {
 describe("references — corpus links (003)", () => {
   it("references a library corpus from the dialog and blocks duplicates", async () => {
     const user = userEvent.setup()
-    vi.mocked(linkCorpus).mockResolvedValue()
+    vi.mocked(Project.Mutations.linkCorpus).mockResolvedValue()
     renderRoute()
 
     await user.click(
@@ -316,18 +314,18 @@ describe("references — corpus links (003)", () => {
     ).toHaveLength(1)
 
     await user.click(within(dialog).getByRole("button", { name: "Reference" }))
-    await waitFor(() => expect(linkCorpus).toHaveBeenCalledWith("p1", "c3"))
+    await waitFor(() => expect(Project.Mutations.linkCorpus).toHaveBeenCalledWith("p1", "c3"))
   })
 
   it("removes a reference without touching the library", async () => {
     const user = userEvent.setup()
-    vi.mocked(unlinkCorpus).mockResolvedValue()
+    vi.mocked(Project.Mutations.unlinkCorpus).mockResolvedValue()
     renderRoute()
 
     const row = (await screen.findByText("Peshitta OT")).closest("li")
     if (!row) throw new Error("reference row not found")
     await user.click(within(row).getByRole("button", { name: "Remove" }))
-    await waitFor(() => expect(unlinkCorpus).toHaveBeenCalledWith("p1", "c1"))
+    await waitFor(() => expect(Project.Mutations.unlinkCorpus).toHaveBeenCalledWith("p1", "c1"))
   })
 })
 
@@ -346,7 +344,7 @@ describe("details panel — status workflow (003)", () => {
   })
 
   it("enables Ready for review once licence, classification, and corpus pass", async () => {
-    vi.mocked(getProject).mockResolvedValue(readyDetail)
+    vi.mocked(Project.Queries.getProject).mockResolvedValue(readyDetail)
     renderRoute()
     expect(
       await screen.findByRole("button", { name: "Ready for review" }),
@@ -355,15 +353,15 @@ describe("details panel — status workflow (003)", () => {
 
   it("submits set-status with the loaded project and superadmin flag", async () => {
     const user = userEvent.setup()
-    vi.mocked(getProject).mockResolvedValue(readyDetail)
-    vi.mocked(updateProjectStatus).mockResolvedValue()
+    vi.mocked(Project.Queries.getProject).mockResolvedValue(readyDetail)
+    vi.mocked(Project.Mutations.updateProjectStatus).mockResolvedValue()
     renderRoute()
 
     await user.click(
       await screen.findByRole("button", { name: "Ready for review" }),
     )
     await waitFor(() =>
-      expect(updateProjectStatus).toHaveBeenCalledWith(
+      expect(Project.Mutations.updateProjectStatus).toHaveBeenCalledWith(
         expect.objectContaining({ id: "p1" }),
         "ready-for-review",
         true,
@@ -373,11 +371,11 @@ describe("details panel — status workflow (003)", () => {
 
   it("lets the superadmin publish or return a project in review", async () => {
     const user = userEvent.setup()
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...readyDetail,
       status: "ready-for-review",
     })
-    vi.mocked(updateProjectStatus).mockResolvedValue()
+    vi.mocked(Project.Mutations.updateProjectStatus).mockResolvedValue()
     renderRoute()
 
     // the double group: publish, or send back to draft
@@ -387,7 +385,7 @@ describe("details panel — status workflow (003)", () => {
     ).toBeInTheDocument()
     await user.click(publish)
     await waitFor(() =>
-      expect(updateProjectStatus).toHaveBeenCalledWith(
+      expect(Project.Mutations.updateProjectStatus).toHaveBeenCalledWith(
         expect.objectContaining({ id: "p1" }),
         "published",
         true,
@@ -397,9 +395,9 @@ describe("details panel — status workflow (003)", () => {
 
   it("surfaces a refused status change as a visible error", async () => {
     const user = userEvent.setup()
-    vi.mocked(getProject).mockResolvedValue(readyDetail)
-    vi.mocked(updateProjectStatus).mockRejectedValue(
-      new DataError("validation", "Only the superadmin can approve."),
+    vi.mocked(Project.Queries.getProject).mockResolvedValue(readyDetail)
+    vi.mocked(Project.Mutations.updateProjectStatus).mockRejectedValue(
+      new Project.Errors.DataError("validation", "Only the superadmin can approve."),
     )
     renderRoute()
 
@@ -414,7 +412,7 @@ describe("details panel — status workflow (003)", () => {
 
 describe("read-only while in review (003)", () => {
   beforeEach(() => {
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...readyDetail,
       status: "ready-for-review",
       // Remove is gated on `!readOnly && project.organization` — without an
@@ -444,8 +442,8 @@ describe("read-only while in review (003)", () => {
   })
 
   it("rejects mutating actions server-side via assertEditable", async () => {
-    vi.mocked(assertEditable).mockRejectedValue(
-      new DataError("validation", "This project is in review and read-only."),
+    vi.mocked(Project.Mutations.assertEditable).mockRejectedValue(
+      new Project.Errors.DataError("validation", "This project is in review and read-only."),
     )
     const request = new Request("http://localhost/project/p1", {
       method: "POST",
@@ -460,7 +458,7 @@ describe("read-only while in review (003)", () => {
       ok: false,
       error: "This project is in review and read-only.",
     })
-    expect(classifyProject).not.toHaveBeenCalled()
+    expect(Project.Mutations.classifyProject).not.toHaveBeenCalled()
   })
 })
 
@@ -528,12 +526,12 @@ describe("details panel — classification (US2)", () => {
 
   it("submits the classification and clears the stale value on a type switch", async () => {
     const user = userEvent.setup()
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       type: "bible",
       languages: ["hebrew"],
     })
-    vi.mocked(classifyProject).mockResolvedValue()
+    vi.mocked(Project.Mutations.classifyProject).mockResolvedValue()
     renderRoute()
 
     // Already classified, so the value itself is the trigger.
@@ -549,7 +547,7 @@ describe("details panel — classification (US2)", () => {
     )
 
     await waitFor(() =>
-      expect(classifyProject).toHaveBeenCalledWith("p1", {
+      expect(Project.Mutations.classifyProject).toHaveBeenCalledWith("p1", {
         type: "review",
         category: "literary",
       }),
@@ -658,7 +656,7 @@ describe("details panel — licences (US3)", () => {
   // querySelector-level click (or a future non-modal surface) sees both.
   it("names the catalog's View apart from the attached row's", async () => {
     const user = userEvent.setup()
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       licenses: [attachedLicence],
     })
@@ -700,7 +698,7 @@ describe("details panel — licences (US3)", () => {
       catalogLicense,
       { ...catalogLicense, id: "CC0-1.0", title: "CC0 Public Domain" },
     ])
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       licenses: [
         attachedLicence,
@@ -738,7 +736,7 @@ describe("details panel — licences (US3)", () => {
   it("lists attached licences with agreement info and detaches one row only", async () => {
     const user = userEvent.setup()
     vi.mocked(detachLicence).mockResolvedValue()
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       licenses: [
         attachedLicence,
@@ -773,7 +771,7 @@ describe("details panel — licences (US3)", () => {
   it("leads with a pending attachment and records the agreement", async () => {
     const user = userEvent.setup()
     vi.mocked(agreeLicence).mockResolvedValue()
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       licenses: [
         { ...attachedLicence, id: "CC0-1.0", title: "CC0 Public Domain" },
@@ -796,7 +794,7 @@ describe("details panel — licences (US3)", () => {
   })
 
   it("hides the agreement control while the project is in review", async () => {
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       status: "ready-for-review",
       licenses: [{ ...attachedLicence, agreedAt: null, agreedBy: null }],
@@ -819,7 +817,7 @@ describe("details panel — licences (US3)", () => {
     vi.mocked(resolveLicenceText).mockResolvedValue(
       "You are free to share and adapt.",
     )
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       licenses: [attachedLicence],
     })
@@ -903,7 +901,7 @@ describe("corpus section (003)", () => {
   it("shows the version history and detaches without deleting the document", async () => {
     const user = userEvent.setup()
     vi.mocked(detachCorpusFromProject).mockResolvedValue()
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...readyDetail,
       commits: [
         {
@@ -943,7 +941,7 @@ describe("details panel — organization & creator (US4)", () => {
 
   it("assigns an existing organization from the picker", async () => {
     const user = userEvent.setup()
-    vi.mocked(setProjectOrganization).mockResolvedValue()
+    vi.mocked(Project.Mutations.setProjectOrganization).mockResolvedValue()
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Add organization" }))
@@ -955,7 +953,7 @@ describe("details panel — organization & creator (US4)", () => {
     await user.click(screen.getByRole("button", { name: "Save" }))
 
     await waitFor(() =>
-      expect(setProjectOrganization).toHaveBeenCalledWith("p1", "o1"),
+      expect(Project.Mutations.setProjectOrganization).toHaveBeenCalledWith("p1", "o1"),
     )
   })
 
@@ -966,7 +964,7 @@ describe("details panel — organization & creator (US4)", () => {
       name: "New Org",
       website: null,
     })
-    vi.mocked(setProjectOrganization).mockResolvedValue()
+    vi.mocked(Project.Mutations.setProjectOrganization).mockResolvedValue()
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Add organization" }))
@@ -982,14 +980,14 @@ describe("details panel — organization & creator (US4)", () => {
       ),
     )
     await waitFor(() =>
-      expect(setProjectOrganization).toHaveBeenCalledWith("p1", "o2"),
+      expect(Project.Mutations.setProjectOrganization).toHaveBeenCalledWith("p1", "o2"),
     )
   })
 
   // The badge used to link out to the website. It now opens the organization
   // editor — the URL has its own row, so the link was the redundant one.
   it("opens the organization editor from the badge and links the website row", async () => {
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       organization: {
         id: "o1",
@@ -1010,8 +1008,8 @@ describe("details panel — organization & creator (US4)", () => {
 
   it("removes the organization without deleting the project", async () => {
     const user = userEvent.setup()
-    vi.mocked(setProjectOrganization).mockResolvedValue()
-    vi.mocked(getProject).mockResolvedValue({
+    vi.mocked(Project.Mutations.setProjectOrganization).mockResolvedValue()
+    vi.mocked(Project.Queries.getProject).mockResolvedValue({
       ...detail,
       organization: { id: "o1", name: "Peshitta Institute", website: null },
     })
@@ -1029,8 +1027,8 @@ describe("details panel — organization & creator (US4)", () => {
     await user.click(screen.getByRole("button", { name: "Save" }))
 
     await waitFor(() =>
-      expect(setProjectOrganization).toHaveBeenCalledWith("p1", null),
+      expect(Project.Mutations.setProjectOrganization).toHaveBeenCalledWith("p1", null),
     )
-    expect(deleteProject).not.toHaveBeenCalled()
+    expect(Project.Mutations.deleteProject).not.toHaveBeenCalled()
   })
 })

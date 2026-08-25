@@ -4,7 +4,7 @@ import { Convert } from "@/components/corpus/convert"
 import type { ConversionController } from "@/components/corpus/convert/use-conversion"
 import { List } from "@/components/corpus/list"
 import { createCorpusDocument, deleteCorpusDocument, listCorpusDocuments, type CorpusType } from "@/lib/corpus/corpus"
-import { DataError, type CorpusSource } from "@/lib/projects"
+import Project, { type CorpusSource } from "@/lib/projects"
 import { parseCommits, parseToc } from "./utils"
 
 export async function clientLoader() {
@@ -62,7 +62,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
                 return { ok: false, error: "Unknown action." }
         }
     } catch (error) {
-        if (error instanceof DataError) {
+        if (error instanceof Project.Errors.DataError) {
             return { ok: false, error: error.message }
         }
         return { ok: false, error: "Something went wrong. Your change was not saved." }

@@ -3,28 +3,30 @@ import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { formatRelativeTime } from "@/lib/format"
-import {
-  createProject,
-  DataError,
-  deleteProject,
-  listProjects,
-  type ProjectSummary,
-} from "@/lib/projects"
+import Project, { type ProjectSummary } from "@/lib/projects"
 import { listUsers } from "@/lib/user/users"
-import ProjectRoute, { clientAction, clientLoader } from "@/routes/project"
+import ProjectsPage, { clientAction, clientLoader } from "@/routes/project"
 
 vi.mock("@/lib/projects", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/projects")>()
+  // Only the namespaced members the route calls are replaced; `Errors` is
+  // spread by reference so `instanceof Project.Errors.DataError` still holds.
   return {
     ...original,
-    listProjects: vi.fn(),
-    createProject: vi.fn(),
-    updateProject: vi.fn(),
-    deleteProject: vi.fn(),
+    default: {
+      ...original.default,
+      Queries: { ...original.default.Queries, listProjects: vi.fn() },
+      Mutations: {
+        ...original.default.Mutations,
+        createProject: vi.fn(),
+        updateProject: vi.fn(),
+        deleteProject: vi.fn(),
+      },
+    },
   }
 })
 
-vi.mock("@/lib/users", () => ({ listUsers: vi.fn() }))
+vi.mock("@/lib/user/users", () => ({ listUsers: vi.fn() }))
 
 const summary: ProjectSummary = {
   id: "p1",
@@ -45,7 +47,7 @@ function renderRoute() {
   const Stub = createRoutesStub([
     {
       path: "/project",
-      Component: ProjectRoute,
+      Component: ProjectsPage,
       HydrateFallback: () => null,
       // biome-ignore lint: route module functions match at runtime
       loader: clientLoader as never,
@@ -58,14 +60,14 @@ function renderRoute() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(listProjects).mockResolvedValue([])
+  vi.mocked(Project.Queries.listProjects).mockResolvedValue([])
   vi.mocked(listUsers).mockResolvedValue(directoryUsers)
 })
 
 describe("/project list", () => {
   it("shows a skeleton while projects load, then the list", async () => {
     let resolveProjects!: (value: ProjectSummary[]) => void
-    vi.mocked(listProjects).mockReturnValue(
+    vi.mocked(Project.Queries.listProjects).mockReturnValue(
       new Promise((resolve) => {
         resolveProjects = resolve
       }),
@@ -94,7 +96,7 @@ describe("/project list", () => {
   })
 
   it("lists projects with name, status badge, and last-updated info", async () => {
-    vi.mocked(listProjects).mockResolvedValue([summary])
+    vi.mocked(Project.Queries.listProjects).mockResolvedValue([summary])
     renderRoute()
     expect(
       await screen.findByRole("link", { name: /Peshitta Study/ }),
@@ -111,7 +113,7 @@ describe("/project list", () => {
   })
 
   it("renders one table row per project, with trailing row actions", async () => {
-    vi.mocked(listProjects).mockResolvedValue([summary])
+    vi.mocked(Project.Queries.listProjects).mockResolvedValue([summary])
     renderRoute()
 
     const row = await screen.findByRole("row", { name: /Peshitta Study/ })
@@ -131,7 +133,7 @@ describe("/project list", () => {
 
   it("opens the edit dialog from the row's edit action", async () => {
     const user = userEvent.setup()
-    vi.mocked(listProjects).mockResolvedValue([summary])
+    vi.mocked(Project.Queries.listProjects).mockResolvedValue([summary])
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Edit" }))
@@ -140,7 +142,7 @@ describe("/project list", () => {
 
   it("creates a project from the dialog with a required creator", async () => {
     const user = userEvent.setup()
-    vi.mocked(createProject).mockResolvedValue(summary)
+    vi.mocked(Project.Mutations.createProject).mockResolvedValue(summary)
     renderRoute()
 
     await user.click(
@@ -154,14 +156,14 @@ describe("/project list", () => {
     await user.click(screen.getByRole("button", { name: "Create project" }))
 
     await waitFor(() =>
-      expect(createProject).toHaveBeenCalledWith({
+      expect(Project.Mutations.createProject).toHaveBeenCalledWith({
         name: "Peshitta Study",
         description: "",
         userId: "u1",
       }),
     )
     // action success revalidates the list
-    await waitFor(() => expect(listProjects).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(Project.Queries.listProjects).toHaveBeenCalledTimes(2))
   })
 
   it("blocks creation and explains when the user directory is empty (FR-015)", async () => {
@@ -176,13 +178,13 @@ describe("/project list", () => {
       await screen.findByText(/no user profiles are available/i),
     ).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Create project" })).toBeDisabled()
-    expect(createProject).not.toHaveBeenCalled()
+    expect(Project.Mutations.createProject).not.toHaveBeenCalled()
   })
 
   it("shows the validation message when the name is missing", async () => {
     const user = userEvent.setup()
-    vi.mocked(createProject).mockRejectedValue(
-      new DataError("validation", "A project name is required."),
+    vi.mocked(Project.Mutations.createProject).mockRejectedValue(
+      new Project.Errors.DataError("validation", "A project name is required."),
     )
     renderRoute()
 
@@ -195,7 +197,7 @@ describe("/project list", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "A project name is required.",
     )
-    expect(createProject).toHaveBeenCalledTimes(1)
+    expect(Project.Mutations.createProject).toHaveBeenCalledTimes(1)
   })
 
   // The deferred-loader pattern (here, /corpus and both detail routes) is only
@@ -203,8 +205,8 @@ describe("/project list", () => {
   // re-suspends, every action would blank its page back to a skeleton.
   it("does not flash the skeleton back in when an action revalidates", async () => {
     const user = userEvent.setup()
-    vi.mocked(listProjects).mockResolvedValue([summary])
-    vi.mocked(createProject).mockResolvedValue(summary)
+    vi.mocked(Project.Queries.listProjects).mockResolvedValue([summary])
+    vi.mocked(Project.Mutations.createProject).mockResolvedValue(summary)
     renderRoute()
     await screen.findByRole("link", { name: /Peshitta Study/ })
 
@@ -218,7 +220,7 @@ describe("/project list", () => {
 
     // A slow revalidation widens the window a re-suspend would show in.
     let resolveSecond!: (value: ProjectSummary[]) => void
-    vi.mocked(listProjects).mockReturnValueOnce(
+    vi.mocked(Project.Queries.listProjects).mockReturnValueOnce(
       new Promise((resolve) => {
         resolveSecond = resolve
       }),
@@ -228,7 +230,7 @@ describe("/project list", () => {
     await user.type(await screen.findByLabelText("Name"), "Another")
     await user.selectOptions(screen.getByLabelText("Creator"), "Ada Researcher")
     await user.click(screen.getByRole("button", { name: "Create project" }))
-    await waitFor(() => expect(listProjects).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(Project.Queries.listProjects).toHaveBeenCalledTimes(2))
 
     // Mid-revalidation the stale row is still mounted. Asserted via
     // textContent: the open dialog marks the rest of the app aria-hidden,
@@ -242,12 +244,12 @@ describe("/project list", () => {
 
   it("deletes a project only after confirmation", async () => {
     const user = userEvent.setup()
-    vi.mocked(listProjects).mockResolvedValue([summary])
-    vi.mocked(deleteProject).mockResolvedValue()
+    vi.mocked(Project.Queries.listProjects).mockResolvedValue([summary])
+    vi.mocked(Project.Mutations.deleteProject).mockResolvedValue()
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Delete" }))
-    expect(deleteProject).not.toHaveBeenCalled()
+    expect(Project.Mutations.deleteProject).not.toHaveBeenCalled()
     expect(
       await screen.findByText(/deletes the project and its references/i),
     ).toBeInTheDocument()
@@ -256,6 +258,6 @@ describe("/project list", () => {
     expect(confirm).toBeDisabled()
     await user.type(screen.getByRole("textbox"), "DELETE")
     await user.click(confirm)
-    await waitFor(() => expect(deleteProject).toHaveBeenCalledWith("p1"))
+    await waitFor(() => expect(Project.Mutations.deleteProject).toHaveBeenCalledWith("p1"))
   })
 })

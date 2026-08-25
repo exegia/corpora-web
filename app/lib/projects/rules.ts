@@ -1,5 +1,5 @@
-import type { ProjectDetail } from "@/lib/projects/types"
-import { PROJECT_STATUSES, type ProjectStatus } from "@/lib/projects/vocabulary"
+import type { ProjectDetail } from "./types"
+import { PROJECT_STATUSES, type ProjectStatus } from "./vocabulary"
 
 // ---- Status workflow (003) ------------------------------------------------
 

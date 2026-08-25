@@ -1,7 +1,7 @@
 import { zipSync } from "fflate"
 import { describe, expect, it } from "vitest"
 import { readCorpusArchive } from "@/lib/corpus/archive"
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 
 const encoder = new TextEncoder()
 
@@ -98,6 +98,6 @@ describe("corpus-archive", () => {
   it("throws a validation error for an unreadable zip", async () => {
     await expect(
       readCorpusArchive(new Blob(["not a zip at all"])),
-    ).rejects.toThrowError(DataError)
+    ).rejects.toThrowError(Project.Errors.DataError)
   })
 })

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
 import { listUsers } from "@/lib/user/users"
 
@@ -44,6 +44,6 @@ describe("listUsers", () => {
       name: "DataError",
       code: "unknown",
     })
-    await expect(listUsers()).rejects.toBeInstanceOf(DataError)
+    await expect(listUsers()).rejects.toBeInstanceOf(Project.Errors.DataError)
   })
 })

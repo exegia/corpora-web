@@ -9,7 +9,7 @@ import { Buffer } from "buffer"
 import git from "isomorphic-git"
 import type { CorpusCommitInput, HubCommit, Stats } from "./types"
 import { unzipCorpusArchive } from "./archive"
-import { DataError } from "@/lib/projects"
+import Project from "@/lib/projects"
 import { MAX_COMMITS } from "./constants"
 
 // isomorphic-git assumes the Node Buffer global; browsers don't have one and
@@ -148,7 +148,7 @@ export async function extractCorpusHistory(file: File): Promise<CorpusCommitInpu
         }))
     } catch (error) {
         console.error("[corpus-history] could not read the .git history", error)
-        throw new DataError("validation", "The corpus carries a .git directory but its history could not be read.")
+        throw new Project.Errors.DataError("validation", "The corpus carries a .git directory but its history could not be read.")
     }
 }
 

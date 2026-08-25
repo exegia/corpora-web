@@ -3,7 +3,7 @@
 // Read-only: reads `user_directory` (NOT `public.users`, which belongs to
 // corpora-auth — research R4). Route modules import ONLY from this module.
 
-import { DataError, SUPERADMIN_EMAIL } from "@/lib/projects"
+import Project, { SUPERADMIN_EMAIL } from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
 
 export interface DirectoryUser {
@@ -19,7 +19,7 @@ export async function listUsers(): Promise<DirectoryUser[]> {
     .select("id, name, username, email")
     .order("name", { ascending: true })
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not load the user directory: ${error.message ?? "unexpected error"}`,
     )
@@ -39,7 +39,7 @@ export async function getSuperadmin(): Promise<DirectoryUser | null> {
     .eq("email", SUPERADMIN_EMAIL)
     .maybeSingle()
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not load the superadmin: ${error.message ?? "unexpected error"}`,
     )

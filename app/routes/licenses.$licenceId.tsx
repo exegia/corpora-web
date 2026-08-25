@@ -17,7 +17,7 @@ import {
   saveLicenceText,
   updateLicence,
 } from "@/lib/licenses"
-import { DataError, type LicenseStatus } from "@/lib/projects"
+import Project, { type LicenseStatus } from "@/lib/projects"
 import { getSuperadmin } from "@/lib/user/users"
 
 export async function clientLoader({ params }: LoaderFunctionArgs) {
@@ -74,7 +74,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
         return { ok: false, error: "Unknown action." }
     }
   } catch (error) {
-    if (error instanceof DataError) {
+    if (error instanceof Project.Errors.DataError) {
       return { ok: false, error: error.message }
     }
     return { ok: false, error: "Something went wrong. Your change was not saved." }

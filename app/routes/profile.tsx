@@ -180,7 +180,7 @@ import RowLabel from "@/components/profile/row-label"
 import { PROFILE_INTENT, PROFILE_TAB } from "@/components/profile/constants"
 
 
-export default function Profile({ loaderData }: Route.ComponentProps) {
+export default function ProfilePage({ loaderData }: Route.ComponentProps) {
   const { profile, email, emailConfirmed } = loaderData
   const fetcher = useFetcher<typeof clientAction>()
   const fileInputRef = useRef<HTMLInputElement>(null)

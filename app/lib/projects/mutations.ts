@@ -1,8 +1,8 @@
 import { getSupabase } from "@/lib/supabase"
-import { DataError } from "@/lib/projects/errors"
-import { fail, PROJECT_COLUMNS, type ProjectRow, requireNonEmpty, toSummary } from "@/lib/projects/rows"
-import { isProjectReadOnly, refuseStatusChange } from "@/lib/projects/rules"
-import type { ProjectDetail, ProjectSummary } from "@/lib/projects/types"
+import { DataError } from "./errors"
+import { fail, PROJECT_COLUMNS, type ProjectRow, requireNonEmpty, toSummary } from "./rows"
+import { isProjectReadOnly, refuseStatusChange } from "./rules"
+import type { ProjectDetail, ProjectSummary } from "./types"
 import {
     BOOK_TYPES,
     type BookType,
@@ -14,7 +14,7 @@ import {
     languageOptionsFor,
     type ProjectStatus,
     SCRIPTURAL_TYPES,
-} from "@/lib/projects/vocabulary"
+} from "./vocabulary"
 
 /**
  * Bump projects.updated_at so list ordering reflects child activity (FR-002)

@@ -1,6 +1,6 @@
-import { DataError } from "@/lib/projects/errors"
-import type { CorpusCommit, CorpusSource, LicenseStatus, ProjectCreator, ProjectSummary } from "@/lib/projects/types"
-import type { BookType, CategoryType, LanguageType, ProjectStatus } from "@/lib/projects/vocabulary"
+import { DataError } from "./errors"
+import type { CorpusCommit, CorpusSource, LicenseStatus, ProjectCreator, ProjectSummary } from "./types"
+import type { BookType, CategoryType, LanguageType, ProjectStatus } from "./vocabulary"
 
 export interface ProjectRow {
   id: string

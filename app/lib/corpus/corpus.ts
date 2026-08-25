@@ -2,7 +2,8 @@
 /** Commit shape produced by extractCorpusHistory, before it has a row id. */
 
 import type { Json } from "@/types/database";
-import { type CorpusSource, DataError, touchProject } from "../projects";
+import type { CorpusSource } from "@/lib/projects";
+import Project from "@/lib/projects";
 import { getSupabase } from "../supabase";
 import { CORPUS_BUCKET, DOCUMENT_COLUMNS } from "./constants";
 import type { CorpusCommitInput, CorpusDocument, CorpusMetadataInput, DocumentRow } from "./types";
@@ -16,7 +17,7 @@ export async function listCorpusDocuments(): Promise<CorpusDocument[]> {
     .select(DOCUMENT_COLUMNS)
     .order("uploaded_at", { ascending: false })
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not load the corpus library: ${error.message ?? "unexpected error"}`,
     )
@@ -35,7 +36,7 @@ export async function getCorpusDocument(
     .eq("id", id)
     .maybeSingle()
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not load the corpus: ${error.message ?? "unexpected error"}`,
     )
@@ -47,14 +48,14 @@ export async function getCorpusDocument(
 /** Upload the .corpus file to the private bucket; returns its storage path. */
 export async function uploadCorpusFile(file: File): Promise<string> {
   if (!file.name.endsWith(".corpus")) {
-    throw new DataError("validation", "Pick a .corpus file.")
+    throw new Project.Errors.DataError("validation", "Pick a .corpus file.")
   }
   const path = `${crypto.randomUUID()}/${file.name}`
   const { error } = await getSupabase()
     .storage.from(CORPUS_BUCKET)
     .upload(path, file, { upsert: true })
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unavailable",
       `Could not upload the corpus: ${error.message ?? "unexpected error"}`,
     )
@@ -73,10 +74,10 @@ export async function createCorpusDocument(input: {
 } & CorpusMetadataInput): Promise<CorpusDocument> {
   const name = input.name.trim()
   if (!name) {
-    throw new DataError("validation", "A corpus name is required.")
+    throw new Project.Errors.DataError("validation", "A corpus name is required.")
   }
   if (input.source === "huggingface" && !isHuggingFaceUrl(input.path)) {
-    throw new DataError("validation", "Enter a valid Hugging Face URL.")
+    throw new Project.Errors.DataError("validation", "Enter a valid Hugging Face URL.")
   }
   const supabase = getSupabase()
   const { data, error } = await supabase
@@ -107,7 +108,7 @@ export async function createCorpusDocument(input: {
       nodes, words, status, converted_at, description, toc`)
     .single()
   if (error || !data) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not add the corpus: ${error?.message ?? "unexpected error"}`,
     )
@@ -127,7 +128,7 @@ export async function createCorpusDocument(input: {
       })),
     )
     if (inserted.error) {
-      throw new DataError(
+      throw new Project.Errors.DataError(
         "unknown",
         `Could not save the version history: ${inserted.error.message ?? "unexpected error"}`,
       )
@@ -155,7 +156,7 @@ export async function updateCorpusDocument(
   if (patch.name !== undefined) {
     const name = patch.name.trim()
     if (!name) {
-      throw new DataError("validation", "A corpus name is required.")
+      throw new Project.Errors.DataError("validation", "A corpus name is required.")
     }
     row.name = name
   }
@@ -169,7 +170,7 @@ export async function updateCorpusDocument(
     row.licence = patch.licence?.trim() || null
   }
   if (Object.keys(row).length === 0) {
-    throw new DataError("validation", "Provide at least one field to update.")
+    throw new Project.Errors.DataError("validation", "Provide at least one field to update.")
   }
   const { data, error } = await getSupabase()
     .from("corpus_documents")
@@ -178,13 +179,13 @@ export async function updateCorpusDocument(
     .select(DOCUMENT_COLUMNS)
     .maybeSingle()
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not save the corpus: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data) {
-    throw new DataError("not-found", "This corpus no longer exists.")
+    throw new Project.Errors.DataError("not-found", "This corpus no longer exists.")
   }
   return toDocument(data as unknown as DocumentRow)
 }
@@ -201,13 +202,13 @@ export async function deleteCorpusDocument(id: string): Promise<void> {
     .eq("id", id)
     .maybeSingle()
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not load the corpus: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data) {
-    throw new DataError("not-found", "This corpus no longer exists.")
+    throw new Project.Errors.DataError("not-found", "This corpus no longer exists.")
   }
   const row = data as { source: CorpusSource; path: string }
   if (row.source === "upload") {
@@ -216,7 +217,7 @@ export async function deleteCorpusDocument(id: string): Promise<void> {
   }
   const deleted = await supabase.from("corpus_documents").delete().eq("id", id)
   if (deleted.error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not delete the corpus: ${deleted.error.message ?? "unexpected error"}`,
     )
@@ -229,7 +230,7 @@ export async function attachCorpusToProject(
   documentId: string,
 ): Promise<void> {
   if (!documentId.trim()) {
-    throw new DataError("validation", "Pick a corpus to import.")
+    throw new Project.Errors.DataError("validation", "Pick a corpus to import.")
   }
   const { data, error } = await getSupabase()
     .from("projects")
@@ -241,13 +242,13 @@ export async function attachCorpusToProject(
     .select("id")
     .maybeSingle()
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not import the corpus: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data) {
-    throw new DataError("not-found", "This project no longer exists.")
+    throw new Project.Errors.DataError("not-found", "This project no longer exists.")
   }
 }
 
@@ -260,14 +261,14 @@ export async function detachCorpusFromProject(projectId: string): Promise<void> 
     .select("id")
     .maybeSingle()
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not detach the corpus: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data) {
-    throw new DataError("not-found", "This project no longer exists.")
+    throw new Project.Errors.DataError("not-found", "This project no longer exists.")
   }
-  await touchProject(projectId)
+  await Project.Mutations.touchProject(projectId)
 }
 

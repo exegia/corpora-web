@@ -1,4 +1,4 @@
-import { DataError, touchProject } from "@/lib/projects"
+import Project from "@/lib/projects"
 import { getSupabase } from "@/lib/supabase"
 
 /**
@@ -12,10 +12,10 @@ export async function attachLicence(
   agreedByUserId: string,
 ): Promise<void> {
   if (!licenceId.trim()) {
-    throw new DataError("validation", "Pick a licence to attach.")
+    throw new Project.Errors.DataError("validation", "Pick a licence to attach.")
   }
   if (!agreedByUserId.trim()) {
-    throw new DataError("validation", "An agreeing user is required.")
+    throw new Project.Errors.DataError("validation", "An agreeing user is required.")
   }
   const { error } = await getSupabase().from("project_licences").insert({
     project_id: projectId,
@@ -24,17 +24,17 @@ export async function attachLicence(
   })
   if (error) {
     if (error.code === "23505") {
-      throw new DataError(
+      throw new Project.Errors.DataError(
         "already-attached",
         "This licence is already attached to the project.",
       )
     }
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not attach the licence: ${error.message ?? "unexpected error"}`,
     )
   }
-  await touchProject(projectId)
+  await Project.Mutations.touchProject(projectId)
 }
 
 /**
@@ -48,7 +48,7 @@ export async function agreeLicence(
   agreedByUserId: string,
 ): Promise<void> {
   if (!agreedByUserId.trim()) {
-    throw new DataError("validation", "An agreeing user is required.")
+    throw new Project.Errors.DataError("validation", "An agreeing user is required.")
   }
   const { data, error } = await getSupabase()
     .from("project_licences")
@@ -60,15 +60,15 @@ export async function agreeLicence(
     .eq("licence_id", licenceId)
     .select("licence_id")
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not record the agreement: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data || data.length === 0) {
-    throw new DataError("not-found", "This licence is not attached to the project.")
+    throw new Project.Errors.DataError("not-found", "This licence is not attached to the project.")
   }
-  await touchProject(projectId)
+  await Project.Mutations.touchProject(projectId)
 }
 
 /** Detach one licence; the project's other licences are untouched (FR-013). */
@@ -83,13 +83,13 @@ export async function detachLicence(
     .eq("licence_id", licenceId)
     .select("licence_id")
   if (error) {
-    throw new DataError(
+    throw new Project.Errors.DataError(
       "unknown",
       `Could not remove the licence: ${error.message ?? "unexpected error"}`,
     )
   }
   if (!data || data.length === 0) {
-    throw new DataError("not-found", "This licence is not attached to the project.")
+    throw new Project.Errors.DataError("not-found", "This licence is not attached to the project.")
   }
-  await touchProject(projectId)
+  await Project.Mutations.touchProject(projectId)
 }
