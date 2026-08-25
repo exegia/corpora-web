@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useFetcher } from "react-router"
 import { toastManager } from "@/components/ui/toast"
 import { uploadCorpusFile } from "@/lib/corpus/corpus"
-import { extractCorpusHistory } from "@/lib/corpus/corpus-history"
+import { extractCorpusHistory } from "@/lib/corpus/history"
 import { DataError } from "@/lib/projects"
 
 export interface CorpusUploadController {

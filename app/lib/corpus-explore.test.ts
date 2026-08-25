@@ -8,7 +8,7 @@ import {
   sectionsFromIndex,
   slotForToken,
   structureRootFromIndex,
-} from "@/lib/corpus/corpus-explore"
+} from "@/lib/corpus/explore"
 
 const index: CorpusIndex = {
   toc: null,

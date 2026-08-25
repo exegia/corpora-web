@@ -9,7 +9,7 @@ import {
   CardFrameHeader,
   CardPanel,
 } from "@/components/ui/card"
-import { formatBytes } from "@/lib/corpus/corpus-convert"
+import { formatBytes } from "@/lib/corpus/convert"
 import { formatDate } from "@/lib/format"
 import type { FileSummaryProps } from "./types"
 import { conversionTone, extensionBadge, isDone } from "./utils"

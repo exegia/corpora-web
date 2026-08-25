@@ -1,6 +1,6 @@
 import { zipSync } from "fflate"
 import { describe, expect, it } from "vitest"
-import { readCorpusArchive } from "@/lib/corpus/corpus-archive"
+import { readCorpusArchive } from "@/lib/corpus/archive"
 import { DataError } from "@/lib/projects"
 
 const encoder = new TextEncoder()

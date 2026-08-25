@@ -21,7 +21,7 @@ import type { CorpusDocument } from "@/lib/corpus/corpus"
 import {
   structureNodeFromSection,
   structureRootFromIndex,
-} from "@/lib/corpus/corpus-explore"
+} from "@/lib/corpus/explore"
 import Panel from "./panel"
 import type { StructureNode } from "./types"
 import { formatCount } from "./utils"

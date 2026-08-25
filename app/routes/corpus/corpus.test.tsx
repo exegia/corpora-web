@@ -9,10 +9,10 @@ import {
   uploadCorpusFile,
 } from "@/lib/corpus/corpus"
 import type { CorpusDocument } from "@/lib/corpus/corpus"
-import { readCorpusArchive } from "@/lib/corpus/corpus-archive"
-import { runConversion } from "@/lib/corpus/corpus-convert"
-import type { ConversionEntry, ConversionLog } from "@/lib/corpus/corpus-convert"
-import { extractCorpusHistory } from "@/lib/corpus/corpus-history"
+import { readCorpusArchive } from "@/lib/corpus/archive"
+import { runConversion } from "@/lib/corpus/convert"
+import type { ConversionEntry, ConversionLog } from "@/lib/corpus/convert"
+import { extractCorpusHistory } from "@/lib/corpus/history"
 import { AppLayout } from "@/components/layouts/app-layout"
 import CorpusRoute, { clientAction, clientLoader } from "@/routes/corpus/index"
 
@@ -27,7 +27,7 @@ vi.mock("@/lib/corpus", () => ({
 // Only the transport is scripted; the pure derivations stay real so the
 // drawer renders exactly what a real run would.
 vi.mock("@/lib/corpus-convert", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/corpus/corpus-convert")>()),
+  ...(await importOriginal<typeof import("@/lib/corpus/convert")>()),
   runConversion: vi.fn(),
 }))
 

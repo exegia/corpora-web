@@ -8,14 +8,14 @@ import {
   MAX_UPLOAD_BYTES,
   SUPPORTED_EXTENSIONS,
 } from "@/lib/api/methods"
-import { readCorpusArchive } from "@/lib/corpus/corpus-archive"
+import { readCorpusArchive } from "@/lib/corpus/archive"
 import {
   createConversionEntry,
   libraryTitle,
   runConversion,
-} from "@/lib/corpus/corpus-convert"
-import type { ConversionEntry, ConversionStepId } from "@/lib/corpus/corpus-convert"
-import { extractCorpusHistory } from "@/lib/corpus/corpus-history"
+} from "@/lib/corpus/convert"
+import type { ConversionEntry, ConversionStepId } from "@/lib/corpus/convert"
+import { extractCorpusHistory } from "@/lib/corpus/history"
 
 export interface ConversionController {
   entry: ConversionEntry | null

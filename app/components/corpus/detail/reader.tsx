@@ -15,7 +15,7 @@ import type {
   PassageToken,
 } from "@/lib/api/methods"
 import { fetchCorpusContent, fetchCorpusNode } from "@/lib/api/methods"
-import { findIndexItem, lemmaFromNode, slotForToken } from "@/lib/corpus/corpus-explore"
+import { findIndexItem, lemmaFromNode, slotForToken } from "@/lib/corpus/explore"
 import { cn } from "@/lib/utils"
 import Panel from "./panel"
 import WordPanel from "./word-panel"

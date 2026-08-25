@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   fetchHuggingFaceHistory,
   huggingFaceCommitsEndpoint,
-} from "@/lib/corpus/corpus-history"
+} from "@/lib/corpus/history"
 
 afterEach(() => {
   vi.unstubAllGlobals()

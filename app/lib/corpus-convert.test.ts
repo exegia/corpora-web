@@ -15,8 +15,8 @@ import {
   formatBytes,
   libraryTitle,
   runConversion,
-} from "@/lib/corpus/corpus-convert"
-import type { ConversionEntry } from "@/lib/corpus/corpus-convert"
+} from "@/lib/corpus/convert"
+import type { ConversionEntry } from "@/lib/corpus/convert"
 
 // The transport is mocked at the corpora-api seam; the derivations stay
 // real, so these tests exercise exactly what the drawer will render.

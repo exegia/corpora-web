@@ -34,7 +34,7 @@ import {
   loadCorpusArchive,
   restoreCorpusVersion,
 } from "@/lib/api/methods"
-import { sectionsFromIndex } from "@/lib/corpus/corpus-explore"
+import { sectionsFromIndex } from "@/lib/corpus/explore"
 import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import { DataError } from "@/lib/projects"
