@@ -7,8 +7,12 @@
 // specs/004-connect-with-py/research.md R1). Route modules import ONLY from
 // this module.
 
-import { createConversion, downloadConversion, getConversion, validateConversion } from "@/lib/api/methods"
-import { CorporaApiError, type JobStatusMessage, SUPPORTED_EXTENSIONS, detectSourceFormat } from "../api"
+import CorporaApi, {
+    CorporaApiError,
+    detectSourceFormat,
+    type JobStatusMessage,
+    SUPPORTED_EXTENSIONS,
+} from "../api"
 import {
     ACTIVE_STEP,
     CONVERSION_STEPS,
@@ -210,7 +214,7 @@ export async function runConversion(
 
     let jobId: string
     try {
-        ;({ jobId } = await createConversion({
+        ;({ jobId } = await CorporaApi.createConversion({
             file,
             sourceFormat: entry.sourceFormat as never,
             name: entry.name.replace(/\.[^.]+$/, ""),
@@ -239,7 +243,7 @@ export async function runConversion(
 
         let job: JobStatusMessage
         try {
-            job = await getConversion(jobId)
+            job = await CorporaApi.getConversion(jobId)
             reachedJob = true
         } catch (error) {
             // Vercel fan-out: the first polls can land on an instance that never
@@ -277,7 +281,7 @@ export async function runConversion(
         { status: "validating", validation: { status: "running" } },
         { step: "index", text: "> Validating dataset…", tone: "info" }
     )
-    const report = await validateConversion(jobId)
+    const report = await CorporaApi.validateConversion(jobId)
     if (signal?.aborted) return entry
     if (report.status === "valid") {
         const slots = report.stats?.max_slot
@@ -305,7 +309,7 @@ export async function runConversion(
 
     let blob: Blob
     try {
-        blob = await downloadConversion(jobId)
+        blob = await CorporaApi.downloadConversion(jobId)
     } catch (error) {
         return fail("index", message(error))
     }
