@@ -1,43 +1,39 @@
 # Implementation Plan: AI Assistant Panel for the Corpus Reader
 
-**Spec**: `specs/005-ai-assistant-panel/spec.md`
+**Spec**: `specs/005-ai-assistant-panel/spec.md` (revised 2026-08-28 — curation model)
 **Design**: Sketch "corpora - claude" · page "Corpus - ai chat" · frames AI 1–AI 8
 
 ## Approach
 
-Ship the read path first, then the write path, then hardening — each phase independently releasable, mapping to the spec's prioritized user stories. The panel is a right-hand column of the corpus Documents route (reader shrinks from full width, per frames AI 2–AI 7); state lives outside the route so threads survive navigation (FR-012).
+Curation tool, not research chat. Read path and write path are both P1 because the write path is now small: no approval flow — Apply writes to the working version and version history does the accounting. The panel is a full-height right rail; thread state lives outside the route so it survives navigation.
 
 ## Phases
 
-### Phase 1 — Scoped ask (US1) · read-only
-- Selection → scope resolution (word/passage/articulus/quaestio/corpus; range clamping).
-- Panel shell: scope chip, suggested prompts, composer, keyboard/focus contract (FR-015).
-- Streaming answers: live region, stop, generated marker, paragraph citations.
-- Entry point behind a temporary "Open AI panel ⌘J" affordance until the AI 8 alternate decision lands.
+### Phase 1 — Add to chat + scoped panel
+- Popover: append the single "Add to chat" action (⌘J) to every selection popover; node-summary popover for non-word selections. Lemma popover untouched.
+- Scope resolver (word/passage/articulus/quaestio/corpus; ¶-ranges; articulus clamping).
+- Panel shell: scope chip, curation prompts, composer, keyboard/focus contract; streaming with live region + Stop.
 
-### Phase 2 — Proposals (US2 + US3) · write path
-- Proposal cards with diff rendering (annotation diffs first — smallest surface; text diffs second).
-- Apply → draft revision integration; Undo; version-bound staleness (subscribe to revision changes).
-- Provenance: reader marks (underline + ◆), apparatus record, TEI/citation export attribution. **Apply and provenance ship together — an apply without provenance must not exist.**
+### Phase 2 — Context-Fabric validation + apply
+- Wire the Context-Fabric MCP: validate scoped nodes (boundaries, labels, features); findings with node ids + observable consequences.
+- Suggested-fix cards (diff, generated rationale); Apply → immediate write to working version; Undo; version-bound staleness with content-hash guard.
+- Version-history entries: AI + applying user, node id, previous value; reader marks (underline + ◆); export attribution.
 
-### Phase 3 — Scope model + degradation (US4)
-- Scope picker listbox; thread pinning across navigation; explicit re-scope forking.
-- Corpus-scope commands routed through the #100 confirmation gate.
-- Degraded states: published/read-only, insufficient rights, model unavailable.
-
-### Phase 4 — Entry-point decision + polish
-- Resolve AI 8 alternates (verb-first vs single "Ask AI" row) with a usability pass; wire the winner into the word popover without regressing lemma/POS/frequency.
+### Phase 3 — Scope model + degradation
+- Scope picker listbox; thread pinning; explicit re-scope forking.
+- Corpus-scope commands through the #100 confirmation gate (working drafts only).
+- Degraded states: published/locked, missing rights, model unavailable.
 
 ## Risks
 
-- **Provenance-in-export is the correctness core**: if TEI/citation export cannot carry `resp` + variants yet, Phase 2 must extend the exporter first — do not ship apply without it.
-- **Staleness detection** depends on reliable version signals from the Activity/versions work (#80–#84); if change records lag, proposals could apply against moved text. Mitigate with content-hash check at apply time.
-- **Scope clamping** needs the reader's node addressing (quaestio/articulus/¶ ids) to be stable across revisions.
-- **A11y**: streaming + live regions are easy to get wrong; test with VoiceOver early in Phase 1, not at the end.
+- **No approval gate means tracking is the only safety net** — version-history write must be transactional with the change itself; a change that isn't recorded must not land.
+- **Validation scope**: the panel can fix features/labels/formatting; slot-level corruption needs a walker re-run — the assistant must say so, not fake a fix.
+- **Staleness** depends on version signals (#80–#84); guard with content-hash at apply.
+- **A11y**: live regions for streaming and apply; test with VoiceOver in Phase 1.
 
 ## Dependencies
 
-- Versioning / draft revisions / Activity (#80, #83, #84) — substrate for apply, undo, stale.
-- #100 — confirmation gate for corpus-wide writes (Phase 3).
-- #54 — Profile AI tab for provider configuration (consumed, not owned).
-- Auth/roles from `corpora-auth` for the rights-based degradation (falls back to read-only-for-all until roles land).
+- Version history / Activity (#80, #83, #84) — substrate for tracking, undo, stale.
+- Context-Fabric MCP (schema + TF/RC validation) — the suggestion engine.
+- #100 — confirmation gate for corpus-wide writes.
+- #54 — provider configuration (consumed).
