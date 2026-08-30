@@ -12,7 +12,10 @@ import Panel from "./panel"
 import { formatDateTime } from "./utils"
 import type { ActivityEvent, VersionEntry } from "./types"
 
-function activityFor(document: CorpusDocument): ActivityEvent[] {
+function activityFor(
+  document: CorpusDocument,
+  versions: VersionEntry[] = [],
+): ActivityEvent[] {
   const events: ActivityEvent[] = []
   if (document.convertedAt) {
     events.push({
@@ -35,13 +38,18 @@ function activityFor(document: CorpusDocument): ActivityEvent[] {
     at: document.uploadedAt,
     accent: !document.convertedAt,
   })
-  events.push({
-    id: "created",
-    title: "Corpus created",
-    detail: "Added to the library",
-    at: document.uploadedAt,
-    accent: false,
-  })
+  // history.yml's v1.0 row is the authoritative creation event. Keeping the
+  // local fallback is useful while no history exists, but showing both would
+  // make one upload look like two corpus creations.
+  if (!versions.some((version) => version.label === "v1.0")) {
+    events.push({
+      id: "created",
+      title: "Corpus created",
+      detail: "Added to the library",
+      at: document.uploadedAt,
+      accent: false,
+    })
+  }
   return events
 }
 
@@ -189,7 +197,6 @@ export default function Activity({
   document: CorpusDocument
   archive: CorpusArchive | null
 }) {
-  const events = activityFor(document)
   const archiveKey = archive ? `${archive.kind}:${archive.key}` : ""
   const jobId = archive?.kind === "job" ? archive.key : null
   const fetchers = useFetchers()
@@ -246,6 +253,7 @@ export default function Activity({
     ? [...remote].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
     : []
   const loading = Boolean(archive) && fetchedKey !== archiveKey
+  const events = activityFor(document, versions)
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">

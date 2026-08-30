@@ -76,6 +76,7 @@ describe("Activity", () => {
     expect(screen.getByRole("heading", { name: "Activity" })).toBeInTheDocument()
     expect(screen.getByText("Conversion succeeded")).toBeInTheDocument()
     expect(screen.getByText("Upload received")).toBeInTheDocument()
+    expect(screen.getByText("Corpus created")).toBeInTheDocument()
   })
 
   it("renders API versions with files, author, and approver", async () => {
@@ -109,6 +110,7 @@ describe("Activity", () => {
     expect(screen.getByText("Approved by Grace")).toBeInTheDocument()
     expect(screen.getByText("— Initial package")).toBeInTheDocument()
     expect(screen.queryByText("Initial upload")).not.toBeInTheDocument()
+    expect(screen.queryByText("Corpus created")).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument()
   })
 
