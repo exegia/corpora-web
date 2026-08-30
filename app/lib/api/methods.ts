@@ -5,6 +5,7 @@ import {
     type ContentResponse,
     CorporaApiError,
     type CorpusArchive,
+    type CorpusVersionDiff,
     type CorpusIndex,
     type CorpusNode,
     type ExploreRef,
@@ -157,6 +158,21 @@ export async function fetchCorpusNode(ref: ExploreRef, node: number): Promise<Co
 export async function fetchCorpusVersions(ref: ExploreRef): Promise<VersionsResponse> {
     const response = await apiFetch(`${exploreBase(ref)}/versions`)
     return (await response.json()) as VersionsResponse
+}
+
+/** GET /convert/{job_id}/diff — a read-only path-level snapshot diff. */
+export async function fetchCorpusVersionDiff(
+    ref: ExploreRef,
+    from: string,
+    to: string,
+): Promise<CorpusVersionDiff> {
+    if (ref.kind !== "job") {
+        throw new CorporaApiError("read-only", "Diff is only available for converted library corpora.")
+    }
+    const response = await apiFetch(
+        withQuery(`${exploreBase(ref)}/diff`, { from, to }),
+    )
+    return (await response.json()) as CorpusVersionDiff
 }
 
 /** POST /convert/{job_id}/restore — job-scoped only (issue #82 / py#148). */

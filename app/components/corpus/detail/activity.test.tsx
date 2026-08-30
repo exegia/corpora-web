@@ -1,5 +1,6 @@
 import type { ReactElement } from "react"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import CorporaApi from "@/lib/api"
@@ -14,6 +15,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
     default: {
       ...original.default,
       fetchCorpusVersions: vi.fn(async () => ({ versions: [] })),
+      fetchCorpusVersionDiff: vi.fn(),
     },
   }
 })
@@ -62,6 +64,7 @@ const archive: CorpusArchive = {
 beforeEach(() => {
   vi.mocked(CorporaApi.fetchCorpusVersions).mockReset()
   vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({ versions: [] })
+  vi.mocked(CorporaApi.fetchCorpusVersionDiff).mockReset()
 })
 
 describe("Activity", () => {
@@ -139,6 +142,92 @@ describe("Activity", () => {
     expect(
       newest.compareDocumentPosition(oldest) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
+  })
+
+  it("compares two selected job versions and lists changed files", async () => {
+    const user = userEvent.setup()
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
+      versions: [
+        {
+          id: "v2",
+          label: "v1.1",
+          title: "Now",
+          at: "2026-08-09T10:00:00Z",
+          current: true,
+        },
+        {
+          id: "v1",
+          label: "v1.0",
+          title: "Converted",
+          at: "2026-08-08T13:14:00Z",
+          current: false,
+        },
+      ],
+    })
+    vi.mocked(CorporaApi.fetchCorpusVersionDiff).mockResolvedValue({
+      from: { id: "v1", label: "v1.0" },
+      to: { id: "v2", label: "v1.1" },
+      files: [
+        {
+          path: "manifest.yml",
+          kind: "modified",
+          before: { size: 100 },
+          after: { size: 120 },
+        },
+      ],
+    })
+
+    renderActivity(<Activity archive={archive} document={document} />)
+    await screen.findByText("v1.0")
+    await user.click(screen.getByRole("checkbox", { name: "Select v1.0 for comparison" }))
+    await user.click(screen.getByRole("checkbox", { name: "Select v1.1 for comparison" }))
+    await user.click(screen.getByRole("button", { name: "Compare" }))
+
+    expect(
+      await screen.findByRole("heading", { name: "Changes from v1.0 to v1.1" }),
+    ).toBeInTheDocument()
+    expect(screen.getByText("manifest.yml")).toBeInTheDocument()
+    expect(CorporaApi.fetchCorpusVersionDiff).toHaveBeenCalledWith(
+      archive,
+      "v1",
+      "v2",
+    )
+  })
+
+  it("shows diff failures inline instead of clearing the Activity tab", async () => {
+    const user = userEvent.setup()
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
+      versions: [
+        {
+          id: "v1",
+          label: "v1.0",
+          title: "Converted",
+          at: "2026-08-08T13:14:00Z",
+          current: false,
+        },
+        {
+          id: "v2",
+          label: "v1.1",
+          title: "Now",
+          at: "2026-08-09T10:00:00Z",
+          current: true,
+        },
+      ],
+    })
+    vi.mocked(CorporaApi.fetchCorpusVersionDiff).mockRejectedValue(
+      new Error("Version v1.1 was not found."),
+    )
+
+    renderActivity(<Activity archive={archive} document={document} />)
+    await screen.findByText("v1.0")
+    await user.click(screen.getByRole("checkbox", { name: "Select v1.0 for comparison" }))
+    await user.click(screen.getByRole("checkbox", { name: "Select v1.1 for comparison" }))
+    await user.click(screen.getByRole("button", { name: "Compare" }))
+
+    expect(
+      await screen.findByRole("alert", { name: "Version comparison error" }),
+    ).toHaveTextContent("Version v1.1 was not found.")
+    expect(screen.getByRole("heading", { name: "Activity" })).toBeInTheDocument()
   })
 
   it("enables Restore on a non-current version for a job-scoped archive", async () => {
