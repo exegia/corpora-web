@@ -210,6 +210,23 @@ export interface VersionsResponse {
     versions: CorpusVersion[]
 }
 
+export interface CorpusVersionDiffMember {
+    size: number
+}
+
+export interface CorpusVersionDiffFile {
+    path: string
+    kind: CorpusVersionFileKind
+    before?: CorpusVersionDiffMember
+    after?: CorpusVersionDiffMember
+}
+
+export interface CorpusVersionDiff {
+    from: Pick<CorpusVersion, "id" | "label">
+    to: Pick<CorpusVersion, "id" | "label">
+    files: CorpusVersionDiffFile[]
+}
+
 export interface CorpusArchive extends ExploreRef {
     index: CorpusIndex
 }
