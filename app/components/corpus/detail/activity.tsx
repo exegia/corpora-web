@@ -3,16 +3,24 @@ import { useFetchers } from "react-router"
 import { Blocks } from "@/components/blocks"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toastManager } from "@/components/ui/toast"
-import CorporaApi, { type CorpusArchive, type CorpusVersion } from "@/lib/api"
+import CorporaApi, {
+  type CorpusArchive,
+  type CorpusVersion,
+  type CorpusVersionDiff,
+} from "@/lib/api"
 import type { CorpusDocument } from "@/lib/corpus"
 import { formatSize } from "../list/utils"
 import Panel from "./panel"
 import { formatDateTime } from "./utils"
 import type { ActivityEvent, VersionEntry } from "./types"
 
-function activityFor(document: CorpusDocument): ActivityEvent[] {
+function activityFor(
+  document: CorpusDocument,
+  versions: VersionEntry[] = [],
+): ActivityEvent[] {
   const events: ActivityEvent[] = []
   if (document.convertedAt) {
     events.push({
@@ -35,13 +43,18 @@ function activityFor(document: CorpusDocument): ActivityEvent[] {
     at: document.uploadedAt,
     accent: !document.convertedAt,
   })
-  events.push({
-    id: "created",
-    title: "Corpus created",
-    detail: "Added to the library",
-    at: document.uploadedAt,
-    accent: false,
-  })
+  // history.yml's v1.0 row is the authoritative creation event. Keeping the
+  // local fallback is useful while no history exists, but showing both would
+  // make one upload look like two corpus creations.
+  if (!versions.some((version) => version.label === "v1.0")) {
+    events.push({
+      id: "created",
+      title: "Corpus created",
+      detail: "Added to the library",
+      at: document.uploadedAt,
+      accent: false,
+    })
+  }
   return events
 }
 
@@ -70,9 +83,17 @@ function actorName(
 function VersionRow({
   version,
   jobId,
+  compareEnabled,
+  selected,
+  comparisonDisabled,
+  onToggleComparison,
 }: {
   version: VersionEntry
   jobId: string | null
+  compareEnabled: boolean
+  selected: boolean
+  comparisonDisabled: boolean
+  onToggleComparison: (selected: boolean) => void
 }) {
   const author = actorName(version.author)
   const approver = actorName(version.approved_by)
@@ -88,6 +109,14 @@ function VersionRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
+            {compareEnabled ? (
+              <Checkbox
+                aria-label={`Select ${version.label} for comparison`}
+                checked={selected}
+                disabled={comparisonDisabled}
+                onCheckedChange={(checked) => onToggleComparison(checked === true)}
+              />
+            ) : null}
             <span className="font-medium">{version.label}</span>
             {version.current && (
               <Badge size="sm" variant="outline">
@@ -145,6 +174,66 @@ function VersionRow({
   )
 }
 
+function DiffPanel({
+  diff,
+  loading,
+  error,
+}: {
+  diff: CorpusVersionDiff | null
+  loading: boolean
+  error: string | null
+}) {
+  if (loading) {
+    return (
+      <div aria-label="Loading version comparison" className="mt-4 flex flex-col gap-2" role="status">
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-8 w-5/6" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div
+        aria-label="Version comparison error"
+        className="mt-4 rounded-lg border border-destructive/40 bg-destructive/8 p-3 text-destructive text-sm"
+        role="alert"
+      >
+        Could not compare the selected versions. {error}
+      </div>
+    )
+  }
+
+  if (!diff) return null
+
+  return (
+    <div className="mt-4 rounded-lg border bg-muted/20 p-3">
+      <h3 className="font-medium text-sm">
+        Changes from {diff.from.label} to {diff.to.label}
+      </h3>
+      {diff.files.length === 0 ? (
+        <p className="mt-2 text-muted-foreground text-sm">No file changes.</p>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-1 text-sm">
+          {diff.files.map((file) => (
+            <li className="flex flex-wrap items-baseline gap-x-2 gap-y-1" key={`${file.kind}:${file.path}`}>
+              <span className="font-medium capitalize">{file.kind}</span>
+              <code>{file.path}</code>
+              {(file.before || file.after) && (
+                <span className="text-muted-foreground text-xs">
+                  {file.before ? `${formatSize(file.before.size)} before` : "New"}{" "}
+                  → {file.after ? `${formatSize(file.after.size)} after` : "Removed"}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function EventRow({ event }: { event: ActivityEvent }) {
   return (
     <li className="flex items-start gap-3 border-b py-3 last:border-0">
@@ -189,7 +278,6 @@ export default function Activity({
   document: CorpusDocument
   archive: CorpusArchive | null
 }) {
-  const events = activityFor(document)
   const archiveKey = archive ? `${archive.kind}:${archive.key}` : ""
   const jobId = archive?.kind === "job" ? archive.key : null
   const fetchers = useFetchers()
@@ -201,6 +289,10 @@ export default function Activity({
   const toastedError = useRef<string | null>(null)
   const [fetchedKey, setFetchedKey] = useState<string | null>(null)
   const [remote, setRemote] = useState<VersionEntry[]>([])
+  const [comparisonIds, setComparisonIds] = useState<string[]>([])
+  const [diff, setDiff] = useState<CorpusVersionDiff | null>(null)
+  const [diffError, setDiffError] = useState<string | null>(null)
+  const [diffLoading, setDiffLoading] = useState(false)
 
   useEffect(() => {
     if (restoreFetcher?.state !== "idle") return
@@ -228,11 +320,19 @@ export default function Activity({
     CorporaApi.fetchCorpusVersions(archive)
       .then((body) => {
         if (cancelled) return
+        setComparisonIds([])
+        setDiff(null)
+        setDiffError(null)
+        setDiffLoading(false)
         setRemote((body.versions ?? []).map(toVersionEntry))
         setFetchedKey(archiveKey)
       })
       .catch(() => {
         if (!cancelled) {
+          setComparisonIds([])
+          setDiff(null)
+          setDiffError(null)
+          setDiffLoading(false)
           setRemote([])
           setFetchedKey(archiveKey)
         }
@@ -246,6 +346,38 @@ export default function Activity({
     ? [...remote].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
     : []
   const loading = Boolean(archive) && fetchedKey !== archiveKey
+  const events = activityFor(document, versions)
+  const selectedVersions = comparisonIds
+    .map((id) => versions.find((version) => version.id === id))
+    .filter((version): version is VersionEntry => version != null)
+
+  function toggleComparison(id: string, selected: boolean) {
+    setComparisonIds((current) => {
+      if (selected) {
+        if (current.includes(id) || current.length >= 2) return current
+        return [...current, id]
+      }
+      return current.filter((currentId) => currentId !== id)
+    })
+    setDiff(null)
+    setDiffError(null)
+  }
+
+  async function compareSelectedVersions() {
+    if (archive?.kind !== "job" || selectedVersions.length !== 2) return
+    const [from, to] = selectedVersions
+    if (!from || !to) return
+    setDiffLoading(true)
+    setDiff(null)
+    setDiffError(null)
+    try {
+      setDiff(await CorporaApi.fetchCorpusVersionDiff(archive, from.id, to.id))
+    } catch (error) {
+      setDiffError(error instanceof Error ? error.message : "The comparison failed.")
+    } finally {
+      setDiffLoading(false)
+    }
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
@@ -262,11 +394,44 @@ export default function Activity({
         ) : versions.length === 0 ? (
           <p className="text-muted-foreground text-sm">No version history yet.</p>
         ) : (
-          <ol className="relative ms-1 border-s border-border ps-4">
-            {versions.map((version) => (
-              <VersionRow jobId={jobId} key={version.id} version={version} />
-            ))}
-          </ol>
+          <>
+            {versions.length > 1 && archive?.kind === "job" && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 p-3">
+                <div>
+                  <p className="font-medium text-sm">Compare versions</p>
+                  <p className="text-muted-foreground text-xs">
+                    Select two versions to see which archive files changed.
+                  </p>
+                </div>
+                <Button
+                  disabled={selectedVersions.length !== 2 || diffLoading}
+                  onClick={compareSelectedVersions}
+                  size="sm"
+                  type="button"
+                >
+                  Compare
+                </Button>
+              </div>
+            )}
+            <ol className="relative ms-1 border-s border-border ps-4">
+              {versions.map((version) => (
+                <VersionRow
+                  compareEnabled={archive?.kind === "job" && versions.length > 1}
+                  comparisonDisabled={
+                    comparisonIds.length >= 2 && !comparisonIds.includes(version.id)
+                  }
+                  jobId={jobId}
+                  key={version.id}
+                  onToggleComparison={(selected) => toggleComparison(version.id, selected)}
+                  selected={comparisonIds.includes(version.id)}
+                  version={version}
+                />
+              ))}
+            </ol>
+            {archive?.kind === "job" && (
+              <DiffPanel diff={diff} error={diffError} loading={diffLoading} />
+            )}
+          </>
         )}
       </Panel>
       <Panel bodyClassName="p-0 px-4" title="Activity">
