@@ -1,5 +1,5 @@
+import type { LinkedIdentity } from "@/components/auth/types"
 import { SOCIAL_PROVIDERS } from "@exegia/corpora-ui"
-import type { LinkedIdentity } from "@exegia/corpora-ui"
 import { motion } from "motion/react"
 import { Brand } from "@/components/brand-marks"
 import { Button } from "@/components/ui/button"

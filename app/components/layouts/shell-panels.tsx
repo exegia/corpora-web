@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react"
-import type { ShellPanelControls } from "@exegia/corpora-ui"
+import type { IShellPanelControls as ShellPanelControls } from "@exegia/corpora-ui"
 
 /**
  * The layout's one `useShellPanels()` instance, shared down the tree.

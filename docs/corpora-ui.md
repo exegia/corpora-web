@@ -90,3 +90,25 @@ subpaths to `optimizeDeps.include` in `vite.config.ts` (see
 Keep `bun.lock` committed and in sync — CI installs with `--frozen-lockfile`, so
 bumping a range in `package.json` without re-resolving fails the build before
 anything compiles.
+
+## Upgrading from 0.28 to 2.0
+
+The app pins `@exegia/corpora-ui` 2.0.0, its Jotai 3.0.0 peer, and Base UI
+1.8.0. Align the app's Base UI version with the library so composed controls
+share one set of contexts.
+
+The 2.x package renamed public types, including `TButtonProps`, `TInputProps`,
+`TAuthAccent`, `IFileIconProps`, `IShellPanelControls`, `ITreeNode`, and
+`TProfileCardItem`. App adapters alias these to their existing local names.
+Social-provider and linked-identity types are no longer exported at the package
+root; `app/components/auth/types.ts` derives them from public component contracts.
+Do not import private package paths to recover those types.
+
+`useUISounds()` calls the library's `bindSounds()` after applying the saved mute
+preference. Binding cuelume directly handles delegated pointer events but leaves
+the library's imperative keyboard cues disabled.
+
+The OTP block now includes a "Verification code" label alongside its title.
+Tests waiting for the screen should match the exact "Enter verification code"
+title to avoid an ambiguous text query. Vite's explicit prebundle list includes
+the new 2.x runtime imports as well as the existing Base UI subpaths.

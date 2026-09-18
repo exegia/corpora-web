@@ -29,6 +29,21 @@ export default defineConfig({
     optimizeDeps: {
         include: [
             "@exegia/corpora-ui",
+            // External runtime imports introduced by corpora-ui 2.x.
+            "@exegia/specular",
+            "@exegia/specular/merge",
+            "@omsimos/react-highlight-popover",
+            "@samasante/liquid-glass",
+            "cn",
+            "frimousse",
+            "iconsax-reactjs",
+            "jotai",
+            "lucide",
+            "morphicons/react",
+            "motion-icons-react",
+            "motion-panels",
+            "react-markdown",
+            "recharts",
             "@exegia/plugin-supabase-auth",
             "@exegia/plugin-supabase-auth/web",
             "@exegia/use-auth",

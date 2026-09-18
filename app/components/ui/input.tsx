@@ -1,1 +1,1 @@
-export { Input, InputPrimitive, type InputProps } from "@exegia/corpora-ui";
+export { Input, InputPrimitive, type TInputProps as InputProps } from "@exegia/corpora-ui";

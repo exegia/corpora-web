@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx vitest *)",
+      "WebFetch(domain:coss.com)",
+      "Bash(bun add *)",
+      "Bash(git -C /Users/emmanuel/Desktop/Projects/corpora-apps/corpora-auth status)",
+      "Bash(git -C /Users/emmanuel/Desktop/Projects/corpora-apps/corpora-auth branch -a)"
+    ]
+  }
+}

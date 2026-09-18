@@ -1,5 +1,5 @@
+import type { SocialProvider, LinkedIdentity } from "@/components/auth/types"
 import { SOCIAL_PROVIDERS } from "@exegia/corpora-ui"
-import type { LinkedIdentity, SocialProvider } from "@exegia/corpora-ui"
 import type { Identity } from "@/lib/auth"
 
 /** Narrows a GoTrue provider string to one the block can draw an icon for. */

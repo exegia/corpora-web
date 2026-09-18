@@ -1,4 +1,4 @@
-import { type FileIconProps, FileWordmarkCorpus } from "@exegia/corpora-ui"
+import { type IFileIconProps as FileIconProps, FileWordmarkCorpus } from "@exegia/corpora-ui"
 import type { ComponentType } from "react"
 import type { BadgeProps } from "@/components/ui/badge"
 import type { CorpusDocument, CorpusType } from "@/lib/corpus"
