@@ -185,6 +185,42 @@ describe("corpora-api", () => {
     )
   })
 
+  it("fetches a job-scoped path diff with encoded version selectors", async () => {
+    const api = await freshApi()
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        from: { id: "v1", label: "v1.0" },
+        to: { id: "v2", label: "v1.1" },
+        files: [
+          {
+            path: "manifest.yml",
+            kind: "modified",
+            before: { size: 100 },
+            after: { size: 120 },
+          },
+        ],
+      }),
+    )
+
+    const body = await api.fetchCorpusVersionDiff(
+      { kind: "job", key: "j1" },
+      "v1.0",
+      "v1.1",
+    )
+    expect(body.files[0].path).toBe("manifest.yml")
+    expect(String(fetchMock.mock.calls[0][0])).toContain(
+      "/convert/j1/diff?from=v1.0&to=v1.1",
+    )
+
+    const hubError = await api
+      .fetchCorpusVersionDiff({ kind: "hub", key: "summa.corpus" }, "v1.0", "v1.1")
+      .catch((error: unknown) => error)
+    expect(hubError).toBeInstanceOf(api.CorporaApiError)
+    expect((hubError as InstanceType<typeof api.CorporaApiError>).kind).toBe(
+      "read-only",
+    )
+  })
+
   it("downloads the archive as a blob", async () => {
     const api = await freshApi()
     fetchMock.mockResolvedValueOnce(new Response("corpus-bytes"))
