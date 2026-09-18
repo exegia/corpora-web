@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { BookOpenText } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -22,6 +22,9 @@ import { cn } from "@/lib/utils"
 import Panel from "./panel"
 import WordPanel from "./word-panel"
 import type { Lemma } from "./types"
+import { useReaderSelection } from "../chat/use-reader-selection"
+
+type InspectWord = (load: () => Promise<Lemma>, passage: CorpusPassage, element: HTMLElement, wordNode?: number | null) => void
 
 function placeholderNode(form: string, passage: CorpusPassage, node: number): CorpusNode {
   return {
@@ -86,7 +89,7 @@ function TokenPassage({
   passage: CorpusPassage
   archive: CorpusArchive
   index: number
-  onInspect: (lemma: Lemma) => void
+  onInspect: InspectWord
 }) {
   const tokens = passage.tokens ?? []
   return (
@@ -97,7 +100,7 @@ function TokenPassage({
       >
         {index + 1}
       </span>
-      <p className="text-sm leading-7">
+      <p className="text-sm leading-7" data-reader-passage={index} tabIndex={-1}>
         {tokens.map((token, tokenIndex) => (
           <TokenButton
             archive={archive}
@@ -121,15 +124,18 @@ function TokenButton({
   archive: CorpusArchive
   passage: CorpusPassage
   token: PassageToken
-  onInspect: (lemma: Lemma) => void
+  onInspect: InspectWord
 }) {
   return (
     <>
       <button
-        className="rounded-sm hover:outline hover:outline-primary"
-        onClick={() => {
-          if (token.node == null) return
-          void inspectTokenNode(archive, passage, token.text, token.node).then(onInspect)
+        className="select-text rounded-sm hover:outline hover:outline-primary"
+        data-reader-token=""
+        data-reader-node={token.node ?? undefined}
+        onClick={(event) => {
+          if (window.getSelection()?.toString().trim() || token.node == null) return
+          const node = token.node
+          onInspect(() => inspectTokenNode(archive, passage, token.text, node), passage, event.currentTarget, node)
         }}
         type="button"
       >
@@ -149,7 +155,7 @@ function SplitPassage({
   passage: CorpusPassage
   archive: CorpusArchive
   index: number
-  onInspect: (lemma: Lemma) => void
+  onInspect: InspectWord
 }) {
   const tokens = passage.text.split(/(\s+)/)
   let wordIndex = -1
@@ -161,17 +167,21 @@ function SplitPassage({
       >
         {index + 1}
       </span>
-      <p className="text-sm leading-7">
+      <p className="text-sm leading-7" data-reader-passage={index} tabIndex={-1}>
         {tokens.map((token, tokenIndex) => {
           if (!token || /^\s+$/.test(token)) return token
           const thisWord = ++wordIndex
           const form = token.replace(/^[^\p{L}\p{M}]+|[^\p{L}\p{M}]+$/gu, "") || token
           return (
             <button
-              className="rounded-sm hover:outline hover:outline-primary"
+              className="select-text rounded-sm hover:outline hover:outline-primary"
               key={`${passage.ref}-${tokenIndex}`}
-              onClick={() => {
-                void inspectSplitToken(archive, passage, form, thisWord).then(onInspect)
+              data-reader-token=""
+              onClick={(event) => {
+                if (window.getSelection()?.toString().trim()) return
+                // Text-only responses cannot guarantee one slot per split word.
+                // Keep their AI scope on the containing passage.
+                onInspect(() => inspectSplitToken(archive, passage, form, thisWord), passage, event.currentTarget)
               }}
               type="button"
             >
@@ -185,10 +195,12 @@ function SplitPassage({
 }
 
 function LiveReader({
+  corpusId,
   archive,
   sectionTitle,
   onViewOccurrences,
 }: {
+  corpusId: string
   archive: CorpusArchive
   sectionTitle: string
   onViewOccurrences?: () => void
@@ -204,6 +216,14 @@ function LiveReader({
   const [passages, setPassages] = useState<CorpusPassage[]>([])
   const [loading, setLoading] = useState(Boolean(selected))
   const api = useCorporaApi()
+  const readerRoot = useRef<HTMLElement>(null)
+  const selection = useReaderSelection({ root: readerRoot, corpusId, location: selected, passages, showDetails: setLemma,
+    inspectNode: (node, text, passage) => inspectTokenNode(archive, passage, text, node),
+  })
+  const inspectWord: InspectWord = (load, passage, element, wordNode) => {
+    const request = selection.beginInspection()
+    void load().then((details) => selection.finishInspection(request, details, passage, element, wordNode))
+  }
 
   useEffect(() => {
     if (!selected) return
@@ -255,6 +275,7 @@ function LiveReader({
                         : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                     )}
                     onClick={() => {
+                      selection.clear()
                       setSelected(question.ref)
                       setLemma(null)
                     }}
@@ -268,7 +289,11 @@ function LiveReader({
           </ul>
         </nav>
       </Panel>
-      <article className="min-w-0 rounded-2xl border p-6">
+      <article ref={readerRoot} data-corpus-reader="" tabIndex={-1} aria-label="Corpus reader"
+        className="relative min-w-0 rounded-2xl border p-6"
+        onMouseUp={selection.capture}
+        onKeyUp={(event) => { if (event.key === "Shift" || event.key.startsWith("Arrow")) selection.capture() }}>
+        {selection.popover}
         <header className="mb-6">
           <h2 className="font-heading text-xl font-semibold">{heading}</h2>
         </header>
@@ -279,14 +304,14 @@ function LiveReader({
             <Skeleton className="h-5 w-2/3" />
           </div>
         ) : (
-          <ol className="flex flex-col gap-6">
+          <ol className="flex select-text flex-col gap-6 [&_*]:select-text">
             {passages.map((passage, index) =>
               passage.tokens?.length ? (
                 <TokenPassage
                   archive={archive}
                   index={index}
                   key={`${passage.ref}-${passage.node ?? index}`}
-                  onInspect={setLemma}
+                  onInspect={inspectWord}
                   passage={passage}
                 />
               ) : (
@@ -294,7 +319,7 @@ function LiveReader({
                   archive={archive}
                   index={index}
                   key={`${passage.ref}-${passage.node ?? index}`}
-                  onInspect={setLemma}
+                  onInspect={inspectWord}
                   passage={passage}
                 />
               ),
@@ -315,10 +340,12 @@ function LiveReader({
 
 /** Documents tab: live passages from the conversion job or a Hub import. */
 export default function Reader({
+  corpusId,
   sectionTitle,
   archive,
   onViewOccurrences,
 }: {
+  corpusId: string
   sectionTitle: string
   archive?: CorpusArchive | null
   onViewOccurrences?: () => void
@@ -326,6 +353,7 @@ export default function Reader({
   if (archive?.index.sections?.items.length) {
     return (
       <LiveReader
+        corpusId={corpusId}
         archive={archive}
         onViewOccurrences={onViewOccurrences}
         sectionTitle={sectionTitle}
