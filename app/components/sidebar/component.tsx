@@ -1,4 +1,4 @@
-import { AnimatedSidebarPanelContext, Tree, type TreeNode } from "@exegia/corpora-ui"
+import { AnimatedSidebarPanelContext, Tree, type ITreeNode as TreeNode } from "@exegia/corpora-ui"
 import { BookMarked, BookOpen, Database, FolderKanban, LayoutDashboard, Scale } from "lucide-react"
 import { useContext } from "react"
 import type { ISidebarProps } from "./types"
