@@ -18,15 +18,11 @@ export default function Panel({
   bodyClassName,
 }: PanelProps) {
   return (
-    <CardFrame className={className}>
-      {title || actions ? (
+    <CardFrame className={cn("min-w-xs rounded-sm", className)}>
         <CardFrameHeader>
-          {title ? (
-            <CardFrameTitle render={<h2 />}>{title}</CardFrameTitle>
-          ) : null}
+          <CardFrameTitle render={<h2 />}>{title}</CardFrameTitle>  
           {actions ? <CardFrameAction>{actions}</CardFrameAction> : null}
         </CardFrameHeader>
-      ) : null}
       <Card>
         <CardPanel className={cn(bodyClassName)}>{children}</CardPanel>
       </Card>
