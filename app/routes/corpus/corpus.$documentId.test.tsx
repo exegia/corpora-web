@@ -3,15 +3,8 @@ import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { isCorpusDetailData } from "@/components/breadcrumb/utils"
-import {
-  fetchCorpusContent,
-  fetchCorpusNode,
-  fetchCorpusVersions,
-  loadCorpusArchive,
-  restoreCorpusVersion,
-} from "@/lib/corpora-api"
-import { deleteCorpusDocument, getCorpusDocument } from "@/lib/corpus"
-import type { CorpusDocument } from "@/lib/corpus"
+import CorporaApi from "@/lib/api"
+import Corpus, { type CorpusDocument } from "@/lib/corpus"
 import CorpusDetailRoute, {
   clientAction,
   clientLoader,
@@ -22,31 +15,42 @@ import CorpusAnalyticsRoute from "@/routes/corpus/corpus.$documentId.analytics"
 import CorpusDocumentsRoute from "@/routes/corpus/corpus.$documentId.documents"
 import CorpusStructureRoute from "@/routes/corpus/corpus.$documentId.structure"
 
-vi.mock("@/lib/corpus", () => ({
-  listCorpusDocuments: vi.fn(),
-  createCorpusDocument: vi.fn(),
-  deleteCorpusDocument: vi.fn(),
-  getCorpusDocument: vi.fn(),
-  uploadCorpusFile: vi.fn(),
-}))
+vi.mock("@/lib/corpus", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/corpus")>()
+  return {
+    ...original,
+    default: {
+      ...original.default,
+      Documents: {
+        ...original.default.Documents,
+        listCorpusDocuments: vi.fn(),
+        createCorpusDocument: vi.fn(),
+        deleteCorpusDocument: vi.fn(),
+        getCorpusDocument: vi.fn(),
+        uploadCorpusFile: vi.fn(),
+      },
+    },
+  }
+})
 
-vi.mock("@/lib/corpora-api", () => ({
-  loadCorpusArchive: vi.fn(async () => null),
-  fetchCorpusContent: vi.fn(),
-  fetchCorpusNode: vi.fn(),
-  fetchCorpusSections: vi.fn(),
-  fetchCorpusVersions: vi.fn(async () => ({ versions: [] })),
-  restoreCorpusVersion: vi.fn(),
-  downloadExploreCorpus: vi.fn(),
-  downloadStoredCorpus: vi.fn(),
-  CorporaApiError: class CorporaApiError extends Error {
-    kind: string
-    constructor(kind: string, message: string) {
-      super(message)
-      this.kind = kind
-    }
-  },
-}))
+vi.mock("@/lib/api", async (importOriginal) => {
+  // CorporaApiError is spread by reference so `instanceof` keeps its identity.
+  const original = await importOriginal<typeof import("@/lib/api")>()
+  return {
+    ...original,
+    default: {
+      ...original.default,
+      loadCorpusArchive: vi.fn(async () => null),
+      fetchCorpusContent: vi.fn(),
+      fetchCorpusNode: vi.fn(),
+      fetchCorpusSections: vi.fn(),
+      fetchCorpusVersions: vi.fn(async () => ({ versions: [] })),
+      restoreCorpusVersion: vi.fn(),
+      downloadExploreCorpus: vi.fn(),
+      downloadStoredCorpus: vi.fn(),
+    },
+  }
+})
 
 const summa: CorpusDocument = {
   id: "d2",
@@ -148,9 +152,9 @@ const jobArchive = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(getCorpusDocument).mockResolvedValue(summa)
-  vi.mocked(loadCorpusArchive).mockResolvedValue(null)
-  vi.mocked(fetchCorpusVersions).mockResolvedValue({ versions: [] })
+  vi.mocked(Corpus.Documents.getCorpusDocument).mockResolvedValue(summa)
+  vi.mocked(CorporaApi.loadCorpusArchive).mockResolvedValue(null)
+  vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({ versions: [] })
 })
 
 describe("/corpus/:documentId detail", () => {
@@ -191,7 +195,7 @@ describe("/corpus/:documentId detail", () => {
   })
 
   it("shows an explicit empty state for rows without section data", async () => {
-    vi.mocked(getCorpusDocument).mockResolvedValue({ ...summa, toc: null })
+    vi.mocked(Corpus.Documents.getCorpusDocument).mockResolvedValue({ ...summa, toc: null })
     renderRoute()
     expect(
       await screen.findByText("No section data was captured for this corpus."),
@@ -200,7 +204,7 @@ describe("/corpus/:documentId detail", () => {
   })
 
   it("renders a not-found state when the document is gone", async () => {
-    vi.mocked(getCorpusDocument).mockResolvedValue(null)
+    vi.mocked(Corpus.Documents.getCorpusDocument).mockResolvedValue(null)
     renderRoute()
     expect(
       await screen.findByText("This corpus no longer exists"),
@@ -262,8 +266,8 @@ describe("/corpus/:documentId detail", () => {
 
   it("fills Overview and Analytics from a conversion job when toc is empty", async () => {
     const user = userEvent.setup()
-    vi.mocked(getCorpusDocument).mockResolvedValue({ ...summa, toc: null })
-    vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
+    vi.mocked(Corpus.Documents.getCorpusDocument).mockResolvedValue({ ...summa, toc: null })
+    vi.mocked(CorporaApi.loadCorpusArchive).mockResolvedValue(jobArchive)
     renderRoute()
     const table = await screen.findByRole("table")
     expect(table).toHaveTextContent("Prima Pars")
@@ -281,8 +285,8 @@ describe("/corpus/:documentId detail", () => {
 
   it("reads job passages when opening a section from a conversion result", async () => {
     const user = userEvent.setup()
-    vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
-    vi.mocked(fetchCorpusContent).mockResolvedValue({
+    vi.mocked(CorporaApi.loadCorpusArchive).mockResolvedValue(jobArchive)
+    vi.mocked(CorporaApi.fetchCorpusContent).mockResolvedValue({
       ref: "Prima Pars, Q.1",
       format: "text-orig-full",
       passages: [{ ref: "p1", text: "Sic venit doctrina", node: 9 }],
@@ -299,7 +303,7 @@ describe("/corpus/:documentId detail", () => {
     expect(await screen.findByRole("button", { name: "Q.1" })).toBeInTheDocument()
     expect(await screen.findByRole("button", { name: "Sic" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "doctrina" })).toBeInTheDocument()
-    expect(fetchCorpusContent).toHaveBeenCalledWith(jobArchive, {
+    expect(CorporaApi.fetchCorpusContent).toHaveBeenCalledWith(jobArchive, {
       ref: "Prima Pars, Q.1",
       limit: 20,
     })
@@ -323,8 +327,8 @@ describe("/corpus/:documentId detail", () => {
 
   it("opens word details from a job slot node", async () => {
     const user = userEvent.setup()
-    vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
-    vi.mocked(fetchCorpusContent).mockResolvedValue({
+    vi.mocked(CorporaApi.loadCorpusArchive).mockResolvedValue(jobArchive)
+    vi.mocked(CorporaApi.fetchCorpusContent).mockResolvedValue({
       ref: "Prima Pars, Q.1",
       format: "text-orig-full",
       passages: [{ ref: "p1", text: "Sic venit doctrina", node: 9 }],
@@ -333,7 +337,7 @@ describe("/corpus/:documentId detail", () => {
       limit: 20,
       next_offset: null,
     })
-    vi.mocked(fetchCorpusNode)
+    vi.mocked(CorporaApi.fetchCorpusNode)
       .mockResolvedValueOnce({
         node: 9,
         otype: "verse",
@@ -374,14 +378,14 @@ describe("/corpus/:documentId detail", () => {
     ).toBeInTheDocument()
     expect(screen.getByText("Morphology")).toBeInTheDocument()
     expect(screen.getByText("Nominative")).toBeInTheDocument()
-    expect(fetchCorpusNode).toHaveBeenCalledWith(jobArchive, 9)
-    expect(fetchCorpusNode).toHaveBeenCalledWith(jobArchive, 3)
+    expect(CorporaApi.fetchCorpusNode).toHaveBeenCalledWith(jobArchive, 9)
+    expect(CorporaApi.fetchCorpusNode).toHaveBeenCalledWith(jobArchive, 3)
   })
 
   it("inspects a word from passage tokens without guessing slots", async () => {
     const user = userEvent.setup()
-    vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
-    vi.mocked(fetchCorpusContent).mockResolvedValue({
+    vi.mocked(CorporaApi.loadCorpusArchive).mockResolvedValue(jobArchive)
+    vi.mocked(CorporaApi.fetchCorpusContent).mockResolvedValue({
       ref: "Prima Pars, Q.1",
       format: "text-orig-full",
       passages: [
@@ -401,7 +405,7 @@ describe("/corpus/:documentId detail", () => {
       limit: 20,
       next_offset: null,
     })
-    vi.mocked(fetchCorpusNode).mockResolvedValue({
+    vi.mocked(CorporaApi.fetchCorpusNode).mockResolvedValue({
       node: 3,
       otype: "word",
       is_slot: true,
@@ -424,8 +428,8 @@ describe("/corpus/:documentId detail", () => {
       await screen.findByRole("heading", { name: "doctrina" }),
     ).toBeInTheDocument()
     expect(screen.getByText(/12 in corpus/)).toBeInTheDocument()
-    expect(fetchCorpusNode).toHaveBeenCalledTimes(1)
-    expect(fetchCorpusNode).toHaveBeenCalledWith(jobArchive, 3)
+    expect(CorporaApi.fetchCorpusNode).toHaveBeenCalledTimes(1)
+    expect(CorporaApi.fetchCorpusNode).toHaveBeenCalledWith(jobArchive, 3)
   })
 
   it("renders structure, analytics, and activity from the explorer tabs", async () => {
@@ -469,8 +473,8 @@ describe("/corpus/:documentId detail", () => {
 
   it("renders Activity versions from the archive API, not minted labels", async () => {
     const user = userEvent.setup()
-    vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
-    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+    vi.mocked(CorporaApi.loadCorpusArchive).mockResolvedValue(jobArchive)
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
       versions: [
         {
           id: "v1",
@@ -498,7 +502,7 @@ describe("/corpus/:documentId detail", () => {
 
   it("expands the structure tree from the job index", async () => {
     const user = userEvent.setup()
-    vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
+    vi.mocked(CorporaApi.loadCorpusArchive).mockResolvedValue(jobArchive)
     renderRoute()
     await user.click(await screen.findByRole("link", { name: "Structure" }))
     expect(
@@ -514,7 +518,7 @@ describe("/corpus/:documentId detail", () => {
 
   it("deletes after the DELETE gate and redirects to the library", async () => {
     const user = userEvent.setup()
-    vi.mocked(deleteCorpusDocument).mockResolvedValue()
+    vi.mocked(Corpus.Documents.deleteCorpusDocument).mockResolvedValue()
     renderRoute()
 
     await user.click(await screen.findByRole("button", { name: "Delete" }))
@@ -523,14 +527,14 @@ describe("/corpus/:documentId detail", () => {
     await user.type(screen.getByRole("textbox"), "DELETE")
     await user.click(confirm)
 
-    await waitFor(() => expect(deleteCorpusDocument).toHaveBeenCalledWith("d2"))
+    await waitFor(() => expect(Corpus.Documents.deleteCorpusDocument).toHaveBeenCalledWith("d2"))
     expect(await screen.findByText("Back at the library")).toBeInTheDocument()
   })
 
   it("restores a previous version after typing RESTORE", async () => {
     const user = userEvent.setup()
-    vi.mocked(loadCorpusArchive).mockResolvedValue(jobArchive)
-    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+    vi.mocked(CorporaApi.loadCorpusArchive).mockResolvedValue(jobArchive)
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
       versions: [
         {
           id: "v1.1",
@@ -548,7 +552,7 @@ describe("/corpus/:documentId detail", () => {
         },
       ],
     })
-    vi.mocked(restoreCorpusVersion).mockResolvedValue({ versions: [] })
+    vi.mocked(CorporaApi.restoreCorpusVersion).mockResolvedValue({ versions: [] })
     renderRoute()
     await user.click(await screen.findByRole("link", { name: "Activity" }))
     await user.click(await screen.findByRole("button", { name: "Restore" }))
@@ -557,7 +561,7 @@ describe("/corpus/:documentId detail", () => {
     await user.type(screen.getByRole("textbox"), "RESTORE")
     await user.click(confirm)
     await waitFor(() =>
-      expect(restoreCorpusVersion).toHaveBeenCalledWith(
+      expect(CorporaApi.restoreCorpusVersion).toHaveBeenCalledWith(
         { kind: "job", key: "j-summa" },
         "v1.0",
       ),

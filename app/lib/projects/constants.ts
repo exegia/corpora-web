@@ -1,4 +1,7 @@
+import type { LanguageType, ProjectCreator, ScripturalType } from "./types"
+
 // ---- Vocabularies (002; mirrors the shared domain enums + DB CHECKs) ------
+// The matching type aliases are derived from these lists in types.ts.
 
 export const PROJECT_STATUSES = [
   "draft",
@@ -7,7 +10,6 @@ export const PROJECT_STATUSES = [
   "published",
   "failed",
 ] as const
-export type ProjectStatus = (typeof PROJECT_STATUSES)[number]
 
 /**
  * Pre-auth superadmin: publishing decisions belong to this directory user
@@ -29,7 +31,6 @@ export const BOOK_TYPES = [
   "apocrypha",
   "regular",
 ] as const
-export type BookType = (typeof BOOK_TYPES)[number]
 
 export const LANGUAGE_TYPES = [
   "hebrew",
@@ -47,7 +48,6 @@ export const LANGUAGE_TYPES = [
   "italian",
   "english",
 ] as const
-export type LanguageType = (typeof LANGUAGE_TYPES)[number]
 
 export const CATEGORY_TYPES = [
   "biblical",
@@ -56,11 +56,12 @@ export const CATEGORY_TYPES = [
   "historical",
   "paratext",
 ] as const
-export type CategoryType = (typeof CATEGORY_TYPES)[number]
 
 /** Types that require a source language (FR-006). */
 export const SCRIPTURAL_TYPES = ["bible", "tanakh", "quran", "apocrypha"] as const
-export type ScripturalType = (typeof SCRIPTURAL_TYPES)[number]
+
+/** Types that require a category (FR-007). */
+export const CATEGORIZED_TYPES = ["biography", "commentary", "review"] as const
 
 /**
  * Scriptural types with a constrained source-language vocabulary. Types not
@@ -71,17 +72,19 @@ export const LANGUAGES_BY_TYPE: Partial<Record<ScripturalType, readonly Language
   bible: ["greek", "aramaic", "hebrew", "latin", "french", "english", "syriac"],
 }
 
-export function languageOptionsFor(type: string): readonly LanguageType[] {
-  return LANGUAGES_BY_TYPE[type as ScripturalType] ?? LANGUAGE_TYPES
-}
+// ---- Select column lists --------------------------------------------------
 
-/** Types that require a category (FR-007). */
-export const CATEGORIZED_TYPES = ["biography", "commentary", "review"] as const
-export type CategorizedType = (typeof CATEGORIZED_TYPES)[number]
+export const PROJECT_COLUMNS = "id, name, description, status, type, created_at, updated_at"
 
-/** Discriminated classification value — illegal combinations are untypeable. */
-export type Classification =
-  | { type: ScripturalType; languages: LanguageType[] }
-  | { type: CategorizedType; category: CategoryType }
-  | { type: "lexicon" | "manuscript" | "regular" }
-  | null
+export const PROJECT_DETAIL_COLUMNS = `${PROJECT_COLUMNS}, language, category,
+  corpus_documents ( id, name, source, path, filename, uploaded_at,
+    corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at ) ),
+  user_directory ( id, name, username ),
+  organizations ( id, name, website ),
+  project_licences ( agreed_at,
+    licences ( id, title, url, domain_content, domain_data, domain_software, family, maintainer, status ),
+    user_directory ( id, name, username ) ),
+  project_corpora ( corpus_id, linked_at,
+    corpora ( uid, name, language, type, category, version, available ) )`
+
+export const UNKNOWN_CREATOR: ProjectCreator = { id: "", name: null, username: "unknown" }

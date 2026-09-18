@@ -1,10 +1,4 @@
-export type DataErrorCode =
-  | "not-found"
-  | "already-linked"
-  | "already-attached"
-  | "validation"
-  | "unavailable"
-  | "unknown"
+import type { DataErrorCode } from "./types"
 
 export class DataError extends Error {
   code: DataErrorCode

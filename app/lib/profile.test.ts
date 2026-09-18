@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { getProfile, updateProfile } from "@/lib/profile"
+import Profile from "@/lib/profile"
 
 // Same one-mock boundary as auth.test.ts: the module reaches Supabase only
 // through `getSupabase`.
@@ -37,7 +37,7 @@ describe("getProfile", () => {
       avatar_url: "https://img.example/ada.png",
     })
 
-    await expect(getProfile()).resolves.toEqual({
+    await expect(Profile.GetSet.getProfile()).resolves.toEqual({
       name: "Ada Researcher",
       username: "ada",
       vocation: "Translator",
@@ -53,7 +53,7 @@ describe("getProfile", () => {
   it("falls back to the OAuth full_name and nulls blank fields", async () => {
     givenMetadata({ full_name: "Ada Lovelace", username: "   " })
 
-    const profile = await getProfile()
+    const profile = await Profile.GetSet.getProfile()
     expect(profile.name).toBe("Ada Lovelace")
     expect(profile.username).toBeNull()
     expect(profile.vocation).toBeNull()
@@ -61,7 +61,7 @@ describe("getProfile", () => {
 
   it("rejects when signed out", async () => {
     authApi.getSession.mockResolvedValue({ data: { session: null }, error: null })
-    await expect(getProfile()).rejects.toThrow(/signed out/i)
+    await expect(Profile.GetSet.getProfile()).rejects.toThrow(/signed out/i)
   })
 })
 
@@ -72,7 +72,7 @@ describe("updateProfile", () => {
       error: null,
     })
 
-    await updateProfile({ name: "  Ada  ", website: "" })
+    await Profile.GetSet.updateProfile({ name: "  Ada  ", website: "" })
 
     expect(authApi.updateUser).toHaveBeenCalledWith({
       data: { name: "Ada", website: null },
@@ -87,6 +87,6 @@ describe("updateProfile", () => {
       data: { user: null },
       error: { message: "over quota" },
     })
-    await expect(updateProfile({ bio: "x" })).rejects.toThrow(/over quota/)
+    await expect(Profile.GetSet.updateProfile({ bio: "x" })).rejects.toThrow(/over quota/)
   })
 })

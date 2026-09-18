@@ -25,11 +25,17 @@ const licence: LicenceDetail = {
 const findLicenceByLabel = vi.hoisted(() => vi.fn())
 const resolveLicenceText = vi.hoisted(() => vi.fn())
 
-vi.mock("@/lib/licenses", async (importOriginal) => ({
-    ...(await importOriginal<object>()),
-    findLicenceByLabel,
-    resolveLicenceText,
-}))
+vi.mock("@/lib/licenses", async (importOriginal) => {
+    const original = await importOriginal<typeof import("@/lib/licenses")>()
+    return {
+        ...original,
+        default: {
+            ...original.default,
+            Catalog: { ...original.default.Catalog, findLicenceByLabel },
+            Text: { ...original.default.Text, resolveLicenceText },
+        },
+    }
+})
 
 function renderSheet(label = "CC BY 4.0") {
     const Stub = createRoutesStub([

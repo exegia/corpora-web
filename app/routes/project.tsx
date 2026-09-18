@@ -9,22 +9,15 @@ import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatRelativeTime } from "@/lib/format"
-import {
-    createProject,
-    DataError,
-    deleteProject,
-    listProjects,
-    type ProjectSummary,
-    updateProject,
-} from "@/lib/projects"
+import Project, { type ProjectSummary } from "@/lib/projects"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
-import { listUsers } from "@/lib/users"
+import User, { type DirectoryUser } from "@/lib/user"
 
 export async function clientLoader() {
     // Deliberately not awaited: navigation completes immediately, and the
     // component suspends on this promise, showing the skeleton meanwhile.
-    const data = Promise.all([listProjects(), listUsers()]).then(([projects, users]) => ({ projects, users }))
+    const data = Promise.all([Project.Queries.listProjects(), User.listUsers()]).then(([projects, users]) => ({ projects, users }))
     return { data }
 }
 
@@ -34,26 +27,26 @@ export async function clientAction({ request }: ActionFunctionArgs) {
     try {
         switch (intent) {
             case "create-project":
-                await createProject({
+                await Project.Mutations.createProject({
                     name: String(form.get("name") ?? ""),
                     description: String(form.get("description") ?? ""),
                     userId: String(form.get("userId") ?? ""),
                 })
                 return { ok: true, intent }
             case "update-project":
-                await updateProject(String(form.get("projectId") ?? ""), {
+                await Project.Mutations.updateProject(String(form.get("projectId") ?? ""), {
                     name: String(form.get("name") ?? ""),
                     description: String(form.get("description") ?? ""),
                 })
                 return { ok: true, intent }
             case "delete-project":
-                await deleteProject(String(form.get("projectId") ?? ""))
+                await Project.Mutations.deleteProject(String(form.get("projectId") ?? ""))
                 return { ok: true, intent }
             default:
                 return { ok: false, error: "Unknown action." }
         }
     } catch (error) {
-        if (error instanceof DataError) {
+        if (error instanceof Project.Errors.DataError) {
             return { ok: false, error: error.message }
         }
         return { ok: false, error: "Something went wrong. Your change was not saved." }
@@ -238,7 +231,7 @@ function ProjectList({
     users,
 }: {
     projects: ProjectSummary[]
-    users: Awaited<ReturnType<typeof listUsers>>
+    users: DirectoryUser[]
 }) {
     useReadySound()
     const [creating, setCreating] = useState(false)
@@ -282,7 +275,7 @@ function ProjectList({
     )
 }
 
-export default function Project() {
+export default function ProjectsPage() {
     const { data } = useLoaderData<typeof clientLoader>()
 
     return (

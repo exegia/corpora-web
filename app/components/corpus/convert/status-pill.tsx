@@ -1,7 +1,7 @@
 import { Link } from "react-router"
 import { Blocks } from "@/components/blocks"
 import { Button } from "@/components/ui/button"
-import { CONVERSION_STEPS, currentStep } from "@/lib/corpus-convert"
+import Corpus, { CONVERSION_STEPS } from "@/lib/corpus"
 import type { StatusPillProps } from "./types"
 import { isDone } from "./utils"
 
@@ -17,7 +17,7 @@ export default function StatusPill({
   onOpen,
   onDismiss,
 }: StatusPillProps) {
-  const { id } = currentStep(entry)
+  const { id } = Corpus.Convert.currentStep(entry)
   const stepTitle = CONVERSION_STEPS.find((step) => step.id === id)?.title
   const done = isDone(entry)
   const failed = entry.status === "error"

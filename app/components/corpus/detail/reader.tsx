@@ -8,14 +8,16 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
-import type {
-  CorpusArchive,
-  CorpusNode,
-  CorpusPassage,
-  PassageToken,
-} from "@/lib/corpora-api"
-import { fetchCorpusContent, fetchCorpusNode } from "@/lib/corpora-api"
-import { findIndexItem, lemmaFromNode, slotForToken } from "@/lib/corpus-explore"
+import { useCorporaApi } from "@/hooks"
+// Still imported directly: inspectTokenNode/inspectSplitToken below are
+// module-scope, where a hook cannot be called.
+import CorporaApi, {
+  type CorpusArchive,
+  type CorpusNode,
+  type CorpusPassage,
+  type PassageToken,
+} from "@/lib/api"
+import Corpus from "@/lib/corpus"
 import { cn } from "@/lib/utils"
 import Panel from "./panel"
 import WordPanel from "./word-panel"
@@ -44,9 +46,9 @@ async function inspectTokenNode(
   node: number,
 ): Promise<Lemma> {
   try {
-    return lemmaFromNode(await fetchCorpusNode(archive, node), form)
+    return Corpus.Explore.lemmaFromNode(await CorporaApi.fetchCorpusNode(archive, node), form)
   } catch {
-    return lemmaFromNode(placeholderNode(form, passage, node), form)
+    return Corpus.Explore.lemmaFromNode(placeholderNode(form, passage, node), form)
   }
 }
 
@@ -57,21 +59,21 @@ async function inspectSplitToken(
   wordIndex: number,
 ): Promise<Lemma> {
   if (passage.node == null) {
-    return lemmaFromNode(placeholderNode(form, passage, 0), form)
+    return Corpus.Explore.lemmaFromNode(placeholderNode(form, passage, 0), form)
   }
   try {
-    const container = await fetchCorpusNode(archive, passage.node)
-    const slot = slotForToken(container, wordIndex)
+    const container = await CorporaApi.fetchCorpusNode(archive, passage.node)
+    const slot = Corpus.Explore.slotForToken(container, wordIndex)
     if (slot != null && slot !== container.node) {
       try {
-        return lemmaFromNode(await fetchCorpusNode(archive, slot), form)
+        return Corpus.Explore.lemmaFromNode(await CorporaApi.fetchCorpusNode(archive, slot), form)
       } catch {
-        return lemmaFromNode(container, form)
+        return Corpus.Explore.lemmaFromNode(container, form)
       }
     }
-    return lemmaFromNode(container, form)
+    return Corpus.Explore.lemmaFromNode(container, form)
   } catch {
-    return lemmaFromNode(placeholderNode(form, passage, passage.node), form)
+    return Corpus.Explore.lemmaFromNode(placeholderNode(form, passage, passage.node), form)
   }
 }
 
@@ -191,7 +193,7 @@ function LiveReader({
   sectionTitle: string
   onViewOccurrences?: () => void
 }) {
-  const item = findIndexItem(archive.index, sectionTitle)
+  const item = Corpus.Explore.findIndexItem(archive.index, sectionTitle)
   const questions = item?.children.length
     ? item.children
     : item
@@ -201,12 +203,17 @@ function LiveReader({
   const [lemma, setLemma] = useState<Lemma | null>(null)
   const [passages, setPassages] = useState<CorpusPassage[]>([])
   const [loading, setLoading] = useState(Boolean(selected))
+  const api = useCorporaApi()
 
   useEffect(() => {
     if (!selected) return
+    // Guards against a stale response, not against unmount: clicking question A
+    // then B must not let A's slower reply overwrite B's. The flag belongs to
+    // this run of the effect, which is why it cannot be hoisted into a hook.
     let cancelled = false
     setLoading(true)
-    fetchCorpusContent(archive, { ref: selected, limit: 20 })
+    api
+      .fetchCorpusContent(archive, { ref: selected, limit: 20 })
       .then((content) => {
         if (!cancelled) setPassages(content.passages)
       })
@@ -219,7 +226,7 @@ function LiveReader({
     return () => {
       cancelled = true
     }
-  }, [archive, selected])
+  }, [api, archive, selected])
 
   const heading = questions.find((question) => question.ref === selected)?.title ?? sectionTitle
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { createOrganization, listOrganizations } from "@/lib/organizations"
+import { createOrganization, listOrganizations } from "@/lib/organization/organizations"
 import { getSupabase } from "@/lib/supabase"
 
 vi.mock("@/lib/supabase", () => ({ getSupabase: vi.fn() }))

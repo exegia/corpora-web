@@ -1,15 +1,24 @@
 import type { ReactElement } from "react"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { fetchCorpusVersions } from "@/lib/corpora-api"
-import type { CorpusArchive, CorpusVersion, VersionsResponse } from "@/lib/corpora-api"
+import CorporaApi from "@/lib/api"
+import type { CorpusArchive, CorpusVersion, VersionsResponse } from "@/lib/api"
 import type { CorpusDocument } from "@/lib/corpus"
 import Activity from "./activity"
 
-vi.mock("@/lib/corpora-api", () => ({
-  fetchCorpusVersions: vi.fn(async () => ({ versions: [] })),
-}))
+vi.mock("@/lib/api", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/api")>()
+  return {
+    ...original,
+    default: {
+      ...original.default,
+      fetchCorpusVersions: vi.fn(async () => ({ versions: [] })),
+      fetchCorpusVersionDiff: vi.fn(),
+    },
+  }
+})
 
 function renderActivity(ui: ReactElement) {
   const Stub = createRoutesStub([
@@ -53,8 +62,9 @@ const archive: CorpusArchive = {
 }
 
 beforeEach(() => {
-  vi.mocked(fetchCorpusVersions).mockReset()
-  vi.mocked(fetchCorpusVersions).mockResolvedValue({ versions: [] })
+  vi.mocked(CorporaApi.fetchCorpusVersions).mockReset()
+  vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({ versions: [] })
+  vi.mocked(CorporaApi.fetchCorpusVersionDiff).mockReset()
 })
 
 describe("Activity", () => {
@@ -69,6 +79,7 @@ describe("Activity", () => {
     expect(screen.getByRole("heading", { name: "Activity" })).toBeInTheDocument()
     expect(screen.getByText("Conversion succeeded")).toBeInTheDocument()
     expect(screen.getByText("Upload received")).toBeInTheDocument()
+    expect(screen.getByText("Corpus created")).toBeInTheDocument()
   })
 
   it("renders API versions with files, author, and approver", async () => {
@@ -84,7 +95,7 @@ describe("Activity", () => {
       approved_by: { sub: "u2", name: "Grace" },
     }
     let resolve!: (body: VersionsResponse) => void
-    vi.mocked(fetchCorpusVersions).mockReturnValue(
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockReturnValue(
       new Promise((next) => {
         resolve = next
       }),
@@ -102,11 +113,12 @@ describe("Activity", () => {
     expect(screen.getByText("Approved by Grace")).toBeInTheDocument()
     expect(screen.getByText("— Initial package")).toBeInTheDocument()
     expect(screen.queryByText("Initial upload")).not.toBeInTheDocument()
+    expect(screen.queryByText("Corpus created")).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Restore" })).not.toBeInTheDocument()
   })
 
   it("lists versions newest first", async () => {
-    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
       versions: [
         {
           id: "v1",
@@ -132,8 +144,94 @@ describe("Activity", () => {
     ).toBeTruthy()
   })
 
+  it("compares two selected job versions and lists changed files", async () => {
+    const user = userEvent.setup()
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
+      versions: [
+        {
+          id: "v2",
+          label: "v1.1",
+          title: "Now",
+          at: "2026-08-09T10:00:00Z",
+          current: true,
+        },
+        {
+          id: "v1",
+          label: "v1.0",
+          title: "Converted",
+          at: "2026-08-08T13:14:00Z",
+          current: false,
+        },
+      ],
+    })
+    vi.mocked(CorporaApi.fetchCorpusVersionDiff).mockResolvedValue({
+      from: { id: "v1", label: "v1.0" },
+      to: { id: "v2", label: "v1.1" },
+      files: [
+        {
+          path: "manifest.yml",
+          kind: "modified",
+          before: { size: 100 },
+          after: { size: 120 },
+        },
+      ],
+    })
+
+    renderActivity(<Activity archive={archive} document={document} />)
+    await screen.findByText("v1.0")
+    await user.click(screen.getByRole("checkbox", { name: "Select v1.0 for comparison" }))
+    await user.click(screen.getByRole("checkbox", { name: "Select v1.1 for comparison" }))
+    await user.click(screen.getByRole("button", { name: "Compare" }))
+
+    expect(
+      await screen.findByRole("heading", { name: "Changes from v1.0 to v1.1" }),
+    ).toBeInTheDocument()
+    expect(screen.getByText("manifest.yml")).toBeInTheDocument()
+    expect(CorporaApi.fetchCorpusVersionDiff).toHaveBeenCalledWith(
+      archive,
+      "v1",
+      "v2",
+    )
+  })
+
+  it("shows diff failures inline instead of clearing the Activity tab", async () => {
+    const user = userEvent.setup()
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
+      versions: [
+        {
+          id: "v1",
+          label: "v1.0",
+          title: "Converted",
+          at: "2026-08-08T13:14:00Z",
+          current: false,
+        },
+        {
+          id: "v2",
+          label: "v1.1",
+          title: "Now",
+          at: "2026-08-09T10:00:00Z",
+          current: true,
+        },
+      ],
+    })
+    vi.mocked(CorporaApi.fetchCorpusVersionDiff).mockRejectedValue(
+      new Error("Version v1.1 was not found."),
+    )
+
+    renderActivity(<Activity archive={archive} document={document} />)
+    await screen.findByText("v1.0")
+    await user.click(screen.getByRole("checkbox", { name: "Select v1.0 for comparison" }))
+    await user.click(screen.getByRole("checkbox", { name: "Select v1.1 for comparison" }))
+    await user.click(screen.getByRole("button", { name: "Compare" }))
+
+    expect(
+      await screen.findByRole("alert", { name: "Version comparison error" }),
+    ).toHaveTextContent("Version v1.1 was not found.")
+    expect(screen.getByRole("heading", { name: "Activity" })).toBeInTheDocument()
+  })
+
   it("enables Restore on a non-current version for a job-scoped archive", async () => {
-    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
       versions: [
         {
           id: "v2",
@@ -161,7 +259,7 @@ describe("Activity", () => {
   })
 
   it("keeps Restore disabled on a Hub archive", async () => {
-    vi.mocked(fetchCorpusVersions).mockResolvedValue({
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockResolvedValue({
       versions: [
         {
           id: "v1",
@@ -190,7 +288,7 @@ describe("Activity", () => {
   })
 
   it("shows the empty Version history when the versions fetch fails", async () => {
-    vi.mocked(fetchCorpusVersions).mockRejectedValue(new Error("offline"))
+    vi.mocked(CorporaApi.fetchCorpusVersions).mockRejectedValue(new Error("offline"))
     renderActivity(<Activity archive={archive} document={document} />)
     expect(
       await screen.findByText("No version history yet."),

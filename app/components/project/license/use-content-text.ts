@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { getLicence, resolveLicenceText } from "@/lib/licenses"
+import Licences from "@/lib/licenses"
 
 /**
  * The licence body, fetched the first time a viewer shows it.
@@ -21,8 +21,8 @@ export function useContentText(licenceId: string, open: boolean): { text: string
         if (!open || loaded) return
         let cancelled = false
         setLoading(true)
-        getLicence(licenceId)
-            .then(resolveLicenceText)
+        Licences.Catalog.getLicence(licenceId)
+            .then(Licences.Text.resolveLicenceText)
             .catch(() => null)
             .then(text => {
                 if (cancelled) return
