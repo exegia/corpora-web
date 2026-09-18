@@ -1,5 +1,5 @@
 import type React from "react"
-import type { ButtonProps } from "@exegia/corpora-ui"
+import type { TButtonProps as ButtonProps } from "@exegia/corpora-ui"
 import type { ProjectStatus } from "@/lib/projects"
 
 // glassVariant is omitted along with variant: ButtonProps is a discriminated

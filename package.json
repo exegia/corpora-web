@@ -1,7 +1,7 @@
 {
     "name": "corpora-web",
     "private": true,
-    "version": "3.0.0",
+    "version": "3.1.0",
     "type": "module",
     "scripts": {
         "dev": "dotenvx run -- react-router dev",
@@ -14,9 +14,9 @@
         "test:watch": "vitest"
     },
     "dependencies": {
-        "@base-ui/react": "^1.7.0",
+        "@base-ui/react": "1.8.0",
         "@dotenvx/dotenvx": "^2.21.0",
-        "@exegia/corpora-ui": "0.28.0",
+        "@exegia/corpora-ui": "2.0.0",
         "@exegia/plugin-supabase-auth": "0.12.0",
         "@exegia/use-auth": "0.12.0",
         "@supabase/supabase-js": "^2.112.3",
@@ -28,6 +28,7 @@
         "fflate": "^0.8.3",
         "isbot": "^5",
         "isomorphic-git": "^1.41.7",
+        "jotai": "3.0.0",
         "lucide-react": "^1.33.0",
         "marked": "^18.0.10",
         "motion": "^13.1.1",

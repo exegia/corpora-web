@@ -9,7 +9,6 @@ import {
   MorphStep,
   PasswordInput,
   Reveal,
-  type AuthStatus,
 } from "@exegia/corpora-ui"
 import { useId, useState } from "react"
 import { useNavigate } from "react-router"
@@ -35,7 +34,7 @@ export default function ResetPassword({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate()
   const passwordId = useId()
   const confirmId = useId()
-  const [status, setStatus] = useState<AuthStatus>("idle")
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")

@@ -3,7 +3,8 @@
 // hooks here cover what attributes can't hear: route changes, action
 // results, and deferred skeleton → content transitions.
 
-import { bind, play, setEnabled } from "cuelume"
+import { play, setEnabled } from "cuelume"
+import { bindSounds } from "@exegia/corpora-ui"
 import { useEffect, useRef } from "react"
 import { useFetchers, useLocation } from "react-router"
 
@@ -41,7 +42,7 @@ export function useUISounds(): void {
   // the stored preference applied before anything can play.
   useEffect(() => {
     setEnabled(getSoundPreference())
-    bind()
+    bindSounds()
   }, [])
 
   // Route change → "page". The first render is a load, not a navigation.

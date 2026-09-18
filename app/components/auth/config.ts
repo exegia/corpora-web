@@ -1,4 +1,5 @@
-import type { AuthAccent, SocialProvider } from "@exegia/corpora-ui"
+import type { SocialProvider } from "@/components/auth/types"
+import type { TAuthAccent as AuthAccent } from "@exegia/corpora-ui"
 
 /** Brand accent applied to every auth block's primary action. */
 export const ACCENT: AuthAccent = "corpora"
