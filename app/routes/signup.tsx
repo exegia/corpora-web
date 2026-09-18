@@ -1,5 +1,6 @@
+import type { SocialProvider } from "@/components/auth/types"
 import { Blocks } from "@/components/blocks"
-import type { SocialProvider } from "@exegia/corpora-ui"
+
 import { SignupBlock } from "@exegia/corpora-ui"
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router"

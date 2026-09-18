@@ -1,5 +1,5 @@
+import type { SocialProvider } from "@/components/auth/types"
 import { SOCIAL_PROVIDERS } from "@exegia/corpora-ui"
-import type { SocialProvider } from "@exegia/corpora-ui"
 import { AnimatePresence, motion } from "motion/react"
 import { useId, useState } from "react"
 import { useRevalidator } from "react-router"

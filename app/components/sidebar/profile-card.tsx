@@ -1,4 +1,4 @@
-import { ProfileCardBlock, Skeleton, type ProfileCardItem } from "@exegia/corpora-ui"
+import { ProfileCardBlock, Skeleton, type TProfileCardItem as ProfileCardItem } from "@exegia/corpora-ui"
 import { LogOutIcon, UserIcon } from "lucide-react"
 import { useFetcher, useNavigate } from "react-router"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"

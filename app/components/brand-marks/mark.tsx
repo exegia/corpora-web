@@ -1,4 +1,5 @@
-import type { SocialProvider } from "@exegia/corpora-ui"
+import type { SocialProvider } from "@/components/auth/types"
+
 import type * as React from "react"
 import AppleMark from "@/components/brand-marks/apple"
 import GitHubMark from "@/components/brand-marks/github"
