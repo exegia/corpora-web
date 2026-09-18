@@ -1,5 +1,5 @@
+import type { SocialProvider } from "@/components/auth/types"
 import { LoginBlock } from "@exegia/corpora-ui"
-import type { SocialProvider } from "@exegia/corpora-ui"
 import { useNavigate, useSearchParams } from "react-router"
 import { Auth } from "@/components/auth"
 import { DEFAULT_AUTHENTICATED_PATH, requireAnon, safeRedirectTo, signInWithPassword, signInWithProvider } from "@/lib/auth"

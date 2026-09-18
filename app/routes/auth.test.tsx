@@ -290,7 +290,7 @@ describe("/verify", () => {
   // Base UI leaves the first OTP slot unlabelled (it is the paste target), so
   // the slots are reached by role rather than by label.
   async function typeCode(user: ReturnType<typeof userEvent.setup>, code: string) {
-    await screen.findByText(/verification code/i)
+    await screen.findByText("Enter verification code")
     await user.type(screen.getAllByRole("textbox")[0], code)
   }
 
