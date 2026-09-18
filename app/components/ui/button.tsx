@@ -1,4 +1,4 @@
-import { Button as CorporaButton, type ButtonProps } from "@exegia/corpora-ui";
+import { Button as CorporaButton, type TButtonProps as ButtonProps } from "@exegia/corpora-ui";
 
 export { buttonVariants } from "@exegia/corpora-ui";
 export type { ButtonProps };
