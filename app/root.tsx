@@ -20,7 +20,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </head>
             <body className="relative h-screen w-full overflow-hidden">
                 <ExegiaProvider>
-                    <ToastProvider position="top-right">
+                    <ToastProvider>
                         <AnchoredToastProvider>
                             <div className="absolute top-0 left-0 h-full w-full scrollbar-none overflow-hidden">
                                 {children}
