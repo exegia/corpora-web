@@ -214,6 +214,34 @@ Local addresses to keep handy — none of them is the API:
 pointing the app at it fails. OrbStack per-container domains also need
 `/etc/resolver/orb.local`, which is not installed on every machine.
 
+### Corpus uploads fail with a storage RLS error
+
+A local stack restored without `storage.objects` policies can have the
+`project-corpora` bucket and still reject uploads with “new row violates
+row-level security policy”. Conversion and corpus validation finish before
+this storage request, so those successful steps do not prove persistence works.
+
+Check the local database's policies before changing application authentication:
+
+```bash
+docker exec supabase_db_<ref> psql -U postgres -d postgres -c \
+  "select policyname, cmd from pg_policies where schemaname = 'storage' and tablename = 'objects';"
+```
+
+If the four `anon … project corpora` policies are missing, restore the policy
+contract from `20260721020000_project_publishing.sql` with the idempotent repair:
+
+```bash
+docker exec -i supabase_db_<ref> psql -U postgres -d postgres \
+  -v ON_ERROR_STOP=1 < supabase/repairs/restore_project_corpora_storage_policies.sql
+```
+
+Run this from the web repository against the **local** database. It adds only
+missing policies; it leaves existing policies, objects, and bucket visibility
+untouched. These policies reproduce the existing anonymous/authenticated access
+contract, not an ownership-based authorization model. A reset of a local stack
+whose migrations omit these policies requires replaying this repair.
+
 ### The standing test account
 
 `qa-linking@corpora.test` — local stack only, one email identity. Credentials

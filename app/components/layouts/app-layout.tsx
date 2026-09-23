@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react"
+import { CorpusChat } from "@/components/corpus/chat"
 import { Outlet } from "react-router"
 import type { SessionUser } from "@/lib/auth"
 import { useUISounds } from "@/lib/sounds"
@@ -71,6 +72,7 @@ export function AppLayout({ user }: { user?: SessionUser }) {
 
     return (
         <ShellPanelsContext.Provider value={shell}>
+            <CorpusChat.Provider>
             <ConversionContext.Provider value={conversion}>
                 <Layout.Main {...providerProps} className="pt-2!" variant="web" header={renderHeader()} panels={panels}>
                     <ScrollArea className="route-scroll min-h-0 flex-1" fill>
@@ -82,6 +84,7 @@ export function AppLayout({ user }: { user?: SessionUser }) {
                     </ScrollArea>
                 </Layout.Main>
             </ConversionContext.Provider>
+            </CorpusChat.Provider>
         </ShellPanelsContext.Provider>
     )
 }
