@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
 import {
   abbreviateSection,
-  formatCompact,
   parseExploreTab,
   sectionByTitle,
 } from "./utils"
+import { formatCompact } from "@/lib/utils"
 
 describe("corpus explore helpers", () => {
   it("falls unknown tab values back to overview", () => {

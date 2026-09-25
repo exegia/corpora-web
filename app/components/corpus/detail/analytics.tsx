@@ -2,7 +2,8 @@ import type { CorpusArchive } from "@/lib/api"
 import type { CorpusDocument } from "@/lib/corpus"
 import Corpus from "@/lib/corpus"
 import Panel from "./panel"
-import { abbreviateSection, formatCompact, formatCount } from "./utils"
+import { abbreviateSection} from "./utils"
+import { formatCompact, formatCount } from "@/lib/utils"
 
 function maxCount(values: number[]): number {
   return Math.max(1, ...values)

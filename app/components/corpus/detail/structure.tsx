@@ -10,7 +10,7 @@ import Corpus from "@/lib/corpus"
 import { type CorpusDocument } from "@/lib/corpus"
 import Panel from "./panel"
 import type { StructureNode } from "./types"
-import { formatCount } from "./utils"
+import { formatCount } from "@/lib/utils"
 
 function LoadingRows({ depth }: { depth: number }) {
     return (

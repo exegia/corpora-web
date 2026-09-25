@@ -12,10 +12,9 @@ import CorporaApi, {
   type CorpusVersionDiff,
 } from "@/lib/api"
 import type { CorpusDocument } from "@/lib/corpus"
-import { formatSize } from "../list/utils"
 import Panel from "./panel"
-import { formatDateTime } from "./utils"
 import type { ActivityEvent, VersionEntry } from "./types"
+import { formatDateTime, formatSize } from "@/lib/utils"
 
 function activityFor(
   document: CorpusDocument,
@@ -62,8 +61,9 @@ function activityTimestamp(iso: string, now: Date = new Date()): string {
   const then = new Date(iso).getTime()
   if (Number.isNaN(then)) return ""
   const delta = now.getTime() - then
-  const day = 1000 * 60 * 60 * 24
-  if (delta < day) return formatDateTime(iso).replace(/.*,\s*/, "")
+    const day = 1000 * 60 * 60 * 24
+    const dateTime = formatDateTime(iso)
+  if (dateTime && delta < day) return dateTime.replace(/.*,\s*/, "")
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

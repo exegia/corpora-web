@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { OverviewTableProps } from "./types"
-import { formatCount } from "./utils"
+import { formatCount } from "@/lib/utils"
 
 /** The Overview tab's sections table (title, nodes, words). */
 export default function OverviewTable({

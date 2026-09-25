@@ -2,7 +2,7 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import type { Lemma } from "./types"
-import { formatCount } from "./utils"
+import { formatCount } from "@/lib/utils"
 
 function Row({ label, value }: { label: string; value: string }) {
   return (

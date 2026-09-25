@@ -1,98 +1,65 @@
-import { useContext, type ReactNode } from "react"
+import type { ReactNode } from "react"
 import { CONVERSION_PANEL_WIDTH } from "@/components/corpus/convert/utils"
-import {
-  ShellPanelsContext,
-  useAppShellPanels,
-} from "@/components/layouts/shell-panels"
+import { useAppShellPanels } from "@/components/layouts/shell-panels"
 import { License } from "@/components/licenses"
 import { Button } from "@/components/ui/button"
-import { formatSize, TYPE_LABELS } from "../list/utils"
 import EditPanel from "./edit-panel"
-import Panel from "./panel"
 import type { DetailsCardProps } from "./types"
-import { formatCount, formatDateTime } from "./utils"
+import { Card, Frame, FrameHeader } from "@exegia/corpora-ui"
+import { File, Pencil } from "lucide-react"
+import { cn, formatSize, formatDateTime, formatCount } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { TYPE_LABELS } from "@/components/constant"
 
-function Item({
-  label,
-  children,
-}: {
-  label: string
-  children: ReactNode
-}) {
-  return (
-    <div>
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="mt-0.5 text-sm">{children}</dd>
-    </div>
-  )
+function Item({ label, children, className }: { label: string; children?: ReactNode; className?: string }) {
+    return (
+        <div className="flex flex-row sm:flex-col">
+            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dd className={cn("mt-0.5 text-sm", className, children ? "" : "text-muted-foreground/50 italic")}>
+                {children ?? "unknown"}
+            </dd>
+        </div>
+    )
 }
 
 function DetailsBody({ document }: DetailsCardProps) {
-  const { openPanel, setOpen, resizePanel } = useAppShellPanels()
+    const { openPanel, setOpen, resizePanel } = useAppShellPanels()
 
-  function handleEdit() {
-    resizePanel(CONVERSION_PANEL_WIDTH)
-    openPanel(
-      "right",
-      <EditPanel
-        document={document}
-        onClose={() => setOpen(false, "right")}
-      />,
+    function handleEdit() {
+        resizePanel(CONVERSION_PANEL_WIDTH)
+        openPanel("right", <EditPanel document={document} onClose={() => setOpen(false, "right")} />)
+    }
+
+    return (
+        <Frame className="flex-1 rounded-lg">
+            <FrameHeader className="mb-2 flex flex-row items-center justify-between px-3.5 py-2">
+                <span className="text-sm text-secondary-foreground/60">Details</span>
+                <Button className="flex gap-2" onClick={handleEdit} size="sm" type="button" variant="outline">
+                    <Pencil className="scale-90" /> Edit
+                </Button>
+            </FrameHeader>
+            <Card render={<dl />} className="flex flex-col gap-3 p-4">
+                <Item label="Title">{document.name}</Item>
+                <Item label="Description">{document.description}</Item>
+                <Item label="Type">{document.corpusType ? TYPE_LABELS[document.corpusType] : undefined}</Item>
+                <Item label="Size">{formatSize(document.sizeBytes)}</Item>
+                <Item label="Nodes">{formatCount(document.nodes)}</Item>
+                <Item label="Documents">{formatCount(document.docsCount)}</Item>
+                <Item label="Language">{document.language}</Item>
+                <Item label="Source format">
+                    <Badge variant="secondary" size="lg">
+                        <File aria-hidden="true" />
+                        {document.sourceFormat}
+                    </Badge>
+                </Item>
+                <Item label="License">{document.licence && <License.DetailSheet label={document.licence} />}</Item>
+                <Item label="Uploaded">{formatDateTime(document.uploadedAt)}</Item>
+                <Item label="Converted">{formatDateTime(document.convertedAt)}</Item>
+            </Card>
+        </Frame>
     )
-  }
-
-  return (
-    <Panel
-      title="Details"
-      actions={
-        <Button onClick={handleEdit} size="sm" type="button" variant="outline">
-          Edit
-        </Button>
-      }
-    >
-      <dl className="flex flex-col gap-3">
-        <Item label="Title">{document.name}</Item>
-        <Item label="Description">{document.description || "—"}</Item>
-        {document.corpusType ? (
-          <Item label="Type">{TYPE_LABELS[document.corpusType]}</Item>
-        ) : null}
-        <Item label="Size">{formatSize(document.sizeBytes)}</Item>
-        <Item label="Nodes">{formatCount(document.nodes)}</Item>
-        <Item label="Documents">{formatCount(document.docsCount)}</Item>
-        <Item label="Language">{document.language ?? "—"}</Item>
-        <Item label="Source format">{document.sourceFormat ?? "—"}</Item>
-        <Item label="License">
-          {document.licence ? (
-            <License.DetailSheet label={document.licence} />
-          ) : (
-            "—"
-          )}
-        </Item>
-        <Item label="Uploaded">
-          {document.uploadedAt ? formatDateTime(document.uploadedAt) : "—"}
-        </Item>
-        <Item label="Converted">
-          {document.convertedAt ? formatDateTime(document.convertedAt) : "—"}
-        </Item>
-      </dl>
-    </Panel>
-  )
 }
-
-/** No-op shell so route tests (no AppLayout) can still render the card. */
-const FALLBACK_PANELS = {
-  openPanel: () => {},
-  setOpen: () => {},
-  resizePanel: () => {},
-} as never
-
 /** The left-hand Details card on the corpus detail page. */
 export default function DetailsCard(props: DetailsCardProps) {
-  const panels = useContext(ShellPanelsContext)
-  if (panels) return <DetailsBody {...props} />
-  return (
-    <ShellPanelsContext.Provider value={FALLBACK_PANELS}>
-      <DetailsBody {...props} />
-    </ShellPanelsContext.Provider>
-  )
+    return <DetailsBody {...props} />
 }

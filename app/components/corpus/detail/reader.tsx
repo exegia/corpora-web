@@ -304,7 +304,7 @@ function LiveReader({
             <Skeleton className="h-5 w-2/3" />
           </div>
         ) : (
-          <ol className="flex select-text flex-col gap-6 [&_*]:select-text">
+          <ol className="flex select-text flex-col gap-6 **:select-text">
             {passages.map((passage, index) =>
               passage.tokens?.length ? (
                 <TokenPassage
@@ -350,7 +350,8 @@ export default function Reader({
   archive?: CorpusArchive | null
   onViewOccurrences?: () => void
 }) {
-  if (archive?.index.sections?.items.length) {
+    if (archive?.index.sections?.items.length) {
+      console.log(archive.index.sections)
     return (
       <LiveReader
         corpusId={corpusId}
