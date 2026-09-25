@@ -1,7 +1,7 @@
 import type { Capabilities, CorporaApiErrorKind, SourceFormat } from "./types";
 
 export const CORPORA_API_URL: string =
-  import.meta.env.VITE_CORPORA_API_URL ?? "https://api.exegia.co"
+  import.meta.env.VITE_CORPORA_API_URL ?? "http://192.168.0.225:8000"
 
 export const EXTENSION_TO_FORMAT: Record<string, SourceFormat> = {
   epub: "epub",

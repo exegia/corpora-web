@@ -5,6 +5,7 @@ import type { Json } from "@/types/database";
 import type { CorpusSource } from "@/lib/projects";
 import Project from "@/lib/projects";
 import { getSupabase } from "../supabase";
+import { createUuid } from "../uuid";
 import { CORPUS_BUCKET, DOCUMENT_COLUMNS } from "./constants";
 import type { CorpusCommitInput, CorpusDocument, CorpusMetadataInput, DocumentRow } from "./types";
 import { isHuggingFaceUrl, toDocument } from "./utils";
@@ -50,7 +51,7 @@ export async function uploadCorpusFile(file: File): Promise<string> {
   if (!file.name.endsWith(".corpus")) {
     throw new Project.Errors.DataError("validation", "Pick a .corpus file.")
   }
-  const path = `${crypto.randomUUID()}/${file.name}`
+  const path = `${createUuid()}/${file.name}`
   const { error } = await getSupabase()
     .storage.from(CORPUS_BUCKET)
     .upload(path, file, { upsert: true })

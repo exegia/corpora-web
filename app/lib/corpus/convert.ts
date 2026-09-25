@@ -23,6 +23,7 @@ import {
 } from "./constants"
 import type { ConversionEntry, ConversionLog, ConversionStep, ConversionStepId, RunConversionOptions } from "./types"
 import { defaultDelay, formatBytes } from "./utils"
+import { createUuid } from "../uuid"
 
 /** Library heading: job display_name, then manifest name, then a de-slugged stem. */
 export function libraryTitle(input: {
@@ -44,7 +45,7 @@ export function createConversionEntry(file: {
     lastModified: number
 }): ConversionEntry {
     return {
-        id: crypto.randomUUID(),
+        id: createUuid(),
         name: file.name,
         size: file.size,
         type: file.type || "text/xml",

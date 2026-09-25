@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import CorporaApi, { CorporaApiError } from "@/lib/api"
 import type { JobStatusMessage } from "@/lib/api"
 import Corpus, { formatBytes } from "@/lib/corpus"
@@ -70,7 +70,31 @@ beforeEach(() => {
   vi.mocked(CorporaApi.downloadConversion).mockResolvedValue(new Blob(["corpus-bytes"]))
 })
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe("corpus-convert transport", () => {
+  it("starts a PDF conversion when randomUUID is unavailable on HTTP", async () => {
+    vi.stubGlobal("crypto", {
+      getRandomValues: crypto.getRandomValues.bind(crypto),
+    })
+    vi.mocked(CorporaApi.getConversion).mockResolvedValue(job("succeeded"))
+    const pdf = new File(["%PDF-1.7"], "aramaic-grammar.pdf", { type: "application/pdf" })
+
+    const { final, snapshots } = await runToEnd(pdf)
+
+    expect(CorporaApi.createConversion).toHaveBeenCalledWith({
+      file: pdf,
+      sourceFormat: "pdf",
+      name: "aramaic-grammar",
+    })
+    expect(snapshots[0].status).toBe("uploading")
+    expect(final.status).toBe("ready")
+    expect(final.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(Corpus.Convert.createConversionEntry(pdf).id).not.toBe(final.id)
+  })
+
   it("walks a real job to ready: poll, validate, download", async () => {
     vi.mocked(CorporaApi.getConversion)
       .mockResolvedValueOnce(job("queued"))
