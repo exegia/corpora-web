@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { TableCell, TableRow } from "@/components/ui/table"
 import { formatDate } from "@/lib/format"
 import type { RowProps } from "./types"
-import { fileIconFor, formatOf, formatSize, TYPE_BADGE_VARIANTS, TYPE_LABELS } from "./utils"
+import { TYPE_BADGE_VARIANTS, TYPE_LABELS } from "./utils"
+import { fileIconFor, formatOf, formatSize } from "@/lib/utils"
 
 /**
  * One corpus in the table — a stretched-link row (docs/ui-patterns.md): the

@@ -1,5 +1,3 @@
-import { type IFileIconProps as FileIconProps, FileWordmarkCorpus } from "@exegia/corpora-ui"
-import type { ComponentType } from "react"
 import type { BadgeProps } from "@/components/ui/badge"
 import type { CorpusDocument, CorpusType } from "@/lib/corpus"
 import type { CorpusFilters, DateFilter } from "./types"
@@ -30,39 +28,7 @@ export const TYPE_LABELS: Record<CorpusType, string> = {
   docs: "Docs",
 }
 
-export function formatSize(bytes: number | null): string {
-  if (bytes === null) return "—"
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(0)} KB`
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
-  return `${(bytes / 1024 ** 3).toFixed(1)} GB`
-}
 
-function isCorpusObject(document: CorpusDocument): boolean {
-  return (
-    document.source !== "huggingface" ||
-    Boolean(document.filename && /\.corpus$/i.test(document.filename))
-  )
-}
-
-/** The file type shown on the library row and detail header. */
-export function formatOf(document: CorpusDocument): string {
-  return isCorpusObject(document) ? ".corpus" : "Hugging Face"
-}
-
-/**
- * The corpora-ui wordmark for the library object. Converted and uploaded
- * rows are always `.corpus` (source format lives on the details card).
- */
-export function fileIconFor(
-  document: CorpusDocument,
-): ComponentType<FileIconProps> | null {
-  return isCorpusObject(document) ? FileWordmarkCorpus : null
-}
-
-export function subtitleOf(document: CorpusDocument): string {
-  return `${formatOf(document)} · ${document.licence ?? "No licence"}`
-}
 
 const DATE_WINDOWS: Record<Exclude<DateFilter, "any">, number> = {
   "7d": 7 * 24 * 60 * 60 * 1000,
