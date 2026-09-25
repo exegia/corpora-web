@@ -1,6 +1,9 @@
 import type { ReactNode } from "react"
 import type { CorpusCommit, ProjectCorpus } from "@/lib/projects"
 
+export * from "./detail/types"
+export * from "./list/types"
+
 export interface CommitRowProps {
     commit: CorpusCommit
 }
