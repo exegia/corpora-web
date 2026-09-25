@@ -14,7 +14,6 @@ import { Blocks } from "@/components/blocks"
 import { CorpusDetail } from "@/components/corpus/detail"
 import type { ExploreTab } from "@/components/corpus/detail/types"
 import {
-  formatCount,
   parseExploreTab,
   sectionByTitle,
 } from "@/components/corpus/detail/utils"
@@ -33,7 +32,7 @@ import Corpus from "@/lib/corpus"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import Project from "@/lib/projects"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
-import { cn } from "@/lib/utils"
+import { cn, formatCount } from "@/lib/utils"
 
 export type CorpusExplorerContext = {
   document: CorpusDocument

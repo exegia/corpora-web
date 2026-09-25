@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { Provider } from "jotai"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import Corpus, { type ConversionEntry, type ConversionLog, type CorpusDocument } from "@/lib/corpus"
 import { AppLayout } from "@/components/layouts/app-layout"
 import CorpusRoute, { clientAction, clientLoader } from "@/routes/corpus/index"
@@ -178,6 +178,10 @@ beforeEach(() => {
     vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([peshitta, septuagint])
 })
 
+afterEach(() => {
+    vi.unstubAllGlobals()
+})
+
 describe("/corpus library", () => {
     it("lists documents in the table with their metadata", async () => {
         renderRoute()
@@ -278,7 +282,12 @@ describe("/corpus library", () => {
         )
     })
 
-    it("shows the running pill and the drawer while a conversion is in flight", async () => {
+    it.each([true, false])("shows conversion progress with native randomUUID available: %s", async hasRandomUuid => {
+        if (!hasRandomUuid) {
+            vi.stubGlobal("crypto", {
+                getRandomValues: crypto.getRandomValues.bind(crypto),
+            })
+        }
         const user = userEvent.setup()
         scriptConversion("queued")
         renderRoute()
