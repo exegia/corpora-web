@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "dotenvx run -- react-router dev",
-        "dev:local": "dotenvx run -f .env.local -f .env -- react-router dev --open",
+        "dev:local": "dotenvx run -f .env.local -f .env -- react-router dev --host 0.0.0.0 --force",
         "build": "dotenvx run -- react-router build",
         "preview": "vite preview",
         "typecheck": "dotenvx run -- react-router typegen && tsc",
@@ -16,7 +16,7 @@
     "dependencies": {
         "@base-ui/react": "1.8.0",
         "@dotenvx/dotenvx": "^2.21.0",
-        "@exegia/corpora-ui": "2.0.0",
+        "@exegia/corpora-ui": "3.1.0",
         "@exegia/plugin-supabase-auth": "0.12.0",
         "@exegia/use-auth": "0.12.0",
         "@supabase/supabase-js": "^2.112.3",
