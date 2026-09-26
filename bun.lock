@@ -7,7 +7,7 @@
       "dependencies": {
         "@base-ui/react": "1.8.0",
         "@dotenvx/dotenvx": "^2.21.0",
-        "@exegia/corpora-ui": "3.1.0",
+        "@exegia/corpora-ui": "4.0.0",
         "@exegia/plugin-supabase-auth": "0.12.0",
         "@exegia/use-auth": "0.12.0",
         "@supabase/supabase-js": "^2.112.3",
@@ -163,7 +163,7 @@
 
     "@emnapi/wasi-threads": ["@emnapi/wasi-threads@2.0.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-9DsSk+o5NBX0CCJT8s0EROGSGxjR/tKu6aBTaVyq+SjAEQH4XcdcRxPBRzsBLizTTJ49MJjF+jgu3qnO9GLQcQ=="],
 
-    "@exegia/corpora-ui": ["@exegia/corpora-ui@3.1.0", "", { "dependencies": { "@base-ui/react": "^1.8.0", "@exegia/specular": "^0.1.2", "@omsimos/react-highlight-popover": "^1.4.1", "@remixicon/react": "^4.9.0", "@samasante/liquid-glass": "^0.1.1", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "cn": "^0.2.6", "cuelume": "^0.2.2", "echarts": "^6.1.0", "frimousse": "^0.3.0", "iconsax-reactjs": "^0.0.8", "lucide": "^1.45.0", "lucide-react": "^1.45.0", "morphicons": "^1.7.1", "motion": "^13.2.0", "motion-icons-react": "^1.1.0", "motion-panels": "^0.5.2", "react-markdown": "^10.1.0", "recharts": "^3.10.1", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "jotai": "^3.0.0", "react": "^19.2.0", "react-dom": "^19.2.0" } }, "sha512-04gcBF7IlaC9RH+05Uj83Li1I7H2kyG1AuP8BYfUeWxQ8Ghd3Qgyhtuel2QPM6obKOFfI4yKIdezukFwnIM+5w=="],
+    "@exegia/corpora-ui": ["@exegia/corpora-ui@4.0.0", "", { "dependencies": { "@base-ui/react": "^1.8.0", "@exegia/specular": "^0.1.2", "@omsimos/react-highlight-popover": "^1.4.1", "@remixicon/react": "^4.9.0", "@samasante/liquid-glass": "^0.1.1", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "cn": "^0.2.6", "cuelume": "^0.2.2", "echarts": "^6.1.0", "frimousse": "^0.3.0", "iconsax-reactjs": "^0.0.8", "lucide": "^1.45.0", "lucide-react": "^1.45.0", "morphicons": "^1.7.1", "motion": "^13.2.0", "motion-icons-react": "^1.1.0", "motion-panels": "^0.5.2", "react-day-picker": "^10.0.1", "react-markdown": "^10.1.0", "recharts": "^3.10.1", "tailwind-merge": "^3.6.0" }, "peerDependencies": { "jotai": "^3.0.0", "react": "^19.2.0", "react-dom": "^19.2.0" } }, "sha512-E8cMwfJAEXp10VdW0/E3AMaocgt/jZ47LiC8KN/seVYoWbLc5aQ2iGzDBVcNJsI8ampvfDba61xw525xASykJw=="],
 
     "@exegia/plugin-supabase-auth": ["@exegia/plugin-supabase-auth@0.12.0", "", { "dependencies": { "@supabase/auth-js": "^2.111.0", "@tauri-apps/api": "^2.11.1" } }, "sha512-sxjl2x6CYkMubaK9zCZ7dmi0VhiP9CfI7TyczaZjvrm8DnC3CTXLQ4ujTARL82EJ/UHLWPvM8tL8cAy7m7N6wQ=="],
 
