@@ -122,7 +122,9 @@ nothing for those pseudo-elements.
 
 ## Vite dev-server note
 
-`vite.config.ts` declares every bare import in `optimizeDeps.include`. Without
-it Vite discovers deps lazily per route, re-optimises mid-session, and in-flight
-requests for the previous hash fail with **504 Outdated Optimize Dep**. Add new
-dependencies to that list — including `@base-ui/react/*` subpaths.
+`vite.config.ts` scans application source files up front through
+`optimizeDeps.entries`, excluding tests. Base UI subpaths are pre-bundled with
+`@base-ui/react/*`, and `@exegia/corpora-ui` is explicitly included for linked
+checkouts. This avoids discovering dependencies lazily during navigation and
+invalidating in-flight requests with **504 Outdated Optimize Dep**. New static
+app imports and Base UI subpaths are covered automatically.

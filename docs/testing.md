@@ -1,6 +1,6 @@
 # Testing notes
 
-Vitest + jsdom + Testing Library. `app/**/*.test.{ts,tsx}`. Routes are exercised
+Vitest + jsdom + Testing Library, configured in `vitest.config.ts`. `app/**/*.test.{ts,tsx}`. Routes are exercised
 through `createRoutesStub`.
 
 ```tsx

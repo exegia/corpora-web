@@ -23,7 +23,7 @@ make pr-guard BASE=... HEAD=... TITLE=...  # validate PR guard locally
 - Client-only SPA: `VITE_*` vars are **inlined into public JS at build time**. Never put secrets behind `VITE_`.
 - Local `.env` is **encrypted with dotenvx** (key in `.env.keys`, never committed). Scripts use `dotenvx run`. Vercel's `vercel.json` buildCommand is `react-router build` (no dotenvx) — Vercel env vars are the only source there.
 - `vercel.json` pins `framework: null`, `outputDirectory: build/client`, rewrites `/(.*)` → `/index.html` for SPA deep links, immutable cache on `/assets/*`.
-- `vite.config.ts:optimizeDeps.include` must list every `@base-ui/react/*` subpath and bare import used transitively — otherwise Vite lazy re-optimizes and in-flight requests 504. After bumping `@exegia/corpora-ui`, add new subpaths there.
+- `vite.config.ts:optimizeDeps.entries` scans app source (excluding tests) up front to prevent navigation-time dependency reloads and 504s. `include` covers linked `@exegia/corpora-ui` and all `@base-ui/react/*` subpaths; new static imports need no manual list updates.
 - `vite.config.ts:server.fs.allow` includes resolved `node_modules` — required for git worktrees (otherwise `vite dev` serves blank).
 - `.npmrc` pins `@exegia:registry=https://registry.npmjs.org/` — don't switch to `npm.pkg.github.com` or `bun.lock` bakes authed URLs that 401 in CI/Vercel. Verify with `HOME=/tmp/empty bun install --frozen-lockfile`.
 
@@ -37,7 +37,7 @@ make pr-guard BASE=... HEAD=... TITLE=...  # validate PR guard locally
 - `app/components/ui/*` are thin re-exports of `@exegia/corpora-ui` — check `node_modules/@exegia/corpora-ui/src/...` or `../corpora-ui/react/src/...` before restyling; if change is generic, it belongs upstream (`extract-component` skill, `docs/corpora-ui.md`). `button.tsx` wraps with `sound` default; `Input`'s `className` lands on the wrapper, not inner `<input>` (`docs/ui-patterns.md`).
 - corpora-py conversion service is **poll-only** (polling advances the job) — see `specs/004-connect-with-py/contracts/corpora-api.md`.
 
-## Testing (`docs/testing.md`, `vitest.config` in `vite.config.ts`)
+## Testing (`docs/testing.md`, `vitest.config.ts`)
 - `app/**/*.test.{ts,tsx}`, jsdom, `setupFiles: app/test/setup.ts` (stubs `ResizeObserver`, `Element.prototype.getAnimations`, `matchMedia` — without these every layout route crashes).
 - Route tests use `createRoutesStub` — must pass `HydrateFallback: () => null` for any route with `clientLoader`, and cast `loader`/`action` as `never`.
 - Deferred content needs `findBy*` not `getBy*`. Don't use a heading as a load proxy — `project/:projectId` header resolves before panels. Skeletons are `role="status"` so bare `getByRole("status")` is ambiguous — query by text then assert role.

@@ -83,9 +83,8 @@ HOME=/tmp/empty bun install --frozen-lockfile
 ## Version bumps
 
 After a component is published, update here with
-`bun add @exegia/corpora-ui@<version>`, then add any new `@base-ui/react/*`
-subpaths to `optimizeDeps.include` in `vite.config.ts` (see
-[motion.md](motion.md) for why).
+`bun add @exegia/corpora-ui@<version>`. Vite scans app imports and pre-bundles
+Base UI subpaths automatically (see [motion.md](motion.md)).
 
 Keep `bun.lock` committed and in sync — CI installs with `--frozen-lockfile`, so
 bumping a range in `package.json` without re-resolving fails the build before
