@@ -19,7 +19,7 @@ export default function CorpusOverviewRoute() {
     return (
         <div className="flex flex-col gap-3 sm:flex-row">
             <CorpusDetail.DetailsCard document={document} />
-            <CorpusDetail.DetailsCard document={document} />
+            <CorpusDetail.SlotByNodeCard document={document} />
         </div>
     )
 }
