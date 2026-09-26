@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { createStore } from "jotai"
-import { addSelection, createChatAtom } from "./state"
+import { addSelection, chatStateAtom, resetChatAtom } from "./state"
 import { selectedPassages, selectionScope } from "./utils"
 
 const passages = [
@@ -54,17 +54,18 @@ describe("reader selection scope", () => {
     })
 })
 
-describe("layout-owned chat contexts", () => {
+describe("shared chat state", () => {
     it("preserves the original scope on navigation and retains explicit re-scopes", () => {
         const store = createStore()
-        const state = createChatAtom()
+        const state = chatStateAtom
         store.set(state, s => addSelection(s, scope()))
         store.set(state, s => ({ ...s, location: { corpusId: "corpus-1", ref: "Q.2" } }))
         expect(store.get(state).sections[0].location).toBe("Q.1.a.1")
         store.set(state, s => addSelection(s, { ...scope("A different passage"), location: "Q.2" }))
         expect(store.get(state).sections).toHaveLength(2)
         expect(store.get(state).active).toBe(1)
-        const freshSession = createChatAtom()
-        expect(store.get(freshSession).sections).toEqual([])
+        expect(createStore().get(chatStateAtom).sections).toEqual([])
+        store.set(resetChatAtom)
+        expect(store.get(chatStateAtom)).toEqual({ sections: [], active: -1, location: null })
     })
 })

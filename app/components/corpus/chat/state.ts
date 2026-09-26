@@ -1,10 +1,12 @@
 import { atom, useAtomValueRawSync, useSetAtom } from "jotai"
-import { createContext, useContext } from "react"
 import type { ChatState, ReaderScope } from "./types"
 
-export function createChatAtom() {
-    return atom<ChatState>({ sections: [], active: -1, location: null })
-}
+export const chatStateAtom = atom<ChatState>({ sections: [], active: -1, location: null })
+chatStateAtom.debugLabel = "corpus-chat/state"
+
+export const resetChatAtom = atom(null, (_get, set) => {
+    set(chatStateAtom, { sections: [], active: -1, location: null })
+})
 
 export function addSelection(state: ChatState, selection: ReaderScope): ChatState {
     const current = state.sections[state.active]
@@ -20,14 +22,7 @@ export function addSelection(state: ChatState, selection: ReaderScope): ChatStat
     return { ...state, sections: [...state.sections, selection], active: state.sections.length }
 }
 
-// The atom belongs to the signed-in layout, not to a route or a global store.
-// Navigation preserves it; leaving the layout (including logout) discards it.
-export const ChatContext = createContext<ReturnType<typeof createChatAtom> | null>(null)
-export function useChatAtom() {
-    return useContext(ChatContext)
-}
+/** Shared by reader and panel in the root store; reset when the session ends. */
 export function useChatState() {
-    const state = useChatAtom()
-    if (!state) throw new Error("Corpus chat requires ChatProvider")
-    return [useAtomValueRawSync(state), useSetAtom(state)] as const
+    return [useAtomValueRawSync(chatStateAtom), useSetAtom(chatStateAtom)] as const
 }

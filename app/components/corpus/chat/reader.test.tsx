@@ -1,13 +1,11 @@
-import { useMemo, useState, type ReactNode } from "react"
-import { Provider, createStore } from "jotai"
+import { useState } from "react"
+import { Provider } from "jotai"
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { IShellPanelControls } from "@exegia/corpora-ui"
 import CorporaApi, { type CorpusArchive } from "@/lib/api"
-import { ShellPanelsContext } from "@/components/layouts/shell-panels"
+import { useAppShellPanels } from "@/components/layouts/shell-layout"
 import Reader from "../detail/reader"
-import ChatProvider from "./provider"
 
 vi.mock("@/lib/api", async load => {
     const original = await load<typeof import("@/lib/api")>()
@@ -54,33 +52,19 @@ const passages = [
         ],
     },
 ]
-function Harness() {
-    const [panel, setPanel] = useState<ReactNode>(null)
-    const [open, setOpen] = useState(false)
+function ReaderRoute() {
     const [mounted, setMounted] = useState(true)
-    const shell = useMemo(
-        () =>
-            ({
-                resizePanel: vi.fn(),
-                openPanel: (_: string, content: ReactNode) => {
-                    setPanel(content)
-                    setOpen(true)
-                },
-                setOpen: (value: boolean) => setOpen(value),
-            }) as unknown as IShellPanelControls,
-        []
-    )
+    const { open, providerProps } = useAppShellPanels()
     return (
-        <Provider store={useMemo(() => createStore(), [])}>
-            <ShellPanelsContext.Provider value={shell}>
-                <ChatProvider>
-                    <button onClick={() => setMounted(v => !v)}>Toggle reader route</button>
-                    {mounted && <Reader corpusId="c1" archive={archive} sectionTitle="Part one" />}
-                    {open && panel}
-                </ChatProvider>
-            </ShellPanelsContext.Provider>
-        </Provider>
+        <>
+            <button onClick={() => setMounted(v => !v)}>Toggle reader route</button>
+            {mounted && <Reader corpusId="c1" archive={archive} sectionTitle="Part one" />}
+            {open.right && providerProps.panelComponents?.right}
+        </>
     )
+}
+function Harness() {
+    return <Provider><ReaderRoute /></Provider>
 }
 beforeEach(() => {
     vi.clearAllMocks()

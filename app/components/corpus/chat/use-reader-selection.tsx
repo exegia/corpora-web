@@ -1,11 +1,11 @@
-import { useContext, useEffect, useRef, useState, type RefObject } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 import { useStore } from "jotai"
 import { SelectionPopover } from "@exegia/corpora-ui"
 import type { CorpusPassage } from "@/lib/api"
-import { ShellPanelsContext } from "@/components/layouts/shell-panels"
+import { useAppShellPanels } from "@/components/layouts/shell-layout"
 import type { Lemma } from "../detail/types"
 import Panel from "./panel"
-import { addSelection, useChatAtom } from "./state"
+import { addSelection, chatStateAtom } from "./state"
 import { selectedPassages, selectionScope } from "./utils"
 import type { ReaderSelection } from "./types"
 
@@ -26,9 +26,8 @@ export function useReaderSelection({
 }) {
     const restore = useRef<HTMLElement | null>(null)
     const request = useRef({ id: 0 })
-    const stateAtom = useChatAtom()
     const store = useStore()
-    const shell = useContext(ShellPanelsContext)
+    const shell = useAppShellPanels()
     const [selection, setSelection] = useState<ReaderSelection | null>(null)
     const [word, setWord] = useState<Lemma | null>(null)
     const [anchor, setAnchor] = useState({ top: 0, left: 0 })
@@ -36,13 +35,12 @@ export function useReaderSelection({
     useEffect(() => {
         const sequence = request.current
         sequence.id++
-        if (!stateAtom) return
-        store.set(stateAtom, state => ({ ...state, location: { corpusId, ref: location } }))
+        store.set(chatStateAtom, state => ({ ...state, location: { corpusId, ref: location } }))
         return () => {
             sequence.id++
-            store.set(stateAtom, state => ({ ...state, location: null }))
+            store.set(chatStateAtom, state => ({ ...state, location: null }))
         }
-    }, [corpusId, location, stateAtom, store])
+    }, [corpusId, location, store])
 
     function returnFocus() {
         const element = restore.current?.isConnected
@@ -111,15 +109,15 @@ export function useReaderSelection({
         if (id === request.current.id) inspect(lemma, passage, element, wordNode)
     }
     function addToChat() {
-        if (!selection || !stateAtom || !shell) return
-        store.set(stateAtom, state => addSelection(state, selection))
+        if (!selection) return
+        store.set(chatStateAtom, state => addSelection(state, selection))
         setSelection(null)
         window.getSelection()?.removeAllRanges()
         shell.resizePanel(384)
         shell.openPanel("right", <Panel returnFocus={returnFocus} />)
     }
     const popover =
-        selection && selection.corpusId === corpusId && selection.location === location && stateAtom && shell ? (
+        selection && selection.corpusId === corpusId && selection.location === location ? (
             <SelectionPopover
                 open
                 variant={word ? "word" : "node"}

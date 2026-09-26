@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import { AiPanel } from "@exegia/corpora-ui"
 import { Button } from "@/components/ui/button"
-import { useAppShellPanels } from "@/components/layouts/shell-panels"
+import { useAppShellPanels } from "@/components/layouts/shell-layout"
 import { useChatState } from "./state"
 
 export default function ChatPanel({ returnFocus }: { returnFocus: () => void }) {
