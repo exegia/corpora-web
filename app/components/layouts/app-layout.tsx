@@ -73,17 +73,22 @@ export function AppLayout({ user }: { user?: SessionUser }) {
     return (
         <ShellPanelsContext.Provider value={shell}>
             <CorpusChat.Provider>
-            <ConversionContext.Provider value={conversion}>
-                <Layout.Main {...providerProps} className="pt-2!" variant="web" header={renderHeader()} panels={panels}>
-                    <ScrollArea className="route-scroll min-h-0 flex-1" fill>
-                        <main className="p-6">
-                            {/* Routes reach the conversion controller (pill + actions
-                                in their own headers) through the outlet context. */}
-                            <Outlet context={conversion} />
-                        </main>
-                    </ScrollArea>
-                </Layout.Main>
-            </ConversionContext.Provider>
+                <ConversionContext.Provider value={conversion}>
+                    <Layout.Main
+                        {...providerProps}
+                        className="pt-2!"
+                        variant="web"
+                        header={renderHeader()}
+                        panels={panels}>
+                        <ScrollArea className="route-scroll min-h-0 flex-1" fill>
+                            <main className="p-6">
+                                {/* Routes reach the conversion controller (pill + actions
+                                  in their own headers) through the outlet context. */}
+                                <Outlet context={conversion} />
+                            </main>
+                        </ScrollArea>
+                    </Layout.Main>
+                </ConversionContext.Provider>
             </CorpusChat.Provider>
         </ShellPanelsContext.Provider>
     )

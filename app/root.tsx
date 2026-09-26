@@ -1,8 +1,8 @@
 import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router"
-import { AnchoredToastProvider, ToastProvider } from "@/components/ui/toast"
 import type { Route } from "./+types/root"
 import { THEME_INIT_SCRIPT } from "@/lib/theme"
 import { ExegiaProvider } from "@exegia/corpora-ui"
+import "@exegia/corpora-ui/index.css"
 import "./app.css"
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -20,14 +20,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </head>
             <body className="relative h-screen w-full overflow-hidden">
                 <ExegiaProvider>
-                    <ToastProvider>
-                        <AnchoredToastProvider>
-                            <div className="absolute top-0 left-0 h-full w-full scrollbar-none overflow-hidden">
-                                {children}
-                                <ScrollRestoration />
-                            </div>
-                        </AnchoredToastProvider>
-                    </ToastProvider>
+                  {children}
+                  <ScrollRestoration />
                 </ExegiaProvider>
                 <Scripts />
             </body>

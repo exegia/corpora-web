@@ -35,7 +35,6 @@ export default [
             index("routes/corpus/corpus.$documentId._index.tsx"),
             route("documents", "routes/corpus/corpus.$documentId.documents.tsx"),
             route("structure", "routes/corpus/corpus.$documentId.structure.tsx"),
-            route("analytics", "routes/corpus/corpus.$documentId.analytics.tsx"),
             route("activity", "routes/corpus/corpus.$documentId.activity.tsx"),
         ]),
         route("licenses", "routes/licenses.tsx"),

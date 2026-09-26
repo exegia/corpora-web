@@ -25,7 +25,7 @@ export default function CorpusDocumentsRoute() {
       corpusId={document.id}
       key={section.title}
       onViewOccurrences={() =>
-        navigate("../analytics", { preventScrollReset: true })
+        navigate("..", { preventScrollReset: true })
       }
       sectionTitle={section.title}
     />

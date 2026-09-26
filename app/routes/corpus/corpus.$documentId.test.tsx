@@ -11,9 +11,13 @@ import CorpusDetailRoute, {
 } from "@/routes/corpus/corpus.$documentId"
 import CorpusOverviewRoute from "@/routes/corpus/corpus.$documentId._index"
 import CorpusActivityRoute from "@/routes/corpus/corpus.$documentId.activity"
-import CorpusAnalyticsRoute from "@/routes/corpus/corpus.$documentId.analytics"
 import CorpusDocumentsRoute from "@/routes/corpus/corpus.$documentId.documents"
 import CorpusStructureRoute from "@/routes/corpus/corpus.$documentId.structure"
+
+vi.mock("@/components/layouts/shell-panels", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/components/layouts/shell-panels")>(),
+  useAppShellPanels: () => ({ openPanel: vi.fn(), setOpen: vi.fn(), resizePanel: vi.fn() }),
+}))
 
 vi.mock("@/lib/corpus", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/corpus")>()
@@ -102,12 +106,6 @@ function renderRoute(entry = "/corpus/d2") {
           action: clientAction as never,
         },
         {
-          path: "analytics",
-          Component: CorpusAnalyticsRoute,
-          // biome-ignore lint: route module functions match at runtime
-          action: clientAction as never,
-        },
-        {
           path: "activity",
           Component: CorpusActivityRoute,
           // biome-ignore lint: route module functions match at runtime
@@ -181,24 +179,45 @@ describe("/corpus/:documentId detail", () => {
     expect(licenceTriggers[0]).toHaveAttribute("data-slot", "sheet-trigger")
   })
 
-  it("shows the Overview sections and enables the explorer tabs", async () => {
+  it("shows corpus charts on Overview and enables the explorer tabs", async () => {
     renderRoute()
     expect(await screen.findByRole("link", { name: "Overview" })).toBeInTheDocument()
-    for (const name of ["Documents", "Structure", "Analytics", "Activity"]) {
+    for (const name of ["Documents", "Structure", "Activity"]) {
       expect(screen.getByRole("link", { name })).toBeInTheDocument()
     }
-    const table = await screen.findByRole("table")
-    expect(table).toHaveTextContent("Prima Pars")
-    expect(table).toHaveTextContent("8,442")
-    expect(table).toHaveTextContent("312,004")
-    expect(table).toHaveTextContent("Supplementum")
+    expect(await screen.findByRole("heading", { name: "Words per document" })).toBeInTheDocument()
+    expect(screen.getByText("Prima Pars")).toBeInTheDocument()
+    expect(screen.getByText("312,004 words")).toBeInTheDocument()
+    expect(screen.getByText(/1 document has no word count/)).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "Analytics" })).not.toBeInTheDocument()
+  })
+
+  it("redirects old analytics bookmarks to Overview", async () => {
+    renderRoute("/corpus/d2/analytics")
+    expect(await screen.findByRole("heading", { name: "Words per document" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page")
+  })
+
+  it("keeps zero word counts and excludes unknown counts", async () => {
+    vi.mocked(Corpus.Documents.getCorpusDocument).mockResolvedValue({
+      ...summa,
+      toc: [
+        { title: "Empty document", nodes: 0, words: 0 },
+        { title: "Unknown document", nodes: 1, words: null },
+      ],
+    })
+    renderRoute()
+    expect(await screen.findByText("0 words")).toBeInTheDocument()
+    expect(screen.getByText("Empty document")).toBeInTheDocument()
+    expect(screen.queryByText("Unknown document")).not.toBeInTheDocument()
+    expect(screen.getByText(/1 document has no word count/)).toBeInTheDocument()
   })
 
   it("shows an explicit empty state for rows without section data", async () => {
     vi.mocked(Corpus.Documents.getCorpusDocument).mockResolvedValue({ ...summa, toc: null })
     renderRoute()
     expect(
-      await screen.findByText("No section data was captured for this corpus."),
+      await screen.findByText("No section word counts were captured for this corpus."),
     ).toBeInTheDocument()
     expect(screen.queryByRole("table")).not.toBeInTheDocument()
   })
@@ -264,18 +283,15 @@ describe("/corpus/:documentId detail", () => {
     )
   })
 
-  it("fills Overview and Analytics from a conversion job when toc is empty", async () => {
-    const user = userEvent.setup()
+  it("fills Overview charts from a conversion job when toc is empty", async () => {
     vi.mocked(Corpus.Documents.getCorpusDocument).mockResolvedValue({ ...summa, toc: null })
     vi.mocked(CorporaApi.loadCorpusArchive).mockResolvedValue(jobArchive)
     renderRoute()
-    const table = await screen.findByRole("table")
-    expect(table).toHaveTextContent("Prima Pars")
+    expect(await screen.findByText("Prima Pars")).toBeInTheDocument()
     expect(
       screen.queryByText("No section data was captured for this corpus."),
     ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole("link", { name: "Analytics" }))
     expect(
       await screen.findByRole("heading", { name: "Nodes by type" }),
     ).toBeInTheDocument()
@@ -296,7 +312,7 @@ describe("/corpus/:documentId detail", () => {
       next_offset: null,
     })
     renderRoute()
-    await user.click(await screen.findByRole("button", { name: "Prima Pars" }))
+    await user.click(await screen.findByRole("link", { name: "Documents" }))
     expect(
       await screen.findByRole("heading", { name: "Prima Pars" }),
     ).toBeInTheDocument()
@@ -312,7 +328,7 @@ describe("/corpus/:documentId detail", () => {
   it("opens the Documents reader from an Overview section row", async () => {
     const user = userEvent.setup()
     renderRoute()
-    await user.click(await screen.findByRole("button", { name: "Prima Pars" }))
+    await user.click(await screen.findByRole("link", { name: "Documents" }))
     expect(await screen.findByRole("heading", { name: "Prima Pars" })).toBeInTheDocument()
     expect(
       await screen.findByText(
@@ -371,7 +387,7 @@ describe("/corpus/:documentId detail", () => {
         node_types: ["word"],
       })
     renderRoute()
-    await user.click(await screen.findByRole("button", { name: "Prima Pars" }))
+    await user.click(await screen.findByRole("link", { name: "Documents" }))
     await user.click(await screen.findByRole("button", { name: "doctrina" }))
     expect(
       await screen.findByRole("heading", { name: "doctrina" }),
@@ -422,7 +438,7 @@ describe("/corpus/:documentId detail", () => {
       occurrences_in_section: 2,
     })
     renderRoute()
-    await user.click(await screen.findByRole("button", { name: "Prima Pars" }))
+    await user.click(await screen.findByRole("link", { name: "Documents" }))
     await user.click(await screen.findByRole("button", { name: "doctrina" }))
     expect(
       await screen.findByRole("heading", { name: "doctrina" }),
@@ -447,7 +463,7 @@ describe("/corpus/:documentId detail", () => {
       screen.queryByRole("heading", { name: "Document hierarchy" }),
     ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole("link", { name: "Analytics" }))
+    await user.click(screen.getByRole("link", { name: "Overview" }))
     expect(
       await screen.findByRole("heading", { name: "Nodes by type" }),
     ).toBeInTheDocument()
