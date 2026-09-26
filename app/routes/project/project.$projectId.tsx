@@ -34,7 +34,7 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
     // (components/breadcrumb), so deferring it there leaves the trail showing
     // "Project" instead of the name. It is one indexed row.
     const project = await Project.Queries.getProject(projectId)
-    // Deliberately not awaited (see routes/project.tsx): the five queries below
+    // Deliberately not awaited (see routes/project/index.tsx): the five queries below
     // are the slow part, so the workspace suspends on this promise and shows the
     // skeleton meanwhile.
     const data = (async () => {

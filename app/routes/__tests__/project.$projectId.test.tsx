@@ -10,7 +10,7 @@ import User from "@/lib/user"
 import WorkspaceRoute, {
   clientAction,
   clientLoader,
-} from "@/routes/project.$projectId"
+} from "@/routes/project/project.$projectId"
 
 vi.mock("@/lib/projects", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/projects")>()

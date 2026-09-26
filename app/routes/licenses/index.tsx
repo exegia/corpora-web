@@ -30,7 +30,7 @@ import Project, { type LicenseStatus } from "@/lib/projects"
 import User from "@/lib/user"
 
 export async function clientLoader() {
-  // Deliberately not awaited (see routes/project.tsx): navigation completes
+  // Deliberately not awaited (see routes/project/index.tsx): navigation completes
   // immediately and the component suspends on this promise, showing the
   // skeleton rows meanwhile.
   const data = Promise.all([Licences.Catalog.listLicences(), User.getSuperadmin()]).then(

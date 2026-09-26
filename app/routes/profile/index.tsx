@@ -45,7 +45,7 @@ import {
   listIdentities,
 } from "@/lib/auth"
 import Profile, { TRADITIONS, VOCATIONS } from "@/lib/profile"
-import type { Route } from "./+types/profile"
+import type { Route } from "./+types/index"
 
 /**
  * The signed-in researcher's persona profile.

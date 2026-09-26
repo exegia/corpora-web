@@ -2,7 +2,7 @@ import { AuthCard, Button } from "@exegia/corpora-ui"
 import { redirect, useNavigate } from "react-router"
 import { Auth } from "@/components/auth"
 import { AuthError, completeAuthRedirect } from "@/lib/auth"
-import type { Route } from "./+types/auth.callback"
+import type { Route } from "./+types/callback"
 
 /**
  * Where every out-of-app auth journey comes back to: an OAuth provider, a

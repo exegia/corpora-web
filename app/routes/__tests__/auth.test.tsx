@@ -4,18 +4,18 @@ import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import AuthCallbackRoute, {
   clientLoader as callbackLoader,
-} from "@/routes/auth.callback"
+} from "@/routes/auth/callback"
 import ForgotPasswordRoute, {
   clientLoader as forgotLoader,
-} from "@/routes/forgot-password"
+} from "@/routes/auth/forgot-password"
 import IndexRoute, { clientLoader as indexLoader } from "@/routes/index"
-import LoginRoute, { clientLoader as loginLoader } from "@/routes/login"
+import LoginRoute, { clientLoader as loginLoader } from "@/routes/auth/login"
 import ProtectedLayout, {
   clientLoader as protectedLoader,
 } from "@/components/layouts/protected-layout"
-import ResetPasswordRoute, { clientLoader as resetLoader } from "@/routes/reset-password"
-import SignupRoute, { clientLoader as signupLoader } from "@/routes/signup"
-import VerifyRoute from "@/routes/verify"
+import ResetPasswordRoute, { clientLoader as resetLoader } from "@/routes/auth/reset-password"
+import SignupRoute, { clientLoader as signupLoader } from "@/routes/auth/signup"
+import VerifyRoute from "@/routes/auth/verify"
 
 // Mocked at the Supabase boundary rather than at `@/lib/auth`, so the real
 // guards, the real redirect vetting and the real error mapping all still run —

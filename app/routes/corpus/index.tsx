@@ -8,7 +8,7 @@ import Project, { type CorpusSource } from "@/lib/projects"
 import { parseCommits, parseToc } from "./utils"
 
 export async function clientLoader() {
-    // Deliberately not awaited (see routes/project.tsx): navigation completes
+    // Deliberately not awaited (see routes/project/index.tsx): navigation completes
     // immediately, the upload controls stay interactive, and the list suspends
     // on this promise, showing the skeleton meanwhile.
     const documents = Corpus.Documents.listCorpusDocuments()
