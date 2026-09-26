@@ -44,3 +44,5 @@ supabase/.temp/
 supabase/.branches/
 # Run 'supabase gen types` to generate the types automatically after login to supabase.
 **/types/database.ts
+
+.remember

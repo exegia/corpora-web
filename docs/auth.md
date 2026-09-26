@@ -93,8 +93,8 @@ it, so an "I agree" button could not actually tick it.
 The body is a **working draft**, marked as such in the dialog itself, and needs
 real reviewed wording before public sign-ups.
 
-`app/routes.ts` puts the first five under `routes/auth-layout.tsx` (centered
-card, no sidebar) and everything else under `routes/protected-layout.tsx`,
+`app/routes.ts` puts the first five under `components/layouts/auth-layout.tsx` (centered
+card, no sidebar) and everything else under `components/layouts/protected-layout.tsx`,
 whose `clientLoader` calls `requireSession` before any child loader runs. That
 is why no protected route repeats the check. `root.tsx` is now just an
 `<Outlet />`.
@@ -111,7 +111,7 @@ the blocks' progressive-disclosure feel.
 2. **It also rejects absolute and protocol-relative URLs** — otherwise
    `?redirectTo=https://evil.example` is an open redirect off the login screen.
 
-Both are pinned by tests in `app/lib/auth.test.ts`.
+Both are pinned by tests in `app/lib/__tests__/auth.test.ts`.
 
 ## RLS: signing in changes which policies apply
 
@@ -188,7 +188,7 @@ promise is the one deferred piece of that loader. All calls go through
   0.10.0), so the last-method guard only fires when a social identity really is
   the last way in — an email + one-provider account can disconnect its
   provider, while a lone social identity with no email stays guarded. Both
-  sides are pinned by tests in `app/routes/profile.test.tsx`.
+  sides are pinned by tests in `app/routes/__tests__/profile.test.tsx`.
 - **GoTrue enforces at-least-one-identity server-side**; the card's guard is
   UX, not the security boundary.
 

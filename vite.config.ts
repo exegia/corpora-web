@@ -11,10 +11,7 @@ import devtoolsJson from "vite-plugin-devtools-json"
 // main checkout, which sits outside vite's root. Without this, /@fs requests
 // for them 403 ("outside of Vite serving allow list"), entry.client.tsx never
 // loads, and the app renders blank with no build error to point at.
-const nodeModules = path.resolve(
-    createRequire(import.meta.url).resolve("vite/package.json"),
-    "../..",
-)
+const nodeModules = path.resolve(createRequire(import.meta.url).resolve("vite/package.json"), "../..")
 
 export default defineConfig({
     plugins: [!process.env.VITEST && reactRouter(), tailwindcss(), devtoolsJson()],
@@ -102,7 +99,7 @@ export default defineConfig({
                 "toolbar",
                 "tooltip",
                 "use-render",
-            ].map((m) => `@base-ui/react/${m}`),
+            ].map(m => `@base-ui/react/${m}`),
         ],
     },
     server: {

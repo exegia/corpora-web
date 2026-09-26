@@ -73,7 +73,7 @@ Five details that are easy to get wrong:
 `className` on `Table` lands on the inner `<table>`, not the scroll container — put page spacing on a wrapper element
 (same trap as `Input`, below).
 
-Reference: `ProjectRow` / `ProjectTable` in `app/routes/project.tsx`.
+Reference: `ProjectRow` / `ProjectTable` in `app/routes/project/index.tsx`.
 
 ## Status badges
 

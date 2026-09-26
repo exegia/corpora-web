@@ -53,7 +53,7 @@ await user.click(confirm)
 
 ## Tests that pin down invariants
 
-`app/routes/project.test.tsx` → *"does not flash the skeleton back in when an
+`app/routes/__tests__/project.test.tsx` → *"does not flash the skeleton back in when an
 action revalidates"* protects the assumption the whole deferred-loader design
 rests on. See [data-loading.md](data-loading.md). Don't remove it.
 

@@ -29,7 +29,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     )
 }
 
-// The chrome moved down a level: `routes/protected-layout` renders the sidebar
+// The chrome moved down a level: `components/layouts/protected-layout` renders the sidebar
 // shell, `routes/auth-layout` renders the signed-out one. Root just hosts them.
 export default function App() {
     return <Outlet />

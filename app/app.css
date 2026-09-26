@@ -1,18 +1,18 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-
-/* Generate utilities for @exegia/corpora-ui component class strings. */
-@source "../node_modules/@exegia/corpora-ui/dist-lib";
+/* root.tsx imports corpora-ui/index.css once, including Preflight, base styles
+   and component animations. Generate only the app's theme and utilities here. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 
 @custom-variant dark (&:is(.dark *));
 
 /* Cal Sans 2.0 variable — the coss main font (see coss.com/ui/docs/styling). */
 @font-face {
-  font-family: "Cal Sans";
-  src: url("./fonts/CalSansVF.woff2") format("woff2");
-  font-weight: 300 700;
-  font-style: normal;
-  font-display: swap;
+    font-family: "Cal Sans";
+    src: url("/fonts/CalSansVF.woff2") format("woff2");
+    font-weight: 300 700;
+    font-style: normal;
+    font-display: swap;
 }
 
 * {
@@ -21,233 +21,132 @@
 }
 
 :root {
-  color-scheme: light;
-  /* Let width/height tween between auto and fixed values (corpora-ui buttons
-     morph size when loading). No-op in browsers without support. */
-  interpolate-size: allow-keywords;
-  --accent: light-dark(--alpha(var(--color-black) / 6%), --alpha(var(--color-white) / 6%));
-  --accent-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
-  --background: light-dark(var(--color-white), color-mix(in srgb, var(--color-neutral-950) 95%, var(--color-white)));
-  --border: light-dark(--alpha(var(--color-black) / 8%), --alpha(var(--color-white) / 6%));
-  --card: light-dark(var(--color-white), color-mix(in srgb, var(--background) 98%, var(--color-white)));
-  --card-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
-  --destructive: light-dark(var(--color-red-500), color-mix(in srgb, var(--color-red-500) 90%, var(--color-white)));
-  --destructive-foreground: light-dark(var(--color-red-700), var(--color-red-400));
-  --foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
-  --info: var(--color-blue-500);
-  --info-foreground: light-dark(var(--color-blue-700), var(--color-blue-400));
-  --input: light-dark(--alpha(var(--color-black) / 10%), --alpha(var(--color-white) / 8%));
-  --muted: light-dark(--alpha(var(--color-black) / 4%), --alpha(var(--color-white) / 4%));
-  --muted-foreground: color-mix(in srgb, var(--color-neutral-500) 90%, light-dark(var(--color-black), var(--color-white)));
-  --popover: light-dark(var(--color-white), color-mix(in srgb, var(--background) 98%, var(--color-white)));
-  --popover-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
-  --primary: light-dark(var(--color-neutral-800), var(--color-neutral-100));
-  --primary-foreground: light-dark(var(--color-neutral-50), var(--color-neutral-800));
-  --ring: light-dark(var(--color-neutral-400), var(--color-neutral-500));
-  --secondary: light-dark(--alpha(var(--color-black) / 4%), --alpha(var(--color-white) / 4%));
-  --secondary-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
-  --success: var(--color-emerald-500);
-  --success-foreground: light-dark(var(--color-emerald-700), var(--color-emerald-400));
-  --warning: var(--color-amber-500);
-  --warning-foreground: light-dark(var(--color-amber-700), var(--color-amber-400));
-  --chart-1: light-dark(var(--color-orange-600), var(--color-blue-700));
-  --chart-2: light-dark(var(--color-teal-600), var(--color-emerald-500));
-  --chart-3: light-dark(var(--color-cyan-900), var(--color-amber-500));
-  --chart-4: light-dark(var(--color-amber-400), var(--color-purple-500));
-  --chart-5: light-dark(var(--color-amber-500), var(--color-rose-500));
-  --code: light-dark(var(--color-white), color-mix(in srgb, var(--background) 98%, var(--color-white)));
-  --code-foreground: var(--foreground);
-  --code-highlight: light-dark(--alpha(var(--color-black) / 4%), --alpha(var(--color-white) / 4%));
-  --radius: 0.625rem;
-  --sidebar: light-dark(var(--color-neutral-50), color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white)));
-  --sidebar-accent: light-dark(--alpha(var(--color-black) / 4%), --alpha(var(--color-white) / 4%));
-  --sidebar-accent-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
-  --sidebar-border: light-dark(--alpha(var(--color-black) / 6%), --alpha(var(--color-white) / 5%));
-  --sidebar-foreground: color-mix(in srgb, light-dark(var(--color-neutral-800), var(--color-neutral-100)) 64%, var(--sidebar));
-  --sidebar-primary: light-dark(var(--color-neutral-800), var(--color-neutral-100));
-  --sidebar-primary-foreground: light-dark(var(--color-neutral-50), var(--color-neutral-800));
-  --sidebar-ring: var(--color-neutral-400);
-  --invert: var(--color-zinc-900);
-  --invert-foreground: var(--color-zinc-50);
+    color-scheme: light;
+    /* App palette overrides the library defaults in both color schemes. */
+    --accent: light-dark(--alpha(var(--color-black) / 6%), --alpha(var(--color-white) / 6%));
+    --accent-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
+    --background: light-dark(var(--color-white), color-mix(in srgb, var(--color-neutral-950) 95%, var(--color-white)));
+    --border: light-dark(--alpha(var(--color-black) / 8%), --alpha(var(--color-white) / 6%));
+    --card: light-dark(var(--color-white), color-mix(in srgb, var(--background) 98%, var(--color-white)));
+    --card-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
+    --destructive: light-dark(var(--color-red-500), color-mix(in srgb, var(--color-red-500) 90%, var(--color-white)));
+    --destructive-foreground: light-dark(var(--color-red-700), var(--color-red-400));
+    --foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
+    --info-foreground: light-dark(var(--color-blue-700), var(--color-blue-400));
+    --input: light-dark(--alpha(var(--color-black) / 10%), --alpha(var(--color-white) / 8%));
+    --muted: light-dark(--alpha(var(--color-black) / 4%), --alpha(var(--color-white) / 4%));
+    --muted-foreground: color-mix(
+        in srgb,
+        var(--color-neutral-500) 90%,
+        light-dark(var(--color-black), var(--color-white))
+    );
+    --popover: light-dark(var(--color-white), color-mix(in srgb, var(--background) 98%, var(--color-white)));
+    --popover-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
+    --primary: light-dark(var(--color-neutral-800), var(--color-neutral-100));
+    --primary-foreground: light-dark(var(--color-neutral-50), var(--color-neutral-800));
+    --ring: light-dark(var(--color-neutral-400), var(--color-neutral-500));
+    --secondary: light-dark(--alpha(var(--color-black) / 4%), --alpha(var(--color-white) / 4%));
+    --secondary-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
+    --success-foreground: light-dark(var(--color-emerald-700), var(--color-emerald-400));
+    --warning-foreground: light-dark(var(--color-amber-700), var(--color-amber-400));
+    --chart-1: light-dark(var(--color-orange-600), var(--color-blue-700));
+    --chart-2: light-dark(var(--color-teal-600), var(--color-emerald-500));
+    --chart-3: light-dark(var(--color-cyan-900), var(--color-amber-500));
+    --chart-4: light-dark(var(--color-amber-400), var(--color-purple-500));
+    --chart-5: light-dark(var(--color-amber-500), var(--color-rose-500));
+    --code: light-dark(var(--color-white), color-mix(in srgb, var(--background) 98%, var(--color-white)));
+    --code-foreground: var(--foreground);
+    --code-highlight: light-dark(--alpha(var(--color-black) / 4%), --alpha(var(--color-white) / 4%));
+    --radius: 0.625rem;
+    --sidebar: light-dark(
+        var(--color-neutral-50),
+        color-mix(in srgb, var(--color-neutral-950) 97%, var(--color-white))
+    );
+    --sidebar-accent: light-dark(--alpha(var(--color-black) / 4%), --alpha(var(--color-white) / 4%));
+    --sidebar-accent-foreground: light-dark(var(--color-neutral-800), var(--color-neutral-100));
+    --sidebar-border: light-dark(--alpha(var(--color-black) / 6%), --alpha(var(--color-white) / 5%));
+    --sidebar-foreground: color-mix(
+        in srgb,
+        light-dark(var(--color-neutral-800), var(--color-neutral-100)) 64%,
+        var(--sidebar)
+    );
+    --sidebar-primary: light-dark(var(--color-neutral-800), var(--color-neutral-100));
+    --sidebar-primary-foreground: light-dark(var(--color-neutral-50), var(--color-neutral-800));
+    --sidebar-ring: var(--color-neutral-400);
 }
 
 .dark {
-  color-scheme: dark;
-  --destructive-foreground: var(--color-red-400);
-  --success: var(--color-emerald-500);
-  --success-foreground: var(--color-emerald-600);
-  --info: var(--color-violet-500);
-  --info-foreground: var(--color-violet-600);
-  --warning: var(--color-yellow-500);
-  --warning-foreground: var(--color-yellow-600);
-  --invert: var(--color-zinc-700);
-  --invert-foreground: var(--color-zinc-50);
+    color-scheme: dark;
+    --success-foreground: var(--color-emerald-600);
+    --info: var(--color-violet-500);
+    --info-foreground: var(--color-violet-600);
+    --warning: var(--color-yellow-500);
+    --warning-foreground: var(--color-yellow-600);
 }
 
 @theme inline {
-  /* motion tokens (transitions.dev scale) — required by corpora-ui components */
-  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --animate-input-shake: input-shake 0.4s ease-in-out;
-  /* Shorter and shallower than route-enter (260ms/8px): switching a tab is a
+    /* Semantic mappings are still needed to generate app utilities; the
+       compiled library CSS does not expose Tailwind theme directives. */
+    /* Shorter and shallower than route-enter (260ms/8px): switching a tab is a
      smaller move than arriving on a route, and 200ms matches the tab list's
      own indicator so the underline and the content settle together. */
-  --animate-tab-panel-enter: tab-panel-enter 200ms var(--ease-smooth-out) both;
-  --font-heading: var(--font-sans);
-  --font-mono: var(--font-mono, ui-monospace, monospace);
-  --font-sans: "Cal Sans", ui-sans-serif, system-ui, sans-serif;
-  ----animate-toast-success-odd: toast-success-odd 0.32s cubic-bezier(0.5, 1, 0.89, 1);
-  ----animate-toast-success-even: toast-success-even 0.32s cubic-bezier(0.5, 1, 0.89, 1);
-  ----animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-  ----animate-toast-error-even: toast-error-even 0.28s cubic-bezier(0.5, 1, 0.89, 1);
-  ----animate-skeleton: skeleton 2s -1s infinite linear;
-  ----animate-caret-blink: 1s ease-out infinite caret-blink;
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-background: var(--background);
-  --color-border: var(--border);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-foreground: var(--foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-input: var(--input);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-ring: var(--ring);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-code: var(--code);
-  --color-code-foreground: var(--code-foreground);
-  --color-code-highlight: var(--code-highlight);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-invert-foreground: var(--invert-foreground);
-  --color-invert: var(--invert);
+    --animate-tab-panel-enter: tab-panel-enter 200ms var(--ease-smooth-out) both;
+    --font-heading: var(--font-sans);
+    --font-sans: "Cal Sans", ui-sans-serif, system-ui, sans-serif;
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-background: var(--background);
+    --color-border: var(--border);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-foreground: var(--foreground);
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+    --color-input: var(--input);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-ring: var(--ring);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+    --color-code: var(--code);
+    --color-code-foreground: var(--code-foreground);
+    --color-code-highlight: var(--code-highlight);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-invert-foreground: var(--invert-foreground);
+    --color-invert: var(--invert);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50 {
+    /* The library owns Preflight; keep the app's Cal Sans default explicit. */
+    html {
+        @apply font-sans;
     }
-  }
-  body {
-    @apply bg-background text-foreground {
-    }
-  }
-  code, kbd, samp, pre {
-    font-family: var(--font-mono);
-  }
-}
-
-@keyframes toast-success-odd {
-  0% {
-    scale: 1;
-  }
-  30% {
-    scale: 1.025;
-  }
-  60% {
-    scale: 0.99;
-  }
-  100% {
-    scale: 1;
-  }
-}
-@keyframes toast-error-odd {
-  0% {
-    translate: 0 0;
-  }
-  25% {
-    translate: -3px 0;
-  }
-  50% {
-    translate: 3px 0;
-  }
-  75% {
-    translate: -3px 0;
-  }
-  100% {
-    translate: 0 0;
-  }
-}
-@keyframes toast-success-even {
-  0% {
-    scale: 1;
-  }
-  30% {
-    scale: 1.025;
-  }
-  60% {
-    scale: 0.99;
-  }
-  100% {
-    scale: 1;
-  }
-}
-@keyframes toast-error-even {
-  0% {
-    translate: 0 0;
-  }
-  25% {
-    translate: -3px 0;
-  }
-  50% {
-    translate: 3px 0;
-  }
-  75% {
-    translate: -3px 0;
-  }
-  100% {
-    translate: 0 0;
-  }
-}
-
-@keyframes skeleton {
-  to {
-    background-position: -200% 0;
-  }
-}
-
-@keyframes input-shake {
-  0%, 100% { translate: 0; }
-  20% { translate: -6px 0; }
-  40% { translate: 6px 0; }
-  60% { translate: -4px 0; }
-  80% { translate: 4px 0; }
-}
-
-@keyframes caret-blink {
-  0%, 70%, to {
-    opacity: 1;
-  }
-  20%, 50% {
-    opacity: 0;
-  }
 }
 
 /* View transitions (react-router `viewTransition` on links).
@@ -256,17 +155,17 @@
    and stays put. The outgoing half is deliberately much shorter than the
    incoming one: a slow fade-out reads as lag, a slow fade-in reads as arrival. */
 @keyframes route-enter {
-  from {
-    opacity: 0;
-    translate: 0 8px;
-  }
+    from {
+        opacity: 0;
+        translate: 0 8px;
+    }
 }
 
 @keyframes route-exit {
-  to {
-    opacity: 0;
-    translate: 0 -4px;
-  }
+    to {
+        opacity: 0;
+        translate: 0 -4px;
+    }
 }
 
 /* Base UI unmounts the inactive panel, so there is no outgoing half to
@@ -274,10 +173,10 @@
    honest shape here: the old panel is already gone by the time the new one
    mounts, and faking a crossfade would need both kept alive. */
 @keyframes tab-panel-enter {
-  from {
-    opacity: 0;
-    translate: 0 4px;
-  }
+    from {
+        opacity: 0;
+        translate: 0 4px;
+    }
 }
 
 /* The scroll viewport, not <main>: naming the content itself would snapshot its
@@ -286,42 +185,42 @@
    bounded. Scoped to .route-scroll because several ScrollAreas — the sidebar's
    included — are mounted at once, and a duplicate name aborts the transition. */
 .route-scroll [data-slot="scroll-area-viewport"] {
-  view-transition-name: route-content;
+    view-transition-name: route-content;
 }
 
 ::view-transition-old(route-content) {
-  animation: route-exit 110ms var(--ease-smooth-out) both;
+    animation: route-exit 110ms var(--ease-smooth-out) both;
 }
 
 ::view-transition-new(route-content) {
-  animation: route-enter 260ms var(--ease-smooth-out) both;
+    animation: route-enter 260ms var(--ease-smooth-out) both;
 }
 
 /* Element-level `motion-reduce:` utilities cannot reach the transition
    pseudo-elements, so the UA cross-fade needs switching off explicitly. */
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
-  }
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+        animation: none !important;
+    }
 }
 
 /* Licence text rendered by react-remark: a lightweight prose style over the
    semantic HTML it emits, using app tokens so both schemes follow the theme. */
 .licence-prose {
-  font-size: 0.875rem;
-  line-height: 1.65;
-  color: var(--foreground);
-  overflow-wrap: break-word;
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: var(--foreground);
+    overflow-wrap: break-word;
 }
 
 .licence-prose > :first-child {
-  margin-top: 0;
+    margin-top: 0;
 }
 
 .licence-prose > :last-child {
-  margin-bottom: 0;
+    margin-bottom: 0;
 }
 
 .licence-prose p,
@@ -329,83 +228,83 @@
 .licence-prose ol,
 .licence-prose blockquote,
 .licence-prose pre {
-  margin: 0.75em 0;
+    margin: 0.75em 0;
 }
 
 .licence-prose h1,
 .licence-prose h2,
 .licence-prose h3,
 .licence-prose h4 {
-  margin: 1.25em 0 0.5em;
-  font-weight: 600;
-  line-height: 1.3;
+    margin: 1.25em 0 0.5em;
+    font-weight: 600;
+    line-height: 1.3;
 }
 
 .licence-prose h1 {
-  font-size: 1.35em;
+    font-size: 1.35em;
 }
 
 .licence-prose h2 {
-  font-size: 1.2em;
+    font-size: 1.2em;
 }
 
 .licence-prose h3 {
-  font-size: 1.05em;
+    font-size: 1.05em;
 }
 
 .licence-prose ul,
 .licence-prose ol {
-  padding-inline-start: 1.5em;
+    padding-inline-start: 1.5em;
 }
 
 .licence-prose ul {
-  list-style: disc;
+    list-style: disc;
 }
 
 .licence-prose ol {
-  list-style: decimal;
+    list-style: decimal;
 }
 
 .licence-prose li {
-  margin: 0.25em 0;
+    margin: 0.25em 0;
 }
 
 .licence-prose a {
-  color: var(--primary);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 .licence-prose blockquote {
-  border-inline-start: 3px solid var(--border);
-  padding-inline-start: 1em;
-  color: var(--muted-foreground);
+    border-inline-start: 3px solid var(--border);
+    padding-inline-start: 1em;
+    color: var(--muted-foreground);
 }
 
 .licence-prose code {
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.9em;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.9em;
 }
 
 .licence-prose pre {
-  padding: 0.75em 1em;
-  border-radius: var(--radius, 0.5rem);
-  background: var(--muted);
-  overflow-x: auto;
-  /* Licence texts are hard-wrapped at ~80 columns, so indented lines parse as
+    padding: 0.75em 1em;
+    border-radius: var(--radius, 0.5rem);
+    background: var(--muted);
+    overflow-x: auto;
+    /* Licence texts are hard-wrapped at ~80 columns, so indented lines parse as
      code blocks; wrapped, they read on instead of sizing the page sideways
      (same trap as components/project/license/content-body). */
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
 }
 
 .licence-prose pre code {
-  background: none;
-  padding: 0;
+    background: none;
+    padding: 0;
 }
 
 .licence-prose hr {
-  margin: 1.5em 0;
-  border: 0;
-  border-top: 1px solid var(--border);
+    margin: 1.5em 0;
+    border: 0;
+    border-top: 1px solid var(--border);
 }

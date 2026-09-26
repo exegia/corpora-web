@@ -41,7 +41,7 @@ fetcher action — `set-status`, `link-corpus`, `unlink-corpus` — would blank 
 page back to a skeleton.
 
 This is verified by the test *"does not flash the skeleton back in when an action
-revalidates"* in `app/routes/project.test.tsx`. **Do not delete it.** Three
+revalidates"* in `app/routes/__tests__/project.test.tsx`. **Do not delete it.** Three
 routes depend on the behaviour it pins down.
 
 ## `loaderData` is a public contract

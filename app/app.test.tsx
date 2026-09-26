@@ -1,7 +1,8 @@
+import { Provider } from "jotai"
 import { render, screen, within } from "@testing-library/react"
 import { createRoutesStub } from "react-router"
 import { describe, expect, it } from "vitest"
-import { AppLayout } from "@/components/layouts/app-layout"
+import ProtectedLayout from "@/components/layouts/protected-layout"
 import Corpus from "@/routes/corpus"
 import Dashboard from "@/routes/dashboard"
 import Library from "@/routes/library"
@@ -10,7 +11,11 @@ import References from "@/routes/references"
 
 const Stub = createRoutesStub([
   {
-    Component: AppLayout,
+    Component: ProtectedLayout,
+    HydrateFallback: () => null,
+    loader: () => ({
+      user: { id: "test-user", email: "test@example.test", name: null, avatarUrl: null, emailConfirmed: true },
+    }),
     children: [
       { index: true, Component: Dashboard },
       { path: "references", Component: References },
@@ -31,7 +36,7 @@ const Stub = createRoutesStub([
   },
 ])
 
-const renderAt = (path: string) => render(<Stub initialEntries={[path]} />)
+const renderAt = (path: string) => render(<Provider><Stub initialEntries={[path]} /></Provider>)
 
 describe("routes", () => {
   it.each([
@@ -61,8 +66,9 @@ describe("routes", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("shows sidebar navigation links", () => {
+  it("shows sidebar navigation links", async () => {
     renderAt("/")
+    await screen.findByRole("treeitem", { name: "Dashboard" })
     for (const label of [
       "Dashboard",
       "References",
