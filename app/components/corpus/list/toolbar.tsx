@@ -76,7 +76,7 @@ export default function Toolbar({
     onFiltersChange({ ...filters, ...change })
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <div className="lg:max-w-xs lg:flex-1">
         <InputGroup>
           <InputGroupAddon>
