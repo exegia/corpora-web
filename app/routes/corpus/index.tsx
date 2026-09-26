@@ -1,7 +1,7 @@
 import { Suspense } from "react"
-import { Await, useLoaderData, useOutletContext, type ActionFunctionArgs } from "react-router"
+import { Await, useLoaderData, type ActionFunctionArgs } from "react-router"
 import { Convert } from "@/components/corpus/convert"
-import type { ConversionController } from "@/components/corpus/convert/use-conversion"
+import { useConversion } from "@/components/corpus/convert/use-conversion"
 import { List } from "@/components/corpus/list"
 import Corpus, { type CorpusType } from "@/lib/corpus"
 import Project, { type CorpusSource } from "@/lib/projects"
@@ -71,14 +71,12 @@ export async function clientAction({ request }: ActionFunctionArgs) {
 
 /**
  * The corpus library (003): upload .corpus documents or convert source files
- * (text-fabric XML, TEI) into them. Conversion state lives on the app layout
- * (so the shell's right panel survives navigation) and reaches this route
- * through the outlet context; the pill and the Convert/Upload actions render
- * here, on the page's own header row.
+ * (text-fabric XML, TEI) into them. Conversion state lives in the shared Jotai
+ * store; the protected runtime persists results across route navigation.
  */
 export default function CorpusPage() {
     const { documents } = useLoaderData<typeof clientLoader>()
-    const conversion = useOutletContext<ConversionController>()
+    const conversion = useConversion()
 
     return (
         <section className="flex flex-col gap-6">
