@@ -1,0 +1,538 @@
+import { act, render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { createRoutesStub, Link } from "react-router"
+import { createStore, Provider } from "jotai"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import Corpus, { type ConversionEntry, type ConversionLog, type CorpusDocument } from "@/lib/corpus"
+import ProtectedLayout from "@/components/layouts/protected-layout"
+import { chatStateAtom } from "@/components/corpus/chat/state"
+import { conversionEntryAtom, conversionPersistRequestAtom } from "@/components/corpus/convert/store"
+import CorpusRoute, { clientAction, clientLoader } from "@/routes/corpus/index"
+
+// One mock for the whole barrel — persistence, transport, archive and history
+// all live behind it now. Only those are scripted; the pure derivations stay
+// real so the drawer renders exactly what a real run would.
+vi.mock("@/lib/corpus", async importOriginal => {
+    const original = await importOriginal<typeof import("@/lib/corpus")>()
+    return {
+        ...original,
+        default: {
+            ...original.default,
+            Documents: {
+                ...original.default.Documents,
+                listCorpusDocuments: vi.fn(),
+                createCorpusDocument: vi.fn(),
+                deleteCorpusDocument: vi.fn(),
+                getCorpusDocument: vi.fn(),
+                uploadCorpusFile: vi.fn(),
+            },
+            Convert: { ...original.default.Convert, runConversion: vi.fn() },
+            Archive: { ...original.default.Archive, readCorpusArchive: vi.fn() },
+            History: {
+                ...original.default.History,
+                extractCorpusHistory: vi.fn(),
+                fetchHuggingFaceHistory: vi.fn(),
+            },
+        },
+    }
+})
+
+type Outcome = "queued" | "ready" | "error"
+
+/** Instant scripted transport walking the entry to the given outcome. */
+function scriptConversion(outcome: Outcome) {
+    vi.mocked(Corpus.Convert.runConversion).mockImplementation(async (_file, initial, onChange) => {
+        let entry = initial
+        const emit = (patch: Partial<ConversionEntry>, log?: ConversionLog) => {
+            entry = {
+                ...entry,
+                ...patch,
+                logs: log ? [...entry.logs, log] : entry.logs,
+            }
+            onChange(entry)
+        }
+        emit({ status: "uploading" }, { step: "receive", text: `> ${entry.name}`, tone: "info" })
+        emit({
+            jobId: "j1",
+            displayName: "Summa Theologiae",
+            resultFilename: "summa-theologiae.corpus",
+        })
+        emit({ status: "queued" }, { step: "validate", text: "> Parsing nodes…", tone: "info" })
+        if (outcome === "queued") return entry
+        emit({ status: "converting" }, { step: "convert", text: "> Building dataset…", tone: "info" })
+        if (outcome === "error") {
+            emit(
+                { status: "error", error: "IndexError — job j1", finishedAt: Date.now() },
+                { step: "convert", text: "✗ IndexError — job j1", tone: "error" }
+            )
+            return entry
+        }
+        emit({ status: "validating", validation: { status: "running" } })
+        emit(
+            {
+                status: "ready",
+                finishedAt: Date.now(),
+                validation: { status: "valid", stats: { max_slot: 30_102 } },
+                corpusName: entry.name.replace(/\.[^.]+$/, ".corpus"),
+                corpusSize: entry.size,
+                corpusBlob: new Blob(["corpus-bytes"]),
+            },
+            {
+                step: "index",
+                text: "✓ Archive downloaded — corpus ready",
+                tone: "success",
+            }
+        )
+        return entry
+    })
+}
+
+function doc(overrides: Partial<CorpusDocument> = {}): CorpusDocument {
+    return {
+        id: "d1",
+        name: "peshitta",
+        source: "upload",
+        path: "d1/peshitta.corpus",
+        filename: "peshitta.corpus",
+        uploadedAt: "2026-07-10T00:00:00Z",
+        corpusType: null,
+        sourceFormat: null,
+        licence: null,
+        language: null,
+        sizeBytes: null,
+        docsCount: null,
+        nodes: null,
+        words: null,
+        status: null,
+        convertedAt: null,
+        description: null,
+        toc: null,
+        jobId: null,
+        commits: [],
+        ...overrides,
+    }
+}
+
+const peshitta = doc({
+    commits: [
+        {
+            id: "cm1",
+            sha: "a1b2c3d4e5f",
+            message: "Initial import",
+            authorName: "Ada",
+            authorEmail: "ada@example.org",
+            branch: "main",
+            committedAt: "2026-07-01T00:00:00Z",
+        },
+    ],
+})
+
+const septuagint = doc({
+    id: "d2",
+    name: "septuagint",
+    corpusType: "text",
+    sourceFormat: "text-fabric",
+    licence: "CC BY-SA 4.0",
+    language: "Greek",
+    sizeBytes: 42_100_000,
+    docsCount: 53,
+    status: "converted",
+    convertedAt: "2026-07-28T00:00:00Z",
+    description: null,
+    toc: null,
+})
+
+function renderRoute(store = createStore()) {
+    // Use the production protected boundary: shell and persistence runtime
+    // stay mounted when the corpus route changes.
+    const Stub = createRoutesStub([
+        {
+            Component: ProtectedLayout,
+            HydrateFallback: () => null,
+            loader: () => ({
+                user: { id: "test-user", email: "test@example.test", name: null, avatarUrl: null, emailConfirmed: true },
+            }),
+            children: [
+                {
+                    path: "/corpus",
+                    Component: CorpusRoute,
+                    HydrateFallback: () => null,
+                    // biome-ignore lint: route module functions match at runtime
+                    loader: clientLoader as never,
+                    action: clientAction as never,
+                },
+                {
+                    path: "/corpus/:documentId",
+                    Component: () => (
+                        <>
+                            <p>Corpus detail</p>
+                            <Link to="/corpus">Back to corpus</Link>
+                            <Link to="/login">Leave session</Link>
+                        </>
+                    ),
+                    HydrateFallback: () => null,
+                },
+            ],
+        },
+        { path: "/login", Component: () => <p>Signed out</p> },
+    ])
+    // Conversion state lives in module-level atoms; a fresh Jotai store per
+    // render keeps one test's run from leaking into the next.
+    return render(
+        <Provider store={store}>
+            <Stub initialEntries={["/corpus"]} />
+        </Provider>
+    )
+}
+
+beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([peshitta, septuagint])
+})
+
+afterEach(() => {
+    vi.unstubAllGlobals()
+})
+
+describe("/corpus library", () => {
+    it("lists documents in the table with their metadata", async () => {
+        renderRoute()
+        expect(await screen.findByText("peshitta")).toBeInTheDocument()
+        expect(screen.getByText("septuagint")).toBeInTheDocument()
+        // Converted and uploaded rows both present as .corpus (source format
+        // is details-card metadata, not the list file type).
+        expect(screen.getAllByText(".corpus")).toHaveLength(2)
+        expect(screen.queryByText("text-fabric")).not.toBeInTheDocument()
+        expect(screen.getByText("CC BY-SA 4.0")).toBeInTheDocument()
+        expect(screen.getByText("No licence")).toBeInTheDocument()
+        expect(screen.getByText("Text")).toBeInTheDocument()
+        expect(screen.getByText("Greek")).toBeInTheDocument()
+        expect(screen.getByText("40.1 MB")).toBeInTheDocument()
+        expect(screen.getByText("2 corpuses")).toBeInTheDocument()
+    })
+
+    it("links each row to its detail page", async () => {
+        renderRoute()
+        const link = await screen.findByRole("link", { name: "septuagint" })
+        expect(link).toHaveAttribute("href", "/corpus/d2")
+    })
+
+    it("shows the empty state when nothing is uploaded", async () => {
+        vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([])
+        renderRoute()
+        expect(await screen.findByText("The corpus library is empty")).toBeInTheDocument()
+    })
+
+    it("filters rows by the search query", async () => {
+        const user = userEvent.setup()
+        renderRoute()
+
+        await user.type(await screen.findByLabelText("Search corpuses"), "sept")
+        expect(screen.getByText("septuagint")).toBeInTheDocument()
+        expect(screen.queryByText("peshitta")).not.toBeInTheDocument()
+        expect(screen.getByText("1 corpus")).toBeInTheDocument()
+    })
+
+    it("shows a no-results message when filters exclude everything", async () => {
+        const user = userEvent.setup()
+        renderRoute()
+
+        await user.type(await screen.findByLabelText("Search corpuses"), "does-not-exist")
+        expect(screen.getByText("No corpuses match the current filters.")).toBeInTheDocument()
+    })
+
+    it("paginates past six documents", async () => {
+        vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue(
+            Array.from({ length: 8 }, (_, i) => doc({ id: `p${i}`, name: `corpus-${i}` }))
+        )
+        const user = userEvent.setup()
+        renderRoute()
+
+        expect(await screen.findByText("corpus-0")).toBeInTheDocument()
+        expect(screen.getByText("Showing 1–6 of 8 corpuses")).toBeInTheDocument()
+        expect(screen.queryByText("corpus-7")).not.toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "Prev" })).toBeDisabled()
+
+        await user.click(screen.getByRole("button", { name: "Next" }))
+        expect(screen.getByText("corpus-7")).toBeInTheDocument()
+        expect(screen.queryByText("corpus-0")).not.toBeInTheDocument()
+        expect(screen.getByText("Showing 7–8 of 8 corpuses")).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "Next" })).toBeDisabled()
+    })
+
+    it("uploads a .corpus file and records its extracted history", async () => {
+        const user = userEvent.setup()
+        const commits = [
+            {
+                sha: "a1b2c3d",
+                message: "Initial import",
+                authorName: "Ada",
+                authorEmail: "ada@example.org",
+                branch: "main",
+                committedAt: "2026-07-01T00:00:00.000Z",
+            },
+        ]
+        vi.mocked(Corpus.History.extractCorpusHistory).mockResolvedValue(commits)
+        vi.mocked(Corpus.Documents.uploadCorpusFile).mockResolvedValue("d9/genesis.corpus")
+        vi.mocked(Corpus.Documents.createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
+        renderRoute()
+
+        const input = await screen.findByLabelText("Upload .corpus file")
+        const file = new File(["zip-bytes"], "genesis.corpus", {
+            type: "application/zip",
+        })
+        await user.upload(input, file)
+
+        await waitFor(() =>
+            expect(Corpus.Documents.createCorpusDocument).toHaveBeenCalledWith({
+                name: "genesis",
+                source: "upload",
+                path: "d9/genesis.corpus",
+                filename: "genesis.corpus",
+                commits,
+            })
+        )
+    })
+
+    it.each([true, false])("shows conversion progress with native randomUUID available: %s", async hasRandomUuid => {
+        if (!hasRandomUuid) {
+            vi.stubGlobal("crypto", {
+                getRandomValues: crypto.getRandomValues.bind(crypto),
+            })
+        }
+        const user = userEvent.setup()
+        scriptConversion("queued")
+        renderRoute()
+
+        const input = await screen.findByLabelText("Convert source file")
+        await user.upload(input, new File(["<xml/>"], "summa.xml", { type: "text/xml" }))
+
+        const alert = await screen.findByRole("alert")
+        expect(alert).toHaveTextContent("Converting")
+        expect(alert).toHaveTextContent("Validating source")
+        expect(screen.queryByRole("button", { name: "Dismiss" })).not.toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "Show progress" })).toBeInTheDocument()
+        // The panel stays closed until Show progress — no auto-open.
+        expect(screen.queryByText("summa.xml · Step 2 of 4")).not.toBeInTheDocument()
+        expect(screen.queryByText("In progress")).not.toBeInTheDocument()
+        expect(screen.queryByText("> Parsing nodes…")).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole("button", { name: "Show progress" }))
+
+        // Open Base UI / shell panel may aria-hide the page — use body text.
+        expect(await screen.findByText("summa.xml · Step 2 of 4")).toBeInTheDocument()
+        expect(document.body.textContent).toContain("Validating source")
+        expect(document.body.textContent).toContain("Step 2 of 4")
+        expect(document.body.textContent).toContain("In progress")
+        expect(document.body.textContent).toContain("> Parsing nodes…")
+        expect(screen.queryByRole("button", { name: "Close conversion panel" })).not.toBeInTheDocument()
+        expect(document.body.textContent).not.toContain("Dismiss")
+    })
+
+    it("persists a finished conversion with the archive's own metadata", async () => {
+        const user = userEvent.setup()
+        scriptConversion("ready")
+        const commits = [
+            {
+                sha: "a1b2c3d",
+                message: "Initial import",
+                authorName: "Ada",
+                authorEmail: null,
+                branch: "main",
+                committedAt: "2026-08-01T00:00:00.000Z",
+            },
+        ]
+        vi.mocked(Corpus.Archive.readCorpusArchive).mockResolvedValue({
+            name: "Summa Theologia",
+            description: "The Summa, converted from TEI.",
+            language: "English",
+            corpusType: "text",
+            version: "1.0",
+            sections: [{ title: "Prima Pars", nodes: 8442, words: 312004 }],
+        })
+        vi.mocked(Corpus.History.extractCorpusHistory).mockResolvedValue(commits)
+        // Hold the persist so Show progress is still the trailing action after
+        // the pipeline finishes (View corpus replaces it once documentId is set).
+        let releaseUpload: (path: string) => void
+        vi.mocked(Corpus.Documents.uploadCorpusFile).mockImplementation(
+            () =>
+                new Promise(resolve => {
+                    releaseUpload = resolve
+                })
+        )
+        vi.mocked(Corpus.Documents.createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
+        renderRoute()
+
+        const input = await screen.findByLabelText("Convert source file")
+        await user.upload(input, new File(["<xml/>"], "summa.xml", { type: "text/xml" }))
+
+        await waitFor(() => {
+            expect(screen.getByRole("alert")).toHaveTextContent("Conversion complete")
+        })
+        const alert = screen.getByRole("alert")
+        expect(alert).toHaveTextContent("Validating & finalizing")
+        expect(document.body.textContent).not.toContain("summa.xml converted")
+        expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument()
+        expect(screen.queryByRole("button", { name: "Dismiss conversion" })).not.toBeInTheDocument()
+        // Document id is not set until persist returns — trailing is still Show progress.
+        await user.click(screen.getByRole("button", { name: "Show progress" }))
+        expect(await screen.findByText("summa.xml · 4 of 4 steps")).toBeInTheDocument()
+        releaseUpload!("d9/summa.corpus")
+
+        await waitFor(() =>
+            expect(Corpus.Documents.createCorpusDocument).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    name: "Summa Theologiae",
+                    source: "upload",
+                    path: "d9/summa.corpus",
+                    filename: "summa-theologiae.corpus",
+                    jobId: "j1",
+                    sourceFormat: "tei",
+                    corpusType: "text",
+                    language: "English",
+                    description: "The Summa, converted from TEI.",
+                    toc: [{ title: "Prima Pars", nodes: 8442, words: 312004 }],
+                    nodes: 30_102,
+                    status: "converted",
+                    commits,
+                })
+            )
+        )
+        // The stored archive is the downloaded blob, renamed .corpus.
+        const stored = vi.mocked(Corpus.Documents.uploadCorpusFile).mock.calls[0][0]
+        expect(stored.name).toBe("summa-theologiae.corpus")
+
+        // The in-page alert and the file card both link to the persisted row.
+        const links = await screen.findAllByRole("link", { name: "View corpus" })
+        expect(links).toHaveLength(2)
+        for (const link of links) {
+            expect(link).toHaveAttribute("href", "/corpus/d9")
+        }
+
+        await user.click(links[0])
+        expect(await screen.findByText("Corpus detail")).toBeInTheDocument()
+        await waitFor(() => {
+            expect(screen.queryByText(/summa.xml ·/)).not.toBeInTheDocument()
+        })
+    })
+
+    it("persists a conversion that finishes after leaving the corpus route", async () => {
+        const user = userEvent.setup()
+        scriptConversion("ready")
+        const run = vi.mocked(Corpus.Convert.runConversion).getMockImplementation()!
+        let release!: () => void
+        const gate = new Promise<void>(resolve => { release = resolve })
+        vi.mocked(Corpus.Convert.runConversion).mockImplementation(async (...args) => {
+            await gate
+            return run(...args)
+        })
+        vi.mocked(Corpus.Archive.readCorpusArchive).mockResolvedValue({
+            name: "Summa", description: "", language: "", corpusType: "text", version: "1", sections: [],
+        })
+        vi.mocked(Corpus.History.extractCorpusHistory).mockResolvedValue([])
+        vi.mocked(Corpus.Documents.uploadCorpusFile).mockResolvedValue("d9/summa.corpus")
+        vi.mocked(Corpus.Documents.createCorpusDocument).mockResolvedValue(doc({ id: "d9" }))
+        renderRoute()
+
+        await user.upload(await screen.findByLabelText("Convert source file"), new File(["<xml/>"], "summa.xml"))
+        await user.click(await screen.findByRole("link", { name: "septuagint" }))
+        expect(await screen.findByText("Corpus detail")).toBeInTheDocument()
+        await act(async () => { release() })
+        await waitFor(() => expect(Corpus.Documents.createCorpusDocument).toHaveBeenCalledTimes(1))
+        await user.click(screen.getByRole("link", { name: "Back to corpus" }))
+        expect(await screen.findByRole("link", { name: "View corpus" })).toHaveAttribute("href", "/corpus/d9")
+    })
+
+    it("aborts conversion and clears chat when the protected session unmounts", async () => {
+        const user = userEvent.setup()
+        scriptConversion("ready")
+        const run = vi.mocked(Corpus.Convert.runConversion).getMockImplementation()!
+        let release!: () => void
+        const gate = new Promise<void>(resolve => { release = resolve })
+        vi.mocked(Corpus.Convert.runConversion).mockImplementation(async (...args) => {
+            await gate
+            return run(...args)
+        })
+        const store = createStore()
+        store.set(chatStateAtom, { sections: [], active: -1, location: { corpusId: "c1", ref: "Q1" } })
+        renderRoute(store)
+        await user.upload(await screen.findByLabelText("Convert source file"), new File(["<xml/>"], "summa.xml"))
+        const signal = vi.mocked(Corpus.Convert.runConversion).mock.calls[0][3]?.signal
+        expect(signal?.aborted).toBe(false)
+        await user.click(await screen.findByRole("link", { name: "septuagint" }))
+        await user.click(await screen.findByRole("link", { name: "Leave session" }))
+        expect(await screen.findByText("Signed out")).toBeInTheDocument()
+        expect(signal?.aborted).toBe(true)
+        await act(async () => { release() })
+        expect(store.get(conversionEntryAtom)).toBeNull()
+        expect(store.get(conversionPersistRequestAtom)).toBeNull()
+        expect(store.get(chatStateAtom)).toEqual({ sections: [], active: -1, location: null })
+        expect(Corpus.Documents.createCorpusDocument).not.toHaveBeenCalled()
+    })
+
+    it("marks the failed step and reruns the pipeline on Retry", async () => {
+        const user = userEvent.setup()
+        scriptConversion("error")
+        renderRoute()
+
+        const input = await screen.findByLabelText("Convert source file")
+        await user.upload(input, new File(["<xml/>"], "summa-fail.xml", { type: "text/xml" }))
+
+        const alert = await screen.findByRole("alert")
+        expect(alert).toHaveTextContent("Conversion failed")
+        expect(alert).toHaveTextContent("Converting to .corpus")
+        expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "Show progress" })).toBeInTheDocument()
+        expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument()
+
+        await user.click(screen.getByRole("button", { name: "Show progress" }))
+
+        expect(await screen.findByText("✗ IndexError — job j1")).toBeInTheDocument()
+        expect(screen.getByText("Conversion failed. See the failed step above.")).toBeInTheDocument()
+        expect(Corpus.Documents.createCorpusDocument).not.toHaveBeenCalled()
+
+        await user.click(screen.getByRole("button", { name: "Retry" }))
+        await waitFor(() => expect(Corpus.Convert.runConversion).toHaveBeenCalledTimes(2))
+    })
+
+    it("deletes a document after a confirmation step", async () => {
+        const user = userEvent.setup()
+        vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([peshitta])
+        vi.mocked(Corpus.Documents.deleteCorpusDocument).mockResolvedValue()
+        renderRoute()
+
+        await screen.findByRole("heading", { name: "peshitta" })
+        await user.click(screen.getByRole("button", { name: "Delete" }))
+        expect(Corpus.Documents.deleteCorpusDocument).not.toHaveBeenCalled()
+
+        // Gated until DELETE is typed.
+        const confirm = screen.getByRole("button", { name: "Delete corpus" })
+        expect(confirm).toBeDisabled()
+        await user.type(screen.getByRole("textbox"), "DELETE")
+        expect(confirm).toBeEnabled()
+        await user.click(confirm)
+
+        await waitFor(() => expect(Corpus.Documents.deleteCorpusDocument).toHaveBeenCalledWith("d1"))
+    })
+
+    it("refuses to delete a document until DELETE is typed exactly", async () => {
+        const user = userEvent.setup()
+        vi.mocked(Corpus.Documents.listCorpusDocuments).mockResolvedValue([peshitta])
+        vi.mocked(Corpus.Documents.deleteCorpusDocument).mockResolvedValue()
+        renderRoute()
+
+        await screen.findByRole("heading", { name: "peshitta" })
+        await user.click(screen.getByRole("button", { name: "Delete" }))
+        const confirm = screen.getByRole("button", { name: "Delete corpus" })
+
+        // Wrong case must not unlock it — the friction is the point.
+        await user.type(screen.getByRole("textbox"), "delete")
+        expect(confirm).toBeDisabled()
+
+        await user.clear(screen.getByRole("textbox"))
+        await user.type(screen.getByRole("textbox"), "DELET")
+        expect(confirm).toBeDisabled()
+
+        expect(Corpus.Documents.deleteCorpusDocument).not.toHaveBeenCalled()
+    })
+})

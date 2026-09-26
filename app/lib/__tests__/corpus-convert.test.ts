@@ -1,0 +1,298 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import CorporaApi, { CorporaApiError } from "@/lib/api"
+import type { JobStatusMessage } from "@/lib/api"
+import Corpus, { formatBytes } from "@/lib/corpus"
+import type { ConversionEntry } from "@/lib/corpus"
+
+// The transport is mocked at the corpora-api seam; the derivations stay
+// real, so these tests exercise exactly what the drawer will render.
+vi.mock("@/lib/api", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/api")>()
+  return {
+    ...original,
+    default: {
+      ...original.default,
+      createConversion: vi.fn(),
+      getConversion: vi.fn(),
+      downloadConversion: vi.fn(),
+      validateConversion: vi.fn(),
+    },
+  }
+})
+
+const instantly = { delay: () => Promise.resolve() }
+
+const file = new File(["<tei/>"], "summa-theologia.xml", { type: "text/xml" })
+
+function job(
+  status: JobStatusMessage["status"],
+  logs: string[] = [],
+  error: string | null = null,
+): JobStatusMessage {
+  return {
+    id: "j1",
+    source_format: "tei",
+    name: "summa-theologia",
+    status,
+    created_at: 1_755_600_000,
+    started_at: status === "queued" ? null : 1_755_600_001,
+    finished_at: status === "succeeded" || status === "failed" ? 1_755_600_100 : null,
+    error,
+    logs,
+    last_log: logs.at(-1) ?? null,
+    display_name: status === "queued" ? null : "Summa Theologiae",
+    result_filename: "summa-theologiae.corpus",
+    download_ready: status === "succeeded",
+  }
+}
+
+async function runToEnd(input: File = file): Promise<{
+  final: ConversionEntry
+  snapshots: ConversionEntry[]
+}> {
+  const snapshots: ConversionEntry[] = []
+  const final = await Corpus.Convert.runConversion(
+    input,
+    Corpus.Convert.createConversionEntry(input),
+    (entry) => snapshots.push(entry),
+    instantly,
+  )
+  return { final, snapshots }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(CorporaApi.createConversion).mockResolvedValue({ jobId: "j1" })
+  vi.mocked(CorporaApi.validateConversion).mockResolvedValue({
+    status: "valid",
+    stats: { max_slot: 30_102 },
+  })
+  vi.mocked(CorporaApi.downloadConversion).mockResolvedValue(new Blob(["corpus-bytes"]))
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe("corpus-convert transport", () => {
+  it("starts a PDF conversion when randomUUID is unavailable on HTTP", async () => {
+    vi.stubGlobal("crypto", {
+      getRandomValues: crypto.getRandomValues.bind(crypto),
+    })
+    vi.mocked(CorporaApi.getConversion).mockResolvedValue(job("succeeded"))
+    const pdf = new File(["%PDF-1.7"], "aramaic-grammar.pdf", { type: "application/pdf" })
+
+    const { final, snapshots } = await runToEnd(pdf)
+
+    expect(CorporaApi.createConversion).toHaveBeenCalledWith({
+      file: pdf,
+      sourceFormat: "pdf",
+      name: "aramaic-grammar",
+    })
+    expect(snapshots[0].status).toBe("uploading")
+    expect(final.status).toBe("ready")
+    expect(final.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(Corpus.Convert.createConversionEntry(pdf).id).not.toBe(final.id)
+  })
+
+  it("walks a real job to ready: poll, validate, download", async () => {
+    vi.mocked(CorporaApi.getConversion)
+      .mockResolvedValueOnce(job("queued"))
+      .mockResolvedValueOnce(job("running", ["Parsing tei source and building Text-Fabric dataset..."]))
+      .mockResolvedValueOnce(
+        job("succeeded", [
+          "Parsing tei source and building Text-Fabric dataset...",
+          "Conversion complete.",
+        ]),
+      )
+
+    const { final, snapshots } = await runToEnd()
+
+    expect(final.status).toBe("ready")
+    expect(final.jobId).toBe("j1")
+    expect(final.displayName).toBe("Summa Theologiae")
+    expect(final.resultFilename).toBe("summa-theologiae.corpus")
+    expect(final.corpusBlob).not.toBeNull()
+    expect(final.corpusName).toBe("summa-theologiae.corpus")
+    expect(final.validation).toEqual({
+      status: "valid",
+      stats: { max_slot: 30_102 },
+    })
+    const statuses = [...new Set(snapshots.map((s) => s.status))]
+    expect(statuses).toEqual([
+      "uploading",
+      "queued",
+      "converting",
+      "validating",
+      "ready",
+    ])
+    // Server log lines land on the step implied by the server status.
+    const convertLogs = final.logs.filter((log) => log.step === "convert")
+    expect(convertLogs.map((log) => log.text)).toContain(
+      "> Parsing tei source and building Text-Fabric dataset...",
+    )
+    expect(Corpus.Convert.deriveSteps(final).map((s) => s.state)).toEqual([
+      "completed",
+      "completed",
+      "completed",
+      "completed",
+    ])
+    expect(Corpus.Convert.deriveProgress(final)).toBe(1)
+    expect(CorporaApi.createConversion).toHaveBeenCalledWith({
+      file,
+      sourceFormat: "tei",
+      name: "summa-theologia",
+    })
+  })
+
+  it("marks the convert step failed with the server's error", async () => {
+    vi.mocked(CorporaApi.getConversion)
+      .mockResolvedValueOnce(job("running"))
+      .mockResolvedValueOnce(
+        job("failed", [], "Conversion failed: KeyError (job id j1)"),
+      )
+
+    const { final } = await runToEnd()
+    expect(final.status).toBe("error")
+    expect(final.error).toBe("Conversion failed: KeyError (job id j1)")
+    expect(Corpus.Convert.deriveSteps(final).map((s) => s.state)).toEqual([
+      "completed",
+      "completed",
+      "failed",
+      "pending",
+    ])
+    expect(Corpus.Convert.currentStep(final)).toEqual({ id: "convert", index: 3 })
+    expect(CorporaApi.downloadConversion).not.toHaveBeenCalled()
+  })
+
+  it("prefers the job display_name over a de-slugged filename stem", () => {
+    expect(
+      Corpus.Convert.libraryTitle({
+        displayName: "Summa Theologiae",
+        manifestName: "summa-theologia-1200-ENG",
+        filenameStem: "summa-theologia-1200-ENG",
+      }),
+    ).toBe("Summa Theologiae")
+    expect(
+      Corpus.Convert.libraryTitle({
+        displayName: null,
+        manifestName: null,
+        filenameStem: "summa-theologia-1200-ENG",
+      }),
+    ).toBe("summa theologia 1200 ENG")
+  })
+
+  it("rejects unsupported files before anything is uploaded", async () => {
+    const png = new File(["png"], "image.png", { type: "image/png" })
+    const { final } = await runToEnd(png)
+    expect(final.status).toBe("error")
+    expect(Corpus.Convert.deriveSteps(final)[0].state).toBe("failed")
+    expect(CorporaApi.createConversion).not.toHaveBeenCalled()
+  })
+
+  it("fails the receive step when the service refuses the upload", async () => {
+    vi.mocked(CorporaApi.createConversion).mockRejectedValueOnce(
+      new CorporaApiError("queue-full", "The conversion queue is full.", 429),
+    )
+    const { final } = await runToEnd()
+    expect(final.status).toBe("error")
+    expect(final.error).toMatch(/queue is full/)
+    expect(Corpus.Convert.currentStep(final).id).toBe("receive")
+  })
+
+  it("tolerates early instance fan-out, then reaches the job", async () => {
+    // The first polls can hit a Vercel instance that never saw the job.
+    vi.mocked(CorporaApi.getConversion)
+      .mockRejectedValueOnce(new CorporaApiError("not-found", "nope", 404))
+      .mockRejectedValueOnce(new CorporaApiError("unreachable", "offline"))
+      .mockResolvedValueOnce(job("succeeded"))
+    const { final } = await runToEnd()
+    expect(final.status).toBe("ready")
+  })
+
+  it("gives up after repeated first-poll failures", async () => {
+    vi.mocked(CorporaApi.getConversion).mockRejectedValue(
+      new CorporaApiError("not-found", "nope", 404),
+    )
+    const { final } = await runToEnd()
+    expect(final.status).toBe("error")
+    expect(CorporaApi.getConversion).toHaveBeenCalledTimes(4) // initial + 3 retries
+    expect(final.error).toMatch(/no longer knows this job/)
+  })
+
+  it("treats a 404 after prior contact as the service forgetting the job", async () => {
+    vi.mocked(CorporaApi.getConversion)
+      .mockResolvedValueOnce(job("running"))
+      .mockRejectedValueOnce(new CorporaApiError("not-found", "gone", 404))
+    const { final } = await runToEnd()
+    expect(final.status).toBe("error")
+    expect(final.error).toBe(
+      "The service no longer knows this job — its instance was recycled. Retry to start over.",
+    )
+    expect(Corpus.Convert.currentStep(final).id).toBe("convert")
+  })
+
+  it("renders distinct copy per failure kind", async () => {
+    for (const [kind, fragment] of [
+      ["unreachable", /could not be reached/],
+      ["queue-full", /queue is full/],
+      ["too-large", /500 MiB/],
+      ["unauthorized", /sign in/],
+    ] as const) {
+      vi.mocked(CorporaApi.createConversion).mockRejectedValueOnce(
+        new CorporaApiError(kind, "raw server detail"),
+      )
+      const { final } = await runToEnd()
+      expect(final.status).toBe("error")
+      expect(final.error).toMatch(fragment)
+    }
+  })
+
+  it("stops polling when aborted", async () => {
+    const controller = new AbortController()
+    vi.mocked(CorporaApi.getConversion).mockImplementation(async () => {
+      controller.abort()
+      return job("queued")
+    })
+    const final = await Corpus.Convert.runConversion(
+      file,
+      Corpus.Convert.createConversionEntry(file),
+      () => {},
+      { ...instantly, signal: controller.signal },
+    )
+    expect(final.status).toBe("queued")
+    expect(CorporaApi.getConversion).toHaveBeenCalledTimes(1)
+    expect(CorporaApi.downloadConversion).not.toHaveBeenCalled()
+  })
+
+  it("annotates an invalid corpus but still downloads it", async () => {
+    vi.mocked(CorporaApi.getConversion).mockResolvedValueOnce(job("succeeded"))
+    vi.mocked(CorporaApi.validateConversion).mockResolvedValueOnce({
+      status: "invalid",
+      reasons: ["missing otype feature"],
+    })
+    const { final } = await runToEnd()
+    expect(final.status).toBe("ready")
+    expect(final.validation?.status).toBe("invalid")
+    expect(
+      final.logs.some((log) => log.text.includes("missing otype feature")),
+    ).toBe(true)
+    expect(CorporaApi.downloadConversion).toHaveBeenCalled()
+  })
+
+  it("fails the index step when the download fails", async () => {
+    vi.mocked(CorporaApi.getConversion).mockResolvedValueOnce(job("succeeded"))
+    vi.mocked(CorporaApi.downloadConversion).mockRejectedValueOnce(
+      new CorporaApiError("not-ready", "Job is running, not ready", 409),
+    )
+    const { final } = await runToEnd()
+    expect(final.status).toBe("error")
+    expect(Corpus.Convert.currentStep(final).id).toBe("index")
+    expect(final.corpusBlob).toBeNull()
+  })
+
+  it("formats byte sizes for the log lines", () => {
+    expect(formatBytes(512)).toBe("512 B")
+    expect(formatBytes(4_400_000)).toBe("4.2 MB")
+  })
+})
