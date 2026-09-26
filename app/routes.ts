@@ -7,7 +7,7 @@ export default [
     // Auth screens: their own chrome, no sidebar. `/login`, `/signup` and
     // `/forgot-password` are guest-only (each guards itself with `requireAnon`);
     // `/reset-password` and `/verify` are mid-flow and stay open.
-    layout("routes/auth-layout.tsx", [
+    layout("components/layouts/auth-layout.tsx", [
         route("login", "routes/login.tsx"),
         route("signup", "routes/signup.tsx"),
         route("forgot-password", "routes/forgot-password.tsx"),
