@@ -1,10 +1,11 @@
 # Working with `@exegia/corpora-ui`
 
-Most of `app/components/ui/*` is a thin re-export of the published package:
+All 54 modules in `app/components/ui/*` use focused public entries from the
+published package:
 
 ```tsx
 // app/components/ui/input.tsx
-export { Input, InputPrimitive, type InputProps } from "@exegia/corpora-ui";
+export { Input, InputPrimitive, type InputProps } from "@exegia/corpora-ui/ui/input";
 ```
 
 Some files wrap it to set an app-wide default — `button.tsx` turns cuelume
@@ -18,25 +19,25 @@ Sibling checkout: `../corpora-ui`, with the library in `../corpora-ui/react`.
 | --- | --- |
 | npm package | `@exegia/corpora-ui` |
 | library entry | `react/src/index.ts` |
+| focused UI entries | `react/src/ui/` |
 | components | `react/src/components/{ui,composed,blocks}` |
-| docs registry | `react/src/registry/` |
+| documentation and examples | `react/content/`, `react/src/components/stories/` |
 | architecture | `react/ARCHITECTURE.md` |
 | conventions | `react/CLAUDE.md` |
 | branch/release flow | `.github/WORKFLOW.md` |
 
-Note `ARCHITECTURE.md` writes paths as `src/…` and the package as `@corpora/ui`;
-both are relative to `react/`, and the published name is `@exegia/corpora-ui`.
+Library paths such as `src/…` are relative to `react/`.
 
 Dependencies install in `react/`, never at the repo root — the root has no
 `package.json` on purpose.
 
 ## Reading upstream source when a component misbehaves
 
-The published package ships its sources, so you can read the real implementation
-without leaving this repo:
+The published package contains compiled JavaScript, declarations, and CSS in
+`dist-lib/`. Read component source in the sibling checkout:
 
 ```bash
-cat node_modules/@exegia/corpora-ui/src/components/ui/input.tsx
+cat ../corpora-ui/react/src/components/ui/input.tsx
 ```
 
 That is how the `Button` hidden-span trap and the `Input` wrapper/`aria-invalid`
@@ -54,9 +55,13 @@ Move it upstream when it is generic and reusable across the corpora apps, with n
 app imports (`@/lib/*`, `react-router`, Supabase) other than what the library
 already depends on.
 
-To move one, use the **`extract-component`** skill — it covers the split, the
-registry entry, the release/publish flow, and swapping this repo over to the
+To move one, use the **`extract-component`** skill — it covers the split,
+public exports and documentation, the release/publish flow, and swapping this repo over to the
 published version.
+
+The primitive sidebar lives upstream in `components/blocks/sidebar-primitives`.
+Its instance-keyed Jotai state shares the library provider's store. Keep route,
+authentication, and domain wiring in the app's layout components.
 
 ## Which registry
 
@@ -92,8 +97,8 @@ anything compiles.
 
 ## Upgrading from 0.28 to 2.0
 
-The app pins `@exegia/corpora-ui` 2.0.0, its Jotai 3.0.0 peer, and Base UI
-1.8.0. Align the app's Base UI version with the library so composed controls
+The 2.0 upgrade aligned the app with the library's Jotai 3.0.0 peer and Base UI
+1.8.0. Keep the app's Base UI version aligned with the library so composed controls
 share one set of contexts.
 
 The 2.x package renamed public types, including `TButtonProps`, `TInputProps`,
@@ -109,5 +114,5 @@ the library's imperative keyboard cues disabled.
 
 The OTP block now includes a "Verification code" label alongside its title.
 Tests waiting for the screen should match the exact "Enter verification code"
-title to avoid an ambiguous text query. Vite's explicit prebundle list includes
-the new 2.x runtime imports as well as the existing Base UI subpaths.
+title to avoid an ambiguous text query. Vite discovers the runtime imports through
+dependency scanning and the configured Base UI subpath glob.
