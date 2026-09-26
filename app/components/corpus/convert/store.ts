@@ -4,10 +4,8 @@
  * atoms, so the run survives in-app navigation and any component under
  * `ExegiaProvider` can read it without holding the controller.
  *
- * Everything but the persist step lives here. Persisting the registry row
- * goes through the /corpus route's `convert-document` action, which needs a
- * React Router fetcher — so `runConversionAtom` resolves to the payload for
- * that action and `useConversion` submits it.
+ * Successful runs queue a registry payload. ConversionRuntime owns the
+ * React Router fetcher that persists it and revalidates the corpus list.
  */
 import { atom } from "jotai"
 import { atomWithImmer } from "jotai-immer"
@@ -23,8 +21,13 @@ export type ConversionPersistPayload = Record<string, string>
 export const conversionEntryAtom = atomWithImmer<ConversionEntry | null>(null)
 conversionEntryAtom.debugLabel = "conversion/entry"
 
-export const conversionPanelOpenAtom = atom(false)
-conversionPanelOpenAtom.debugLabel = "conversion/panelOpen"
+export interface ConversionPersistRequest {
+    id: string
+    payload: ConversionPersistPayload
+}
+
+export const conversionPersistRequestAtom = atom<ConversionPersistRequest | null>(null)
+conversionPersistRequestAtom.debugLabel = "conversion/persistRequest"
 
 /** Registry row id once the terminal row is persisted — the "View corpus" target. */
 export const conversionDocumentIdAtom = atom<string | null>(null)
@@ -56,20 +59,18 @@ const failConversionAtom = atom(null, (_get, set, step: ConversionStepId, messag
     })
 })
 
-export const openConversionPanelAtom = atom(null, (_get, set) => set(conversionPanelOpenAtom, true))
-export const closeConversionPanelAtom = atom(null, (_get, set) => set(conversionPanelOpenAtom, false))
-
 export const dismissConversionAtom = atom(null, (get, set) => {
     get(abortControllerAtom)?.abort()
     set(abortControllerAtom, null)
     set(conversionEntryAtom, null)
     set(conversionDocumentIdAtom, null)
-    set(conversionPanelOpenAtom, false)
+    set(conversionPersistRequestAtom, null)
+    set(lastFileAtom, null)
 })
 
 /**
  * Drive the pipeline for `file`, replacing any run in flight. Resolves to the
- * `convert-document` payload once the archive is downloaded, its
+ * `convert-document` payload and queues it once the archive is downloaded, its
  * manifest/toc/history read and the .corpus stored in the library bucket —
  * or `null` when the run failed or was superseded.
  */
@@ -79,6 +80,7 @@ export const runConversionAtom = atom(null, async (get, set, file: File): Promis
     set(abortControllerAtom, controller)
     set(lastFileAtom, file)
     set(conversionDocumentIdAtom, null)
+    set(conversionPersistRequestAtom, null)
 
     const initial = Corpus.Convert.createConversionEntry(file)
     set(conversionEntryAtom, initial)
@@ -108,7 +110,7 @@ export const runConversionAtom = atom(null, async (get, set, file: File): Promis
         const path = await Corpus.Documents.uploadCorpusFile(corpusFile)
         if (controller.signal.aborted) return null
 
-        return {
+        const payload: ConversionPersistPayload = {
             intent: "convert-document",
             name: Corpus.Convert.libraryTitle({
                 displayName: final.displayName,
@@ -129,6 +131,8 @@ export const runConversionAtom = atom(null, async (get, set, file: File): Promis
             convertedAt: new Date().toISOString(),
             commits: JSON.stringify(commits ?? []),
         }
+        set(conversionPersistRequestAtom, { id: initial.id, payload })
+        return payload
     } catch (error) {
         if (controller.signal.aborted) return null
         set(
@@ -146,6 +150,7 @@ export const runConversionAtom = atom(null, async (get, set, file: File): Promis
  */
 export const startConversionAtom = atom(null, (_get, set, file: File) => {
     const reject = (message: string) => {
+        set(dismissConversionAtom)
         const rejected = Corpus.Convert.createConversionEntry(file)
         set(conversionEntryAtom, rejected)
         set(failConversionAtom, "receive", message)
@@ -167,3 +172,17 @@ export const retryConversionAtom = atom(null, (get, set) => {
     const file = get(lastFileAtom)
     return file ? set(runConversionAtom, file) : null
 })
+
+/** Ignore a response from a dismissed or superseded run. */
+export const finishConversionPersistAtom = atom(
+    null,
+    (get, set, id: string, result: { ok: boolean; documentId?: string; error?: string }) => {
+        if (get(conversionPersistRequestAtom)?.id !== id) return
+        set(conversionPersistRequestAtom, null)
+        if (result.ok) {
+            set(conversionDocumentIdAtom, result.documentId ?? null)
+        } else {
+            set(failConversionAtom, "index", result.error ?? "The converted corpus could not be saved.")
+        }
+    }
+)

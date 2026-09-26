@@ -6,12 +6,12 @@ import { SUPPORTED_EXTENSIONS } from "@/lib/api"
 import type { ActionsProps } from "./types"
 import { useCorpusUpload } from "./use-corpus-upload"
 import { useCallback } from "react"
-import { useAppShellPanels } from "@/components/layouts/shell-panels"
+import { useAppShellPanels } from "@/components/layouts/shell-layout"
 
 /**
  * The header's Convert / Upload pair: pick a source file to convert through
- * the pipeline, or store a ready-made .corpus directly. Lives in the app
- * layout header so a run stays reachable from every route.
+ * the pipeline, or store a ready-made .corpus directly. The corpus page
+ * renders these controls; their conversion state survives route changes.
  */
 export default function Actions({ conversion }: ActionsProps) {
     const { busy, pick, inputRef, uploading, handleFile } = useCorpusUpload()
@@ -28,8 +28,7 @@ export default function Actions({ conversion }: ActionsProps) {
         },
     })
 
-    // The layout's shell instance — a local `useShellPanels()` here would be
-    // a second, disconnected one whose `openPanel` never reaches the shell.
+    // Address the same shellId in the shared store as the main layout.
     const { openPanel } = useAppShellPanels()
     const handleOnOpenClick = useCallback(
         () =>

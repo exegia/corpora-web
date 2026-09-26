@@ -1,14 +1,9 @@
-import { useConversionContext } from "./conversion-context"
+import { useConversion } from "./use-conversion"
 import Panel from "./panel"
 
-/**
- * The element AppLayout hands to `openPanel("right", …)`. `openPanel` stores
- * the ReactNode it is given, so a `<Panel entry={…} />` built at open time
- * would freeze that render's entry; this host reads the live controller from
- * context instead, so the panel tracks the run for as long as it stays open.
- */
+/** The shell keeps this element; read live conversion atoms on every render. */
 export default function PanelHost() {
-    const conversion = useConversionContext()
+    const conversion = useConversion()
     if (!conversion.entry) return null
     return (
         <Panel
