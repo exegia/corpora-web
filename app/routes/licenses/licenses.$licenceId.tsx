@@ -1,7 +1,7 @@
 import { Suspense, useState } from "react"
 import { Await, useLoaderData } from "react-router"
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
   Card,
   CardFrame,
@@ -9,7 +9,7 @@ import {
   CardFrameHeader,
   CardFrameTitle,
   CardPanel,
-} from "@/components/ui/card"
+} from "@exegia/corpora-ui/ui/card"
 import { License } from "@/components/licenses"
 import Licences from "@/lib/licenses"
 import Project, { type LicenseStatus } from "@/lib/projects"

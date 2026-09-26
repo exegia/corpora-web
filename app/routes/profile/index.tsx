@@ -11,33 +11,33 @@ import { MotionConfig } from "motion/react"
 import { Suspense, useMemo, useRef, useState } from "react"
 import { Await, useFetcher } from "react-router"
 import { cn } from "@/lib/utils"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@exegia/corpora-ui/ui/avatar"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
-} from "@/components/ui/frame"
-import { Input } from "@/components/ui/input"
+} from "@exegia/corpora-ui/ui/frame"
+import { Input } from "@exegia/corpora-ui/ui/input"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
   InputGroupText,
-} from "@/components/ui/input-group"
-import { Label } from "@/components/ui/label"
+} from "@exegia/corpora-ui/ui/input-group"
+import { Label } from "@exegia/corpora-ui/ui/label"
 import {
   Select,
   SelectItem,
   SelectPopup,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
+} from "@exegia/corpora-ui/ui/select"
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@exegia/corpora-ui/ui/tabs"
+import { Textarea } from "@exegia/corpora-ui/ui/textarea"
 import {
   AuthError,
   deleteAccount,

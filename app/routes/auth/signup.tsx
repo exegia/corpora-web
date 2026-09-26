@@ -5,7 +5,7 @@ import { SignupBlock } from "@exegia/corpora-ui"
 import { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router"
 import { Auth } from "@/components/auth"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import { DEFAULT_AUTHENTICATED_PATH, requireAnon, safeRedirectTo, signInWithProvider, signUpWithPassword } from "@/lib/auth"
 import type { Route } from "./+types/signup"
 

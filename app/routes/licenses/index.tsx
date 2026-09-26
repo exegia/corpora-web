@@ -3,27 +3,27 @@ import { Suspense, useState } from "react"
 import { Await, Link, redirect, useLoaderData } from "react-router"
 import type { ActionFunctionArgs } from "react-router"
 import { License } from "@/components/licenses"
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
 import {
   Card,
   CardFrame,
   CardFrameHeader,
   CardFrameTitle,
   CardPanel,
-} from "@/components/ui/card"
+} from "@exegia/corpora-ui/ui/card"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty"
+} from "@exegia/corpora-ui/ui/empty"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from "@/components/ui/input-group"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "@exegia/corpora-ui/ui/input-group"
+import { Skeleton } from "@exegia/corpora-ui/ui/skeleton"
 import Licences, { type CatalogLicence } from "@/lib/licenses"
 import { useLoadingSound, useReadySound } from "@/lib/sounds"
 import Project, { type LicenseStatus } from "@/lib/projects"
