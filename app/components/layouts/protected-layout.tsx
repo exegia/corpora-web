@@ -1,22 +1,40 @@
-import { AppLayout } from "@/components/layouts/app-layout"
+import { useEffect } from "react"
+import { useStore } from "jotai"
+import { resetChatAtom } from "@/components/corpus/chat/state"
+import { dismissConversionAtom } from "@/components/corpus/convert/store"
+import ConversionRuntime from "@/components/corpus/convert/runtime"
 import { requireSession } from "@/lib/auth"
-import type { Route } from "../../routes/+types/protected-layout"
+import { useUISounds } from "@/lib/sounds"
+import type { Route } from "./+types/protected-layout"
+import { AppLayout } from "./app-layout"
+import { useAppShellPanels } from "./shell-layout"
 
-/**
- * Guard + chrome for every authenticated route.
- *
- * `requireSession` throws a redirect to `/login?redirectTo=…` before any child
- * loader runs, so no protected route module ever repeats the check.
- *
- * The shape returned here is intentionally minimal: `app/components/breadcrumb`
- * scans every match's `loaderData` for `project` / `licence` keys, so a layout
- * loader must not introduce either (see docs/data-loading.md).
- */
+/** Keep loader data limited to user so it cannot shadow breadcrumb records. */
 export async function clientLoader({ request }: Route.ClientLoaderArgs) {
-  const user = await requireSession(request)
-  return { user }
+    const user = await requireSession(request)
+    return { user }
 }
 
+/** Owns the protected shell and feature lifetimes for the authenticated session. */
 export default function ProtectedLayout({ loaderData }: Route.ComponentProps) {
-  return <AppLayout user={loaderData.user} />
+    const { user } = loaderData
+    useUISounds()
+    const store = useStore()
+    const { openPanel, setOpen, setOpenMobile } = useAppShellPanels()
+
+    useEffect(() => () => {
+        store.set(dismissConversionAtom)
+        store.set(resetChatAtom)
+        // Drop feature elements as well as visibility when leaving the session.
+        openPanel("right", null)
+        setOpen(false, "right")
+        setOpenMobile(false, "right")
+    }, [store, user.id, openPanel, setOpen, setOpenMobile])
+
+    return (
+        <>
+            <ConversionRuntime key={user.id} />
+            <AppLayout user={user} />
+        </>
+    )
 }

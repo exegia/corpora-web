@@ -3,25 +3,22 @@ import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { ShellPanelsContext } from "@/components/layouts/shell-panels"
 import type { CorpusDocument } from "@/lib/corpus"
 import { DetailsCard } from "./details-card"
 
-const panels = {
+const panels = vi.hoisted(() => ({
   openPanel: vi.fn(),
   setOpen: vi.fn(),
   resizePanel: vi.fn(),
-}
+}))
+
+vi.mock("@/components/layouts/shell-layout", () => ({ useAppShellPanels: () => panels }))
 
 function renderCard(ui: ReactElement) {
   const Stub = createRoutesStub([
     {
       path: "/",
-      Component: () => (
-        <ShellPanelsContext.Provider value={panels as never}>
-          {ui}
-        </ShellPanelsContext.Provider>
-      ),
+      Component: () => ui,
       HydrateFallback: () => null,
     },
   ])

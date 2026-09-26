@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { CONVERSION_PANEL_WIDTH } from "@/components/corpus/convert/utils"
-import { useAppShellPanels } from "@/components/layouts/shell-panels"
+import { useAppShellPanels } from "@/components/layouts/shell-layout"
 import { License } from "@/components/licenses"
 import { Button } from "@/components/ui/button"
 import EditPanel from "./edit-panel"
