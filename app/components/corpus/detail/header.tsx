@@ -4,73 +4,63 @@ import { fileIconFor, formatOf } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { License } from "@/components/licenses"
 import type { HeaderProps } from "./types"
+import { Button, Text } from "@exegia/corpora-ui"
+import { exportDocument } from "./utils"
+import { Download } from "lucide-react"
+import { Blocks } from "@/components/blocks"
+import { ExploreTabs } from "../tabs"
 
 /** Detail page header: name, format badge, licence, explorer tabs, actions. */
-export default function Header({
-  document,
-  actions,
-  tabs,
-  title,
-  description,
-  hideMeta,
-}: HeaderProps) {
-  // The title morphs out of the list row it was opened from. Named only while
-  // that navigation is in flight, so the name is never on two elements at once.
-  const morphing = useViewTransitionState(`/corpus/${document.id}`)
-  const format = formatOf(document)
-  const fileIcon = fileIconFor(document)
-  const heading = title ?? document.name
-  const blurb = description ?? (hideMeta ? undefined : document.description)
+export default function Header({ document, tabs, panel, title, description, hideMeta }: HeaderProps) {
 
-  return (
-    <header className="flex flex-wrap items-start justify-between gap-4">
-      <div className="flex min-w-0 items-start gap-4">
-        {fileIcon && !hideMeta &&
-          createElement(fileIcon, {
-            className: "size-16 shrink-0",
-            size: 64,
-            title: `${format} file`,
-          })}
-        <div className="min-w-0">
-          <h1
-            className="font-heading text-2xl font-bold break-words"
-            style={{ viewTransitionName: morphing ? "corpus-title" : "none" }}
-          >
-            {heading}
-          </h1>
-          {blurb && (
-            <p className="mt-1 break-words text-muted-foreground">{blurb}</p>
-          )}
-          {!hideMeta && (
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-              <Badge size="sm" variant="outline">
-                {format}
-              </Badge>
-              {document.status && (
-                <span
-                  className={`flex items-center gap-1.5 capitalize ${
-                    document.status === "converted"
-                      ? "text-success-foreground"
-                      : "text-warning-foreground"
-                  }`}
-                >
-                  <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
-                  {document.status}
-                </span>
-              )}
-              {document.licence && (
-                <License.DetailSheet label={document.licence} />
-              )}
+    const format = formatOf(document)
+    const FileIcon = fileIconFor(document)
+    const heading = title ?? document.name
+    const blurb = description ?? (hideMeta ? undefined : document.description)
+
+    return (
+        <header className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-row gap-2">
+                {FileIcon && <FileIcon title={`${format} file`} className="size-12 shrink-0" size={48} />}
+                <div className="flex flex-col">
+                    <Text.Heading>
+                        {heading}
+                        <Badge size="sm" variant="warning" className="ml-2">
+                            {format}
+                        </Badge>
+                    </Text.Heading>
+                    <div>
+                        {blurb && <p className="mt-1 wrap-break-word text-muted-foreground">{blurb}</p>}
+                        {document.status && (
+                            <span
+                                className={`flex items-center gap-1.5 text-xs capitalize ${
+                                    document.status === "converted"
+                                        ? "text-success-foreground"
+                                        : "text-warning-foreground"
+                                }`}>
+                                <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
+                                {document.status}
+                            </span>
+                        )}
+                        {document.licence && <License.DetailSheet label={document.licence} />}
+                    </div>
+                </div>
             </div>
-          )}
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-col items-end gap-2">
-        {actions && (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
-        )}
-        {tabs}
-      </div>
-    </header>
-  )
+            {tabs && <ExploreTabs tabs={tabs} panel={panel} />}
+            <div className="flex min-w-0 flex-col items-end gap-2">
+                <div className="flex shrink-0 items-center gap-2">
+                    <Blocks.ConfirmDelete
+                        confirmLabel="Delete corpus"
+                        description={`This permanently deletes “${document.name}” and its version history from your library. Projects that reference it will show it as unavailable. This cannot be undone.`}
+                        fields={{ documentId: document.id }}
+                        intent="delete-document"
+                        title={`Delete “${document.name}”?`}
+                    />
+                    <Button onClick={() => exportDocument(document)} size="sm" type="button" variant="secondary">
+                        <Download /> Export
+                    </Button>
+                </div>
+            </div>
+        </header>
+    )
 }

@@ -1,5 +1,6 @@
-import type { CorpusSection } from "@/lib/corpus"
+import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
 import type { ExploreTab } from "./types"
+import CorporaApi from "@/lib/api"
 
 export const EXPLORE_TABS = [
   "overview",
@@ -15,6 +16,40 @@ export function parseExploreTab(value: string | null): ExploreTab {
     return value as ExploreTab
   }
   return "overview"
+}
+
+export function saveDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const anchor = window.document.createElement("a")
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * Prefer the live archive (`GET /convert/{job_id}/download` or Hub download).
+ * Rows with no reachable job or Hub object fall back to a JSON snapshot.
+ */
+export async function exportDocument(document: CorpusDocument) {
+  try {
+    const archive = await CorporaApi.loadCorpusArchive(document)
+    if (archive) {
+      const filename =
+        document.filename ??
+        (archive.kind === "hub" ? archive.key : `${document.name}.corpus`)
+      saveDownload(await CorporaApi.downloadExploreCorpus(archive), filename)
+      return
+    }
+  } catch {
+    // Job expired or unreachable — keep the metadata snapshot.
+  }
+  saveDownload(
+    new Blob([JSON.stringify(document, null, 2)], {
+      type: "application/json",
+    }),
+    `${document.name}.json`,
+  )
 }
 /**
  * Short roman-style labels for the "words per document" chart. Known Summa

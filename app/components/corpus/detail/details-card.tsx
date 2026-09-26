@@ -13,7 +13,7 @@ import { TYPE_LABELS } from "@/components/constant"
 
 function Item({ label, children, className }: { label: string; children?: ReactNode; className?: string }) {
     return (
-        <div className="flex flex-row sm:flex-col">
+        <div className="flex flex-col items-start">
             <dt className="text-xs text-muted-foreground">{label}</dt>
             <dd className={cn("mt-0.5 text-sm", className, children ? "" : "text-muted-foreground/50 italic")}>
                 {children ?? "unknown"}
@@ -31,14 +31,14 @@ function DetailsBody({ document }: DetailsCardProps) {
     }
 
     return (
-        <Frame className="flex-1 rounded-lg">
+        <Frame className="flex-1 rounded-lg col-span-full">
             <FrameHeader className="mb-2 flex flex-row items-center justify-between px-3.5 py-2">
                 <span className="text-sm text-secondary-foreground/60">Details</span>
                 <Button className="flex gap-2" onClick={handleEdit} size="sm" type="button" variant="outline">
                     <Pencil className="scale-90" /> Edit
                 </Button>
             </FrameHeader>
-            <Card render={<dl />} className="flex flex-col gap-3 p-4">
+            <Card render={<dl />} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 border-none p-4">
                 <Item label="Title">{document.name}</Item>
                 <Item label="Description">{document.description}</Item>
                 <Item label="Type">{document.corpusType ? TYPE_LABELS[document.corpusType] : undefined}</Item>
@@ -59,7 +59,8 @@ function DetailsBody({ document }: DetailsCardProps) {
         </Frame>
     )
 }
+
 /** The left-hand Details card on the corpus detail page. */
-export default function DetailsCard(props: DetailsCardProps) {
+export function DetailsCard(props: DetailsCardProps) {
     return <DetailsBody {...props} />
 }

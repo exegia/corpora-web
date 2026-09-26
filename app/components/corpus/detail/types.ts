@@ -1,20 +1,32 @@
 import type { ReactNode } from "react"
 import type { CorpusVersionActor, CorpusVersionFile } from "@/lib/api"
 import type { CorpusDocument, CorpusSection } from "@/lib/corpus"
+import type { Route } from "../../../routes/corpus/+types"
+import type { LucideIcon } from "lucide-react"
 
 export type ExploreTab =
   | "overview"
   | "documents"
   | "structure"
-  | "analytics"
-  | "activity"
+    | "activity"
+
+    
+    type TRoute = Pick<NonNullable<Route.ComponentProps['matches'][number]>, 'pathname' | 'id'>
+
+
+    export type TTabItem = {
+        label: Capitalize<ExploreTab>;
+        id: TRoute['id'];
+        icon?: LucideIcon;
+        value: TRoute['pathname']
+    }
 
 export interface HeaderProps {
   document: CorpusDocument
   /** Delete / Export buttons, right-aligned. */
-  actions?: ReactNode
+  panel?: ReactNode
   /** Segmented explorer tabs, sits with the actions. */
-  tabs?: ReactNode
+  tabs?: TTabItem[]
   /** Overrides the document name (reader uses the section title). */
   title?: string
   /** Overrides the document description. */
