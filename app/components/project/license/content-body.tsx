@@ -1,5 +1,5 @@
 import { useRemarkSync } from "react-remark"
-import { Spinner } from "@/components/ui/spinner"
+import { Spinner } from "@exegia/corpora-ui/ui/spinner"
 import type { ContentBodyProps } from "@/components/project/license/types"
 import { cn } from "@/lib/utils"
 

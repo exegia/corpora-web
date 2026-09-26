@@ -1,4 +1,4 @@
-import type { BadgeProps } from "@/components/ui/badge"
+import type { BadgeProps } from "@exegia/corpora-ui/ui/badge"
 import type { CorpusDocument, CorpusType } from "@/lib/corpus"
 import type { CorpusFilters, DateFilter } from "./types"
 

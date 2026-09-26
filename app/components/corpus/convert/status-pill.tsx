@@ -1,6 +1,6 @@
 import { Link } from "react-router"
 import { Blocks } from "@/components/blocks"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import Corpus, { CONVERSION_STEPS } from "@/lib/corpus"
 import type { StatusPillProps } from "./types"
 import { isDone } from "./utils"

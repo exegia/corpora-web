@@ -4,7 +4,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@exegia/corpora-ui/ui/table"
 import type { TableProps } from "./types"
 import Row from "./row"
 

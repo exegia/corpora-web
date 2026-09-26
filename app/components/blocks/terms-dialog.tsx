@@ -1,6 +1,6 @@
 import type { TermsDialogProps } from "@/components/blocks/types"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
     Dialog,
     DialogClose,
@@ -10,7 +10,7 @@ import {
     DialogPopup,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@exegia/corpora-ui/ui/dialog"
 
 /**
  * Terms shown from the signup form's consent checkbox.

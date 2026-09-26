@@ -1,9 +1,9 @@
 import { ProfileCardBlock, Skeleton, type TProfileCardItem as ProfileCardItem } from "@exegia/corpora-ui"
 import { LogOutIcon, UserIcon } from "lucide-react"
 import { useFetcher, useNavigate } from "react-router"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { PreviewCard, PreviewCardPopup, PreviewCardTrigger } from "@/components/ui/preview-card"
+import { Avatar, AvatarFallback, AvatarImage } from "@exegia/corpora-ui/ui/avatar"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
+import { PreviewCard, PreviewCardPopup, PreviewCardTrigger } from "@exegia/corpora-ui/ui/preview-card"
 import type { ProfileCardProps } from "@/components/sidebar/types"
 import { Suspense } from "react"
 

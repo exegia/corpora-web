@@ -2,7 +2,7 @@ import type { LinkedIdentity } from "@/components/auth/types"
 import { SOCIAL_PROVIDERS } from "@exegia/corpora-ui"
 import { motion } from "motion/react"
 import { Brand } from "@/components/brand-marks"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import { EASE } from "@/components/profile/constants"
 
 /** One connected identity: brand mark, provider, account, disconnect. */

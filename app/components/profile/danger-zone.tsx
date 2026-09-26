@@ -1,6 +1,6 @@
 import { Blocks } from "@/components/blocks"
-import { Button } from "@/components/ui/button"
-import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@/components/ui/frame"
+import { Button } from "@exegia/corpora-ui/ui/button"
+import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@exegia/corpora-ui/ui/frame"
 import { DELETE_ACCOUNT_PHRASE, PROFILE_INTENT } from "@/components/profile/constants"
 
 /**

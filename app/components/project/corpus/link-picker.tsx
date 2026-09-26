@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
     Dialog,
     DialogDescription,
@@ -8,7 +8,7 @@ import {
     DialogPopup,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@exegia/corpora-ui/ui/dialog"
 import LinkRow from "@/components/project/corpus/link-row"
 import type { LinkPickerProps } from "@/components/project/corpus/types"
 

@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
 import type { ProjectStatus } from "@/lib/projects"
 import type { StatusBlockProps } from "@/components/blocks/types"
 

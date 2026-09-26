@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 import { AiPanel } from "@exegia/corpora-ui"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import { useAppShellPanels } from "@/components/layouts/shell-layout"
 import { useChatState } from "./state"
 

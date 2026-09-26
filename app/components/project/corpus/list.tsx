@@ -1,5 +1,5 @@
 import { LibraryBig } from "lucide-react"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@exegia/corpora-ui/ui/empty"
 import ListRow from "@/components/project/corpus/list-row"
 import type { ListProps } from "@/components/project/corpus/types"
 

@@ -1,6 +1,6 @@
 import { FileQuestion } from "lucide-react"
 import { Link } from "react-router"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
   Empty,
   EmptyContent,
@@ -8,7 +8,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty"
+} from "@exegia/corpora-ui/ui/empty"
 
 export default function LicenceNotFound() {
   return (

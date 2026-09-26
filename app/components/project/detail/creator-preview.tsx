@@ -1,5 +1,5 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { PreviewCard, PreviewCardPopup, PreviewCardTrigger } from "@/components/ui/preview-card"
+import { Avatar, AvatarFallback } from "@exegia/corpora-ui/ui/avatar"
+import { PreviewCard, PreviewCardPopup, PreviewCardTrigger } from "@exegia/corpora-ui/ui/preview-card"
 import type { CreatorPreviewProps } from "@/components/project/detail/types"
 import { initials } from "@/lib/utils"
 

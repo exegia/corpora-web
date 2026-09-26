@@ -1,7 +1,7 @@
 import { createElement } from "react"
 import { useViewTransitionState } from "react-router"
 import { fileIconFor, formatOf } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
 import { License } from "@/components/licenses"
 import type { HeaderProps } from "./types"
 import { Button, Text } from "@exegia/corpora-ui"

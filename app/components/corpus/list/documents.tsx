@@ -3,7 +3,7 @@ import { useReadySound } from "@/lib/sounds"
 import { collectLanguages, DEFAULT_FILTERS, filterDocuments, PAGE_SIZE, paginate } from "./utils"
 import type { CorpusFilters } from "./types"
 import { useState } from "react"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@exegia/corpora-ui/ui/empty"
 import { FileArchive } from "lucide-react"
 import { List } from "."
 

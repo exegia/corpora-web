@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
 import DetailField from "@/components/licenses/detail-field"
 import { domainList } from "@/components/licenses/utils"
 import { formatDate } from "@/lib/format"

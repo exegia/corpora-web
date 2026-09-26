@@ -1,7 +1,7 @@
 import { Plus, SearchIcon } from "lucide-react"
 import { Fragment, useState } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
     Drawer,
     DrawerDescription,
@@ -10,9 +10,9 @@ import {
     DrawerPopup,
     DrawerTitle,
     DrawerTrigger,
-} from "@/components/ui/drawer"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
-import { ToggleGroup, ToggleGroupItem, ToggleGroupSeparator } from "@/components/ui/toggle-group"
+} from "@exegia/corpora-ui/ui/drawer"
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@exegia/corpora-ui/ui/input-group"
+import { ToggleGroup, ToggleGroupItem, ToggleGroupSeparator } from "@exegia/corpora-ui/ui/toggle-group"
 import CatalogRow from "@/components/project/license/catalog-row"
 import ContentDrawer from "@/components/project/license/content-drawer"
 import type { CatalogSheetProps } from "@/components/project/license/types"

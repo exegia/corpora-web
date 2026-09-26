@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import type { FooterProps } from "./types"
 
 /** "Showing 1–6 of 12 corpuses" + Prev/Next below the table. */

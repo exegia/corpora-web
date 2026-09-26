@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
     Dialog,
     DialogClose,
@@ -10,7 +10,7 @@ import {
     DialogPopup,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@exegia/corpora-ui/ui/dialog"
 import ContentBody from "@/components/project/license/content-body"
 import type { ContentViewerProps } from "@/components/project/license/types"
 import { useContentText } from "@/components/project/license/use-content-text"

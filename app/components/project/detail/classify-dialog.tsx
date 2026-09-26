@@ -1,7 +1,7 @@
 import { Check, Landmark, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useFetcher } from "react-router"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
     Combobox,
     ComboboxChip,
@@ -12,7 +12,7 @@ import {
     ComboboxList,
     ComboboxPopup,
     ComboboxValue,
-} from "@/components/ui/combobox"
+} from "@exegia/corpora-ui/ui/combobox"
 import {
     Dialog,
     DialogDescription,
@@ -21,9 +21,9 @@ import {
     DialogPanel,
     DialogPopup,
     DialogTitle,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@exegia/corpora-ui/ui/dialog"
+import { Label } from "@exegia/corpora-ui/ui/label"
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@exegia/corpora-ui/ui/select"
 import IconLabel from "@/components/project/detail/icon-label"
 import TypeLabel from "@/components/project/detail/type-label"
 import type { ClassifyDialogProps } from "@/components/project/detail/types"

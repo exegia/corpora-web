@@ -1,6 +1,6 @@
 import { X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "@exegia/corpora-ui/ui/button"
+import { Separator } from "@exegia/corpora-ui/ui/separator"
 import type { Lemma } from "./types"
 import { formatCount } from "@/lib/utils"
 

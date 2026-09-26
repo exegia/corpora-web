@@ -11,7 +11,7 @@ import {
   AlertAction,
   AlertDescription,
   AlertTitle,
-} from "@/components/ui/alert";
+} from "@exegia/corpora-ui/ui/alert";
 
 const variantIcons: Record<AlertVariant, React.ComponentType<{ className?: string }>> = {
   error: CircleAlertIcon,

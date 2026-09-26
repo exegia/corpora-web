@@ -1,4 +1,4 @@
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@exegia/corpora-ui/ui/tabs"
 import type { TTabItem } from "./types"
 import { NavLink, Outlet, useLocation } from "react-router"
 import type { TabsPanelProps } from "@base-ui/react"

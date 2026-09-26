@@ -1,4 +1,4 @@
-import { Label } from "@/components/ui/label"
+import { Label } from "@exegia/corpora-ui/ui/label"
 
 /** Left column of a row: what the field is and where it shows up. */
 export default function RowLabel({

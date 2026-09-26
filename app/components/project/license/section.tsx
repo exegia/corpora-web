@@ -1,6 +1,6 @@
 import { Scale } from "lucide-react"
-import { Card, CardFrame, CardFrameAction, CardFrameHeader, CardFrameTitle, CardPanel } from "@/components/ui/card"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Card, CardFrame, CardFrameAction, CardFrameHeader, CardFrameTitle, CardPanel } from "@exegia/corpora-ui/ui/card"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@exegia/corpora-ui/ui/empty"
 import AgreedRow from "@/components/project/license/agreed-row"
 import CatalogSheet from "@/components/project/license/catalog-sheet"
 import PendingCard from "@/components/project/license/pending-card"

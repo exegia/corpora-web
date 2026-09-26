@@ -1,6 +1,6 @@
 import { RefreshCw, SidebarOpen, Upload } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { toastManager } from "@/components/ui/toast"
+import { Button } from "@exegia/corpora-ui/ui/button"
+import { toastManager } from "@exegia/corpora-ui/ui/toast"
 import { useFileUpload } from "@/hooks"
 import { SUPPORTED_EXTENSIONS } from "@/lib/api"
 import type { ActionsProps } from "./types"

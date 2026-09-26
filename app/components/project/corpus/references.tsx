@@ -6,7 +6,7 @@ import {
     CardFrameHeader,
     CardFrameTitle,
     CardPanel,
-} from "@/components/ui/card"
+} from "@exegia/corpora-ui/ui/card"
 import LinkPicker from "@/components/project/corpus/link-picker"
 import List from "@/components/project/corpus/list"
 import type { ReferencesProps } from "@/components/project/corpus/types"

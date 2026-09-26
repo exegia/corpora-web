@@ -1,5 +1,5 @@
 import { Check, X } from "lucide-react"
-import { Spinner } from "@/components/ui/spinner"
+import { Spinner } from "@exegia/corpora-ui/ui/spinner"
 import type { ConversionStep } from "@/lib/corpus"
 import { conversionTone, TONE_CLASSES } from "./utils"
 

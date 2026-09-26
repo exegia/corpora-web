@@ -1,4 +1,4 @@
-import { Frame, FrameDescription, FrameHeader, FrameTitle } from "@/components/ui/frame"
+import { Frame, FrameDescription, FrameHeader, FrameTitle } from "@exegia/corpora-ui/ui/frame"
 
 /**
  * The card shell, shared by all three states. Loading, error and loaded each

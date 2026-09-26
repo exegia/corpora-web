@@ -1,7 +1,7 @@
 import { Building2, Check, Plus, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useFetcher } from "react-router"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
     Dialog,
     DialogDescription,
@@ -10,10 +10,10 @@ import {
     DialogPanel,
     DialogPopup,
     DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@exegia/corpora-ui/ui/dialog"
+import { Input } from "@exegia/corpora-ui/ui/input"
+import { Label } from "@exegia/corpora-ui/ui/label"
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@exegia/corpora-ui/ui/select"
 import type { OrganizationDialogProps } from "@/components/project/detail/types"
 import type { ActionResult } from "@/components/project/types"
 

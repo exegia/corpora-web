@@ -5,7 +5,7 @@ import {
   CardFrameHeader,
   CardFrameTitle,
   CardPanel,
-} from "@/components/ui/card"
+} from "@exegia/corpora-ui/ui/card"
 import { cn } from "@/lib/utils"
 import type { PanelProps } from "./types"
 

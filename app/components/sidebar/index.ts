@@ -1,4 +1,4 @@
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@exegia/corpora-ui/ui/sidebar"
 import { Sidebar as Navigation } from "./component"
 import { Header } from "./header"
 import ProfileCard from "./profile-card"

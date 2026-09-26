@@ -2,9 +2,9 @@ import { ChevronDownIcon } from "lucide-react"
 import { useState } from "react"
 import { useRemarkSync } from "react-remark"
 import { Link } from "react-router"
-import { Button } from "@/components/ui/button"
-import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Frame, FrameHeader, FramePanel } from "@/components/ui/frame"
+import { Button } from "@exegia/corpora-ui/ui/button"
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "@exegia/corpora-ui/ui/collapsible"
+import { Frame, FrameHeader, FramePanel } from "@exegia/corpora-ui/ui/frame"
 import {
     Sheet,
     SheetDescription,
@@ -14,8 +14,8 @@ import {
     SheetPopup,
     SheetTitle,
     SheetTrigger,
-} from "@/components/ui/sheet"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "@exegia/corpora-ui/ui/sheet"
+import { Skeleton } from "@exegia/corpora-ui/ui/skeleton"
 import DetailView from "./detail-view"
 import Licences from "@/lib/licenses"
 import type { LicenceDetail } from "@/lib/licenses"

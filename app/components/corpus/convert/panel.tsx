@@ -1,4 +1,4 @@
-import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress"
+import { Progress, ProgressIndicator, ProgressTrack } from "@exegia/corpora-ui/ui/progress"
 import Corpus from "@/lib/corpus"
 import { CONVERSION_STEPS } from "@/lib/corpus"
 import FileSummary from "./file-summary"

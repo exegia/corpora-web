@@ -1,5 +1,5 @@
-import { Card, CardFrame, CardFrameHeader, CardFrameTitle, CardPanel } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Card, CardFrame, CardFrameHeader, CardFrameTitle, CardPanel } from "@exegia/corpora-ui/ui/card"
+import { Skeleton } from "@exegia/corpora-ui/ui/skeleton"
 import { useLoadingSound } from "@/lib/sounds"
 
 /** CardFrame placeholder while the licence text downloads on first visit. */

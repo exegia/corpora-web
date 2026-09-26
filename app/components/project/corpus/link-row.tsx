@@ -1,6 +1,6 @@
 import { useFetcher } from "react-router"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import type { LinkRowProps } from "@/components/project/corpus/types"
 import type { ActionResult } from "@/components/project/types"
 

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import { useFetchers } from "react-router"
 import { Blocks } from "@/components/blocks"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Skeleton } from "@/components/ui/skeleton"
-import { toastManager } from "@/components/ui/toast"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
+import { Button } from "@exegia/corpora-ui/ui/button"
+import { Checkbox } from "@exegia/corpora-ui/ui/checkbox"
+import { Skeleton } from "@exegia/corpora-ui/ui/skeleton"
+import { toastManager } from "@exegia/corpora-ui/ui/toast"
 import CorporaApi, {
   type CorpusArchive,
   type CorpusVersion,

@@ -4,7 +4,7 @@ import { Breadcrumb } from "../breadcrumb"
 import { Layout, type TPanelMap } from "@exegia/corpora-ui"
 import { Blocks } from "@/components/blocks"
 import { Sidebar } from "@/components/sidebar"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ScrollArea } from "@exegia/corpora-ui/ui/scroll-area"
 import { useAppShellPanels } from "./shell-layout"
 
 export function AppLayout({ user }: { user?: SessionUser }) {

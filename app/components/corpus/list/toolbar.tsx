@@ -3,14 +3,14 @@ import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from "@/components/ui/input-group"
+} from "@exegia/corpora-ui/ui/input-group"
 import {
   Select,
   SelectItem,
   SelectPopup,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@exegia/corpora-ui/ui/select"
 import type { CorpusType } from "@/lib/corpus"
 import type { CorpusFilters, DateFilter, ToolbarProps } from "./types"
 import { TYPE_LABELS } from "./utils"

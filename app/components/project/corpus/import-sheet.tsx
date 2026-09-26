@@ -1,8 +1,8 @@
 import { SearchIcon } from "lucide-react"
 import { useState } from "react"
 import { Link } from "react-router"
-import { Button } from "@/components/ui/button"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
+import { Button } from "@exegia/corpora-ui/ui/button"
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@exegia/corpora-ui/ui/input-group"
 import {
     Sheet,
     SheetDescription,
@@ -11,7 +11,7 @@ import {
     SheetPopup,
     SheetTitle,
     SheetTrigger,
-} from "@/components/ui/sheet"
+} from "@exegia/corpora-ui/ui/sheet"
 import ImportRow from "@/components/project/corpus/import-row"
 import type { ImportSheetProps } from "@/components/project/corpus/types"
 

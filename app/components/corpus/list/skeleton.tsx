@@ -5,8 +5,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Skeleton as Bone } from "@/components/ui/skeleton"
+} from "@exegia/corpora-ui/ui/table"
+import { Skeleton as Bone } from "@exegia/corpora-ui/ui/skeleton"
 import { useLoadingSound } from "@/lib/sounds"
 import { PAGE_SIZE } from "./utils"
 

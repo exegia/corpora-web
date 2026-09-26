@@ -11,8 +11,8 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { Spinner } from "@/components/ui/spinner"
+} from "@exegia/corpora-ui/ui/sidebar"
+import { Spinner } from "@exegia/corpora-ui/ui/spinner"
 import { default as Logo } from "@/components/logo"
 import ProfileCard from "@/components/sidebar/profile-card"
 import type { DrawerProps } from "@/components/sidebar/types"

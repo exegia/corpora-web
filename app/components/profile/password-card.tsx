@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@/components/ui/frame"
+import { Button } from "@exegia/corpora-ui/ui/button"
+import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@exegia/corpora-ui/ui/frame"
 import { sendPasswordReset } from "@/lib/auth"
 import { play } from "@/lib/sounds"
 

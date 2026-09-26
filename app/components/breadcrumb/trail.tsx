@@ -7,7 +7,7 @@ import {
     BreadcrumbList,
     BreadcrumbPage,
     BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+} from "@exegia/corpora-ui/ui/breadcrumb"
 import { useCrumbs } from "@/components/breadcrumb/use-crumbs"
 
 /** The breadcrumb trail for the current route. */

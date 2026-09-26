@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
 import CommitRow from "@/components/corpus/commit-row"
 import type { HistoryProps } from "@/components/corpus/types"
 

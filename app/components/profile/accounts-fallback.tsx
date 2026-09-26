@@ -1,4 +1,4 @@
-import { FramePanel } from "@/components/ui/frame"
+import { FramePanel } from "@exegia/corpora-ui/ui/frame"
 import ConnectedAccountsFrame from "@/components/profile/frame"
 
 /**

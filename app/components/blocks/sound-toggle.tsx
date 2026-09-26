@@ -1,6 +1,6 @@
 import { Volume2, VolumeX } from "lucide-react"
 import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import { getSoundPreference, play, setSoundPreference } from "@/lib/sounds"
 
 /** Mute/unmute the UI sounds; the preference persists like the theme. */

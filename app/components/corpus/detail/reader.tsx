@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react"
 import { BookOpenText } from "lucide-react"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@exegia/corpora-ui/ui/skeleton"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty"
+} from "@exegia/corpora-ui/ui/empty"
 import { useCorporaApi } from "@/hooks"
 // Still imported directly: inspectTokenNode/inspectSplitToken below are
 // module-scope, where a hook cannot be called.

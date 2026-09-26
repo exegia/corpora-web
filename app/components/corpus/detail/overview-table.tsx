@@ -6,7 +6,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@exegia/corpora-ui/ui/table"
 import type { OverviewTableProps } from "./types"
 import { formatCount } from "@/lib/utils"
 

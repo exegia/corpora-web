@@ -1,8 +1,8 @@
 import { Check } from "lucide-react"
 import { useEffect, useRef } from "react"
 import { useFetcher } from "react-router"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
     Drawer,
     DrawerClose,
@@ -12,7 +12,7 @@ import {
     DrawerPanel,
     DrawerPopup,
     DrawerTitle,
-} from "@/components/ui/drawer"
+} from "@exegia/corpora-ui/ui/drawer"
 import ContentBody from "@/components/project/license/content-body"
 import type { ContentDrawerProps } from "@/components/project/license/types"
 import { useContentText } from "@/components/project/license/use-content-text"

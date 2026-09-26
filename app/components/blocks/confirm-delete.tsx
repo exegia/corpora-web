@@ -11,10 +11,10 @@ import {
   AlertDialogPopup,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+} from "@exegia/corpora-ui/ui/alert-dialog"
+import { Button } from "@exegia/corpora-ui/ui/button"
+import { Field, FieldLabel } from "@exegia/corpora-ui/ui/field"
+import { Input } from "@exegia/corpora-ui/ui/input"
 
 /**
  * Typed exactly — case-sensitively — before the delete submits. Matching

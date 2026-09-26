@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useFetcher } from "react-router"
-import { toastManager } from "@/components/ui/toast"
+import { toastManager } from "@exegia/corpora-ui/ui/toast"
 import Corpus from "@/lib/corpus"
 
 import Project from "@/lib/projects"

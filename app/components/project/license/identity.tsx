@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
 import type { IdentityProps } from "@/components/project/license/types"
 
 /** Title plus one line of context — shared by the pending card and agreed rows. */

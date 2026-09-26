@@ -1,14 +1,14 @@
 import { FileText, RotateCw } from "lucide-react"
 import { Link } from "react-router"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@exegia/corpora-ui/ui/badge"
+import { Button } from "@exegia/corpora-ui/ui/button"
 import {
   Card,
   CardFrame,
   CardFrameAction,
   CardFrameHeader,
   CardPanel,
-} from "@/components/ui/card"
+} from "@exegia/corpora-ui/ui/card"
 import { formatBytes } from "@/lib/corpus"
 import { formatDate } from "@/lib/format"
 import type { FileSummaryProps } from "./types"
