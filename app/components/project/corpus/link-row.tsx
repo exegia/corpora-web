@@ -14,7 +14,7 @@ export default function LinkRow({ option }: LinkRowProps) {
             <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{option.name}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                    {[option.language, option.type].filter(Boolean).join(" · ") || "—"}
+                    {option.language ?? "—"}
                 </p>
                 {fetcher.data?.ok === false && fetcher.data.error && (
                     <p role="alert" className="text-xs text-destructive">
@@ -24,8 +24,6 @@ export default function LinkRow({ option }: LinkRowProps) {
             </div>
             {option.alreadyLinked ? (
                 <Badge variant="secondary">Referenced</Badge>
-            ) : !option.available ? (
-                <Badge variant="secondary">Unavailable</Badge>
             ) : (
                 <fetcher.Form method="post">
                     <input type="hidden" name="intent" value="link-corpus" />

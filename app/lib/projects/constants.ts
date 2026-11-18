@@ -68,15 +68,13 @@ export const LANGUAGES_BY_TYPE: Partial<Record<ScripturalType, readonly Language
 
 export const PROJECT_COLUMNS = "id, name, description, status, type, created_at, updated_at"
 
-export const PROJECT_DETAIL_COLUMNS = `${PROJECT_COLUMNS}, language, category,
+export const PROJECT_DETAIL_COLUMNS = `${PROJECT_COLUMNS}, owner_id, language, category,
   corpus_documents ( id, name, source, path, filename, uploaded_at,
     corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at ) ),
   user_directory ( id, name, username ),
   organizations ( id, name, website ),
   project_licences ( agreed_at,
     licences ( id, title, url, domain_content, domain_data, domain_software, family, maintainer, status ),
-    user_directory ( id, name, username ) ),
-  project_corpora ( corpus_id, linked_at,
-    corpora ( uid, name, language, type, category, version, available ) )`
+    user_directory ( id, name, username ) )`
 
 export const UNKNOWN_CREATOR: ProjectCreator = { id: "", name: null, username: "unknown" }

@@ -125,6 +125,9 @@ assume these hosted migrations can be applied to an arbitrary schema without rev
 
 Public catalogue reads may be anonymous; protected workspace operations require a live
 Supabase session and the database's access policies.
+The project corpus picker also requires the managed `/v1/projects/{project_id}/corpora`
+API routes at `VITE_CORPORA_API_URL`. Deploy the API before enabling the web picker;
+an unavailable API leaves the rest of the project page usable and displays an error.
 
 Locally, `.env` is committed **encrypted by dotenvx** and decrypted at run time with the
 private key in `.env.keys` (never committed). Vercel does not get that key — the

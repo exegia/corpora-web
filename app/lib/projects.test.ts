@@ -139,6 +139,7 @@ describe("createProject", () => {
 function makeDetail(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
   return {
     id: "p1",
+    ownerId: "u1",
     name: "Peshitta Study",
     description: null,
     status: "draft",
@@ -357,13 +358,13 @@ const creatorRow = { id: "u1", name: "Ada Researcher", username: "ada" }
 /** Full detail row shape as the nested select returns it (002/003). */
 const detailRow = {
   ...projectRow,
+  owner_id: "u1",
   language: null,
   category: null,
   corpus_documents: null,
   user_directory: creatorRow,
   organizations: null,
   project_licences: [],
-  project_corpora: [],
   corpus_commits: [],
 }
 
@@ -373,35 +374,11 @@ describe("getProject", () => {
     expect(await Project.Queries.getProject("gone")).toBeNull()
   })
 
-  it("surfaces stale corpora via available=false and tolerates missing corpus rows", async () => {
-    mockSupabase([
-      {
-        data: {
-          ...detailRow,
-          project_corpora: [
-            {
-              corpus_id: "c1",
-              linked_at: "2026-07-03T00:00:00Z",
-              corpora: {
-                uid: "u1",
-                name: "Peshitta OT",
-                language: "Aramaic",
-                type: "bible",
-                category: "religious",
-                version: "1.0.0",
-                available: false,
-              },
-            },
-            { corpus_id: "c2", linked_at: "2026-07-04T00:00:00Z", corpora: null },
-          ],
-        },
-        error: null,
-      },
-    ])
+  it("loads the trusted owner and leaves managed corpus links to the API", async () => {
+    mockSupabase([{ data: detailRow, error: null }])
     const project = await Project.Queries.getProject("p1")
-    expect(project?.corpora).toHaveLength(2)
-    expect(project?.corpora[0].corpus?.available).toBe(false)
-    expect(project?.corpora[1].corpus).toBeNull()
+    expect(project?.ownerId).toBe("u1")
+    expect(project?.corpora).toEqual([])
   })
 
   it("maps creator, organization, and attached licenses (002)", async () => {
@@ -514,67 +491,6 @@ describe("setProjectOrganization", () => {
     await expect(Project.Mutations.setProjectOrganization("gone", null)).rejects.toMatchObject({
       code: "not-found",
     })
-  })
-})
-
-describe("listCorpusOptions", () => {
-  it("flags corpora already linked to the project", async () => {
-    mockSupabase([
-      {
-        data: [
-          { id: "c1", name: "A", language: null, type: null, available: true },
-          { id: "c2", name: "B", language: null, type: null, available: true },
-        ],
-        error: null,
-      },
-      { data: [{ corpus_id: "c2" }], error: null },
-    ])
-    const options = await Project.Queries.listCorpusOptions("p1")
-    expect(options.map((o) => [o.id, o.alreadyLinked])).toEqual([
-      ["c1", false],
-      ["c2", true],
-    ])
-  })
-})
-
-describe("linkCorpus", () => {
-  it("maps a duplicate link (23505) to already-linked and skips the touch", async () => {
-    const { from } = mockSupabase([
-      { data: null, error: { code: "23505", message: "duplicate key" } },
-    ])
-    await expect(Project.Mutations.linkCorpus("p1", "c1")).rejects.toMatchObject({
-      code: "already-linked",
-    })
-    expect(from).toHaveBeenCalledTimes(1)
-  })
-
-  it("inserts the link and bumps the project's updated_at", async () => {
-    const { builders } = mockSupabase([
-      { data: null, error: null },
-      { data: null, error: null },
-    ])
-    await Project.Mutations.linkCorpus("p1", "c1")
-    expect(builders[0].table).toBe("project_corpora")
-    expect(builders[0].insert).toHaveBeenCalledWith({
-      project_id: "p1",
-      corpus_id: "c1",
-    })
-    expect(builders[1].table).toBe("projects")
-    expect(builders[1].update).toHaveBeenCalled()
-  })
-})
-
-describe("unlinkCorpus", () => {
-  it("deletes only the join row — never the corpus — and touches the project", async () => {
-    const { builders, from } = mockSupabase([
-      { data: null, error: null },
-      { data: null, error: null },
-    ])
-    await Project.Mutations.unlinkCorpus("p1", "c1")
-    expect(builders[0].table).toBe("project_corpora")
-    expect(builders[0].delete).toHaveBeenCalled()
-    expect(from).not.toHaveBeenCalledWith("corpora")
-    expect(builders[1].table).toBe("projects")
   })
 })
 

@@ -12,6 +12,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 // `Corpus` is the UI namespace above, so the data layer comes in as `Corpora`.
+import { getCurrentUser } from "@/lib/auth"
 import Corpora from "@/lib/corpus"
 import { formatDate, formatRelativeTime } from "@/lib/format"
 import Licences from "@/lib/licenses"
@@ -38,22 +39,40 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
     // are the slow part, so the workspace suspends on this promise and shows the
     // skeleton meanwhile.
     const data = (async () => {
-        const [corpusOptions, licenseCatalog, organizations, superadmin, documents] = project
-            ? await Promise.all([
-                  Project.Queries.listCorpusOptions(projectId),
-                  Licences.Catalog.listLicences(),
-                  Organization.listOrganizations(),
-                  User.isCurrentSuperadmin(),
-                  Corpora.Documents.listCorpusDocuments(),
-              ])
-            : [[], [], [], false, []]
+        if (!project) {
+            return {
+                project: null,
+                corpusOptions: [],
+                documents: [],
+                licenseCatalog: [],
+                organizations: [],
+                superadmin: false,
+                canManageCorpora: false,
+                corpusError: null,
+            }
+        }
+        const [superadmin, user] = await Promise.all([User.isCurrentSuperadmin(), getCurrentUser()])
+        const canManageCorpora = superadmin || (!!user && user.id === project.ownerId)
+        const corpusData = Promise.all([
+            Project.Queries.listLinkedCorpora(projectId),
+            canManageCorpora ? Project.Queries.listCorpusOptions(projectId) : Promise.resolve([]),
+        ]).then(([corpora, corpusOptions]) => ({ corpora, corpusOptions, corpusError: null }))
+          .catch(() => ({ corpora: [], corpusOptions: [], corpusError: "Could not load the project's accessible corpora." }))
+        const [managed, licenseCatalog, organizations, documents] = await Promise.all([
+            corpusData,
+            Licences.Catalog.listLicences(),
+            Organization.listOrganizations(),
+            Corpora.Documents.listCorpusDocuments(),
+        ])
         return {
-            project,
-            corpusOptions,
+            project: { ...project, corpora: managed.corpora },
+            corpusOptions: managed.corpusOptions,
             documents,
             licenseCatalog,
             organizations,
-                  superadmin,
+            superadmin,
+            canManageCorpora,
+            corpusError: managed.corpusError,
         }
     })()
     return { project, data }
@@ -225,6 +244,8 @@ function WorkspacePanels({
     licenseCatalog,
     organizations,
     superadmin,
+    canManageCorpora,
+    corpusError,
 }: WorkspaceData) {
     useReadySound()
 
@@ -244,7 +265,11 @@ function WorkspacePanels({
 
             <Corpus.Section corpus={project.corpus} commits={project.commits} documents={documents} readOnly={readOnly} />
 
-            <Corpus.References corpora={project.corpora} options={corpusOptions} readOnly={readOnly} />
+            {corpusError ? (
+                <Card className="p-4"><p role="alert">{corpusError}</p></Card>
+            ) : (
+                <Corpus.References corpora={project.corpora} options={corpusOptions} readOnly={readOnly || !canManageCorpora} />
+            )}
         </>
     )
 }
