@@ -11,14 +11,6 @@ export const PROJECT_STATUSES = [
   "failed",
 ] as const
 
-/**
- * Pre-auth superadmin: publishing decisions belong to this directory user
- * until corpora-auth lands. The session is treated as the superadmin when a
- * directory row with this email exists (see users.getSuperadmin).
- */
-export const SUPERADMIN_EMAIL =
-  import.meta.env?.VITE_SUPERADMIN_EMAIL ?? "manny.defreitas7@gmail.com"
-
 export const BOOK_TYPES = [
   "bible",
   "commentary",

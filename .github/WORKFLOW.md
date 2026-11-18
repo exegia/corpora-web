@@ -150,3 +150,7 @@ summary rather than failing; the same is true of the preview deploy without
 `next.yml`, `pr-merged.yml` and the `wrapup` job all fail at their first step
 without it. A PR opened with `GITHUB_TOKEN` cannot trigger further workflows,
 so the release PR's own checks would never start.
+
+The release workflows and their setup action pin external actions to full commit SHAs,
+as required by the repository Actions policy. Preserve the version comments
+when updating those pins.

@@ -76,7 +76,7 @@ vi.mock("@/lib/user", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/user")>()
   return {
     ...original,
-    default: { ...original.default, getSuperadmin: vi.fn() },
+    default: { ...original.default, isCurrentSuperadmin: vi.fn() },
   }
 })
 
@@ -187,12 +187,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(Project.Queries.getProject).mockResolvedValue(detail)
   vi.mocked(Project.Mutations.assertEditable).mockResolvedValue()
-  vi.mocked(User.getSuperadmin).mockResolvedValue({
-    id: "u9",
-    name: "Emmanuel",
-    username: "manny",
-    email: "manny.defreitas7@gmail.com",
-  })
+  vi.mocked(User.isCurrentSuperadmin).mockResolvedValue(true)
   vi.mocked(Licences.Catalog.listLicences).mockResolvedValue([catalogLicense, softwareLicense])
   const noMetadata = {
     corpusType: null,
