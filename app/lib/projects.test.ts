@@ -43,7 +43,7 @@ function createBuilder(table: string, result: MockResult): MockBuilder {
 }
 
 /** Queue of results consumed in from() call order; records builders for asserts. */
-function mockSupabase(results: MockResult[]) {
+function mockSupabase(results: MockResult[], lookup: MockResult = { data: null, error: null }) {
   const builders: MockBuilder[] = []
   const queue = [...results]
   const from = vi.fn((table: string) => {
@@ -52,8 +52,9 @@ function mockSupabase(results: MockResult[]) {
     builders.push(builder)
     return builder
   })
-  vi.mocked(getSupabase).mockReturnValue({ from } as never)
-  return { from, builders }
+  const rpc = vi.fn().mockResolvedValue(lookup)
+  vi.mocked(getSupabase).mockReturnValue({ from, rpc } as never)
+  return { from, rpc, builders }
 }
 
 const projectRow = {
@@ -361,7 +362,6 @@ const detailRow = {
   owner_id: "u1",
   language: null,
   category: null,
-  corpus_documents: null,
   user_directory: creatorRow,
   organizations: null,
   project_licences: [],
@@ -496,11 +496,10 @@ describe("setProjectOrganization", () => {
 
 describe("getProject corpus mapping (003)", () => {
   it("maps the imported corpus document and its history newest-first", async () => {
-    mockSupabase([
+    const { rpc, builders } = mockSupabase([
+      { data: detailRow, error: null },
       {
         data: {
-          ...detailRow,
-          corpus_documents: {
             id: "d1",
             name: "peshitta",
             source: "upload",
@@ -527,11 +526,10 @@ describe("getProject corpus mapping (003)", () => {
                 committed_at: "2026-07-05T00:00:00Z",
               },
             ],
-          },
         },
         error: null,
       },
-    ])
+    ], { data: "d1", error: null })
     const project = await Project.Queries.getProject("p1")
     expect(project?.corpus).toEqual({
       id: "d1",
@@ -545,6 +543,8 @@ describe("getProject corpus mapping (003)", () => {
       "e4f5a6b",
       "a1b2c3d",
     ])
+    expect(rpc).toHaveBeenCalledWith("corpora_project_document_id", { p_project: "p1" })
+    expect(builders[1].eq).toHaveBeenCalledWith("id", "d1")
   })
 
   it("returns a null corpus when no upload or URL is recorded", async () => {
@@ -552,6 +552,17 @@ describe("getProject corpus mapping (003)", () => {
     const project = await Project.Queries.getProject("p1")
     expect(project?.corpus).toBeNull()
     expect(project?.commits).toEqual([])
+  })
+
+  it("keeps public project details available when the lookup is denied", async () => {
+    const { from } = mockSupabase(
+      [{ data: detailRow, error: null }],
+      { data: null, error: { message: "not signed in" } },
+    )
+    const project = await Project.Queries.getProject("p1")
+    expect(project?.name).toBe(projectRow.name)
+    expect(project?.corpus).toBeNull()
+    expect(from).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -191,7 +191,6 @@ export interface ProjectDetailRow extends ProjectRow {
   owner_id: string | null
   language: LanguageType[] | null
   category: CategoryType | null
-  corpus_documents: DocumentRow | null
   user_directory: CreatorRow | null
   organizations: { id: string; name: string; website: string | null } | null
   project_licences: {
