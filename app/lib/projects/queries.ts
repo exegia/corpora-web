@@ -2,6 +2,7 @@ import { getSupabase } from "@/lib/supabase"
 import { PROJECT_COLUMNS, PROJECT_DETAIL_COLUMNS, UNKNOWN_CREATOR } from "./constants"
 import type {
     LicenseRow,
+    DocumentRow,
     ProjectDetail,
     ProjectDetailRow,
     ProjectRow,
@@ -30,6 +31,23 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
   if (!data) return null
 
   const row = data as unknown as ProjectDetailRow
+  // Project rows are public; attachment identity is available only through
+  // the session-checked lookup and the document's own access policy.
+  let document: DocumentRow | null = null
+  try {
+    const lookup = await getSupabase().rpc("corpora_project_document_id", { p_project: id })
+    if (!lookup.error && typeof lookup.data === "string") {
+      const result = await getSupabase()
+        .from("corpus_documents")
+        .select(`id, name, source, path, filename, uploaded_at,
+          corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at )`)
+        .eq("id", lookup.data)
+        .maybeSingle()
+      if (!result.error) document = result.data as DocumentRow | null
+    }
+  } catch {
+    // A signed-out or unavailable lookup must not block the public project.
+  }
   return {
     ...toSummary(row),
     ownerId: row.owner_id ?? null,
@@ -68,17 +86,17 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
           : a.agreedAt.localeCompare(b.agreedAt),
       ),
     corpora: [],
-    corpus: row.corpus_documents
+    corpus: document
       ? {
-          id: row.corpus_documents.id,
-          name: row.corpus_documents.name,
-          source: row.corpus_documents.source,
-          path: row.corpus_documents.path,
-          filename: row.corpus_documents.filename,
-          uploadedAt: row.corpus_documents.uploaded_at,
+          id: document.id,
+          name: document.name,
+          source: document.source,
+          path: document.path,
+          filename: document.filename,
+          uploadedAt: document.uploaded_at,
         }
       : null,
-    commits: (row.corpus_documents?.corpus_commits ?? [])
+    commits: (document?.corpus_commits ?? [])
       .map(toCommit)
       .sort((a, b) => (b.committedAt ?? "").localeCompare(a.committedAt ?? "")),
   }
