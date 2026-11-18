@@ -1,7 +1,6 @@
 import { getSupabase } from "@/lib/supabase"
 import { PROJECT_COLUMNS, PROJECT_DETAIL_COLUMNS, UNKNOWN_CREATOR } from "./constants"
 import type {
-    CorpusOption,
     LicenseRow,
     ProjectDetail,
     ProjectDetailRow,
@@ -33,6 +32,7 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
   const row = data as unknown as ProjectDetailRow
   return {
     ...toSummary(row),
+    ownerId: row.owner_id ?? null,
     languages: row.language ?? [],
     category: row.category,
     creator: row.user_directory ?? UNKNOWN_CREATOR,
@@ -67,13 +67,7 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
           ? Number(b.agreedAt === null) - Number(a.agreedAt === null)
           : a.agreedAt.localeCompare(b.agreedAt),
       ),
-    corpora: row.project_corpora
-      .map((link) => ({
-        corpusId: link.corpus_id,
-        linkedAt: link.linked_at,
-        corpus: link.corpora,
-      }))
-      .sort((a, b) => a.linkedAt.localeCompare(b.linkedAt)),
+    corpora: [],
     corpus: row.corpus_documents
       ? {
           id: row.corpus_documents.id,
@@ -90,30 +84,5 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
   }
 }
 
-// ---- Corpus links (US2) ---------------------------------------------------
-
-export async function listCorpusOptions(projectId: string): Promise<CorpusOption[]> {
-  const supabase = getSupabase()
-  const [corpora, links] = await Promise.all([
-    supabase
-      .from("corpora")
-      .select("id, name, language, type, available")
-      .order("name", { ascending: true }),
-    supabase.from("project_corpora").select("corpus_id").eq("project_id", projectId),
-  ])
-  if (corpora.error) fail("Could not load the corpus library", corpora.error)
-  if (links.error) fail("Could not load linked corpora", links.error)
-
-  const linked = new Set(
-    ((links.data ?? []) as { corpus_id: string }[]).map((l) => l.corpus_id),
-  )
-  return (
-    (corpora.data ?? []) as {
-      id: string
-      name: string
-      language: string | null
-      type: string | null
-      available: boolean
-    }[]
-  ).map((c) => ({ ...c, alreadyLinked: linked.has(c.id) }))
-}
+// Managed associations are loaded through the session-checked API.
+export { listCorpusOptions, listLinkedCorpora } from "./managed-corpora"
