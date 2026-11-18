@@ -33,11 +33,10 @@ export async function clientLoader() {
   // Deliberately not awaited (see routes/project.tsx): navigation completes
   // immediately and the component suspends on this promise, showing the
   // skeleton rows meanwhile.
-  const data = Promise.all([Licences.Catalog.listLicences(), User.getSuperadmin()]).then(
+  const data = Promise.all([Licences.Catalog.listLicences(), User.isCurrentSuperadmin()]).then(
     ([licences, superadmin]) => ({
       licences,
-      // Pre-auth: the session acts as the superadmin when the directory has one.
-      superadmin: superadmin !== null,
+      superadmin,
     }),
   )
   return { data }
@@ -49,8 +48,7 @@ export async function clientAction({ request }: ActionFunctionArgs) {
   try {
     switch (intent) {
       case "create-licence": {
-        // Pre-auth guard (research R4): only the superadmin edits the catalog.
-        if ((await User.getSuperadmin()) === null) {
+        if (!(await User.isCurrentSuperadmin())) {
           return { ok: false, error: "Only the superadmin can create licences." }
         }
         const id = await Licences.Authoring.createLicence({

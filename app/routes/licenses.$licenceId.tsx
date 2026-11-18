@@ -22,13 +22,12 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
   // the slow part and keeps its own boundary below.
   const [licence, superadmin] = await Promise.all([
     Licences.Catalog.getLicence(licenceId),
-    User.getSuperadmin(),
+    User.isCurrentSuperadmin(),
   ])
   return {
     licence,
     text: Licences.Text.resolveLicenceText(licence),
-    // Pre-auth: the session acts as the superadmin when the directory has one.
-    superadmin: superadmin !== null,
+    superadmin,
   }
 }
 
@@ -39,8 +38,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
   try {
     switch (intent) {
       case "update-licence": {
-        // Pre-auth guard (research R4): only the superadmin edits the catalog.
-        if ((await User.getSuperadmin()) === null) {
+        if (!(await User.isCurrentSuperadmin())) {
           return { ok: false, error: "Only the superadmin can edit licences." }
         }
         await Licences.Authoring.updateLicence(licenceId, {
@@ -58,8 +56,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
         return { ok: true, intent }
       }
       case "save-licence-text": {
-        // Pre-auth guard (research R4): only the superadmin edits the catalog.
-        if ((await User.getSuperadmin()) === null) {
+        if (!(await User.isCurrentSuperadmin())) {
           return { ok: false, error: "Only the superadmin can edit licences." }
         }
         await Licences.Text.saveLicenceText(licenceId, String(form.get("text") ?? ""))

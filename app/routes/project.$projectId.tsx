@@ -43,18 +43,17 @@ export async function clientLoader({ params }: LoaderFunctionArgs) {
                   Project.Queries.listCorpusOptions(projectId),
                   Licences.Catalog.listLicences(),
                   Organization.listOrganizations(),
-                  User.getSuperadmin(),
+                  User.isCurrentSuperadmin(),
                   Corpora.Documents.listCorpusDocuments(),
               ])
-            : [[], [], [], null, []]
+            : [[], [], [], false, []]
         return {
             project,
             corpusOptions,
             documents,
             licenseCatalog,
             organizations,
-            // Pre-auth: the session acts as the superadmin when the directory has one.
-            superadmin: superadmin !== null,
+                  superadmin,
         }
     })()
     return { project, data }
@@ -106,7 +105,7 @@ export async function clientAction({ request, params }: ActionFunctionArgs) {
                 if (!project) {
                     throw new Project.Errors.DataError("not-found", "This project no longer exists.")
                 }
-                const superadmin = (await User.getSuperadmin()) !== null
+                const superadmin = await User.isCurrentSuperadmin()
                 await Project.Mutations.updateProjectStatus(project, String(form.get("status") ?? "") as ProjectStatus, superadmin)
                 return { ok: true, intent }
             }
