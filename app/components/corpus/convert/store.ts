@@ -34,6 +34,14 @@ conversionDocumentIdAtom.debugLabel = "conversion/documentId"
 const lastFileAtom = atom<File | null>(null)
 const abortControllerAtom = atom<AbortController | null>(null)
 
+/**
+ * The signed-in user the run belongs to. The store outlives the signed-in
+ * layout (the root `ExegiaProvider` survives a sign-out redirect), so a run,
+ * its retained file and its "View corpus" target are scoped to this id and
+ * dropped when it changes — never shown to, or retried by, the next account.
+ */
+const conversionOwnerAtom = atom<string | null>(null)
+
 // ── derived ──────────────────────────────────────────────────────────────
 
 export const conversionRunningAtom = atom(get => {
@@ -65,6 +73,22 @@ export const dismissConversionAtom = atom(null, (get, set) => {
     set(conversionEntryAtom, null)
     set(conversionDocumentIdAtom, null)
     set(conversionPanelOpenAtom, false)
+})
+
+/** Abort and forget everything about the current run, retry handle included. */
+export const resetConversionAtom = atom(null, (_get, set) => {
+    set(dismissConversionAtom)
+    set(lastFileAtom, null)
+})
+
+/**
+ * Bind the run to `owner` (the signed-in user's id, or `null` when signed
+ * out). A different owner than the one that started it resets the run first.
+ */
+export const claimConversionAtom = atom(null, (get, set, owner: string | null) => {
+    if (get(conversionOwnerAtom) === owner) return
+    set(resetConversionAtom)
+    set(conversionOwnerAtom, owner)
 })
 
 /**
