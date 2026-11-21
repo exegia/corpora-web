@@ -58,7 +58,7 @@ feat/add-tooltip ──PR──> dev ──(daily/manual)──> next ──cut�
 | --- | --- |
 | `<type>/<slug>` → PR to `dev` | `guard` (branch name + conventional-commit PR title), `check` (typecheck, lint, test, build), and an AI review once the PR is ready for review |
 | **Promote to next** (22:00 UTC or manual) | Opens `dev` → `next` with a version from line-count churn (`< 100` patch, `100–999` minor, `≥ 1000` major) and auto-merges after CI |
-| Push to `next` | Rolling Vercel preview; cuts or refreshes `release/vX.Y.Z`; the draft PR into `main` is opened or updated |
+| Push to `next` | Rolling Vercel preview; cuts or refreshes `release/vX.Y.Z` (commits created through the GitHub API so they are signed); the draft PR into `main` is opened or updated |
 | `release/vX.Y.Z` → PR to `main` | `guard` also asserts `package.json` matches the branch version; `package` uploads the production build as an artifact |
 | Release PR merged | Deploys to Vercel production, tags `vX.Y.Z`, publishes a GitHub Release, syncs `main` back into `next` and `dev`, deletes leftover branches |
 

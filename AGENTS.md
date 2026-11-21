@@ -48,6 +48,7 @@ make pr-guard BASE=... HEAD=... TITLE=...  # validate PR guard locally
 - Exactly one `release/vX.Y.Z` branch open; `package.json` version must match it. Flow: `<type>/<slug>` → PR → `release/vX.Y.Z` → PR → `main` → Vercel prod + tag + next release branch.
 - Feature branch name: `<type>/<slug>` where type is `feat|fix|chore|docs|ci|refactor|test|perf|build|style|revert` (lowercase). PR **title** must be `<type>: summary` (optionally `(scope)` and `!`) — **no leading emoji** even though commit subjects use `✨ feat: …`. Guard matches from first char. Retitling a red PR does not re-run guard (workflow triggers `opened/reopened/ready_for_review/synchronize`, not `edited`) — close and reopen to re-evaluate.
 - Draft PRs only run `guard`; marking ready runs `check` (typecheck+lint+test+build) and AI review. `release/*` PRs also run `package` (uploads `build/client`) and always get a rolling Vercel preview.
+- Release automation (`make cut-release`, `make sync-lanes`) pushes its commits through `scripts/api-push.sh` (GitHub git-data API as the automation App) so they are signed — Vercel blocks deployments of unverified commits. Don't replace it with `git push`.
 - Reproduce CI locally: `make ci`. Other targets: `make help`, `make next-version BUMP=minor|patch|major`, `make release-notes`.
 
 ## Source of truth
