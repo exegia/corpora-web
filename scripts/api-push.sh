@@ -13,7 +13,8 @@
 # first parent's tree, and the commit is created with the same message and (re-mapped)
 # parents. Trees are content-addressed, so each rebuilt tree must hash to the local
 # one; any difference stops the push before the branch moves. The branch ref is then
-# created, or moved: fast-forward only unless FORCE=1.
+# created, or moved: fast-forward only unless FORCE=1. If <local-ref> was HEAD's
+# commit, HEAD is moved onto the recreated tip afterwards.
 #
 # Bash 3.2 compatible (macOS): no associative arrays, no mapfile.
 set -euo pipefail
@@ -85,7 +86,7 @@ for c in $(git rev-list --reverse --topo-order "$tip" --not --remotes=origin); d
   gh api "repos/$repo/git/commits" --input "$work/commit.json" \
     --jq '[.sha, (.verification.verified | tostring), .verification.reason] | join(" ")' >"$work/created"
   read -r new verified reason <"$work/created"
-  [ "$verified" = true ] || echo "::warning::$new was created but is not verified ($reason)"
+  [ "$verified" = true ] || echo "::warning::$new was created but is not verified ($reason); GitHub signs API commits only for a GitHub App token"
   printf '%s' "$new" >"$work/map/$c"
   echo "recreated $(git rev-parse --short "$c") as ${new:0:7} (verified=$verified)"
   count=$((count + 1))
@@ -100,4 +101,7 @@ else
     | gh api "repos/$repo/git/refs" --input - --silent
 fi
 git fetch --quiet --force origin "+refs/heads/$branch:refs/remotes/origin/$branch"
+# The recreated commits replace the local ones: move HEAD onto them (same tree, so the
+# worktree and index stay clean) and a later push from here builds on the remote.
+if [ "$(git rev-parse HEAD)" = "$tip" ]; then git reset --quiet --soft "$target"; fi
 echo "$branch -> ${target:0:7} ($count commit(s) created through the API)"
