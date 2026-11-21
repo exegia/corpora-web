@@ -18,8 +18,9 @@ export function AppLayout({ user }: { user?: SessionUser }) {
     useUISounds()
 
     // Conversion state lives on the layout so the header pill, the shell's
-    // right panel, and the Convert/Upload actions survive route changes.
-    const conversion = useConversion()
+    // right panel, and the Convert/Upload actions survive route changes. It
+    // is scoped to the signed-in user, so it does not survive a sign-out.
+    const conversion = useConversion(user?.id ?? null)
     const shell = useShellPanels()
     const { openPanel, setOpen, open, providerProps, resizePanel } = shell
 
