@@ -1,10 +1,13 @@
+import { createContext, useContext } from "react"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
-import { Provider } from "jotai"
+import { Provider, createStore } from "jotai"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import Corpus, { type ConversionEntry, type ConversionLog, type CorpusDocument } from "@/lib/corpus"
 import { AppLayout } from "@/components/layouts/app-layout"
+import { retryConversionAtom } from "@/components/corpus/convert/store"
+import type { SessionUser } from "@/lib/auth"
 import CorpusRoute, { clientAction, clientLoader } from "@/routes/corpus/index"
 
 // One mock for the whole barrel — persistence, transport, archive and history
@@ -140,12 +143,16 @@ const septuagint = doc({
     toc: null,
 })
 
-function renderRoute() {
+function sessionUser(id: string): SessionUser {
+    return { id, email: `${id}@example.org`, name: null, avatarUrl: null, emailConfirmed: true }
+}
+
+function renderRoute({ store, user }: { store?: ReturnType<typeof createStore>; user?: SessionUser } = {}) {
     // The conversion pill, the Convert/Upload actions, and the conversion
     // panel render from the app layout, so the route mounts inside it.
     const Stub = createRoutesStub([
         {
-            Component: AppLayout,
+            Component: () => <AppLayout user={user} />,
             HydrateFallback: () => null,
             children: [
                 {
@@ -166,8 +173,10 @@ function renderRoute() {
     ])
     // Conversion state lives in module-level atoms; a fresh Jotai store per
     // render keeps one test's run from leaking into the next.
+    // Pass `store` to share one across renders, as the root provider does
+    // across a sign-out and the next sign-in in the same tab.
     return render(
-        <Provider>
+        <Provider store={store}>
             <Stub initialEntries={["/corpus"]} />
         </Provider>
     )
@@ -459,5 +468,73 @@ describe("/corpus library", () => {
         expect(confirm).toBeDisabled()
 
         expect(Corpus.Documents.deleteCorpusDocument).not.toHaveBeenCalled()
+    })
+})
+
+describe("conversion state across sessions", () => {
+    // The root `ExegiaProvider` outlives the signed-in layout, so a sign-out
+    // followed by another sign-in in the same tab reuses one Jotai store.
+    async function failAs(store: ReturnType<typeof createStore>, user: SessionUser) {
+        const view = renderRoute({ store, user })
+        const input = await screen.findByLabelText("Convert source file")
+        await userEvent.setup().upload(input, new File(["<xml/>"], "private.xml", { type: "text/xml" }))
+        expect(await screen.findByRole("alert")).toHaveTextContent("Conversion failed")
+        return view
+    }
+
+    it("drops the previous user's run and retained file after sign-out", async () => {
+        scriptConversion("error")
+        const store = createStore()
+        const first = await failAs(store, sessionUser("alice"))
+
+        // Sign-out leaves the signed-in layout.
+        first.unmount()
+        renderRoute({ store, user: sessionUser("bob") })
+        await screen.findByLabelText("Convert source file")
+
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+        expect(screen.queryByText(/private\.xml/)).not.toBeInTheDocument()
+        expect(store.set(retryConversionAtom)).toBeNull()
+        expect(Corpus.Convert.runConversion).toHaveBeenCalledTimes(1)
+    })
+
+    it("drops the run when the signed-in user changes under a mounted layout", async () => {
+        scriptConversion("error")
+        const store = createStore()
+        // One stub, so the rerender below keeps the same AppLayout instance and
+        // only the signed-in user changes (e.g. a sign-in in another tab).
+        const SignedIn = createContext<SessionUser>(sessionUser("alice"))
+        const Stub = createRoutesStub([
+            {
+                Component: () => <AppLayout user={useContext(SignedIn)} />,
+                HydrateFallback: () => null,
+                children: [
+                    {
+                        path: "/corpus",
+                        Component: CorpusRoute,
+                        HydrateFallback: () => null,
+                        loader: clientLoader as never,
+                        action: clientAction as never,
+                    },
+                ],
+            },
+        ])
+        const tree = (user: SessionUser) => (
+            <Provider store={store}>
+                <SignedIn.Provider value={user}>
+                    <Stub initialEntries={["/corpus"]} />
+                </SignedIn.Provider>
+            </Provider>
+        )
+        const view = render(tree(sessionUser("alice")))
+        const input = await screen.findByLabelText("Convert source file")
+        await userEvent.setup().upload(input, new File(["<xml/>"], "private.xml", { type: "text/xml" }))
+        expect(await screen.findByRole("alert")).toHaveTextContent("Conversion failed")
+
+        view.rerender(tree(sessionUser("bob")))
+
+        expect(screen.getByLabelText("Convert source file")).toBe(input)
+        await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument())
+        expect(store.set(retryConversionAtom)).toBeNull()
     })
 })
