@@ -1,7 +1,7 @@
 {
     "name": "corpora-web",
     "private": true,
-    "version": "4.0.0",
+    "version": "4.1.0",
     "type": "module",
     "scripts": {
         "dev": "dotenvx run -- react-router dev",
@@ -26,9 +26,11 @@
         "clsx": "^2.1.1",
         "cuelume": "^0.2.2",
         "fflate": "^0.8.3",
+        "immer": "^11.1.18",
         "isbot": "^5",
         "isomorphic-git": "^1.41.7",
         "jotai": "3.0.0",
+        "jotai-immer": "^0.4.3",
         "lucide-react": "^1.33.0",
         "marked": "^18.0.10",
         "motion": "^13.1.1",

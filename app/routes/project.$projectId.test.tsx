@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createRoutesStub } from "react-router"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { getCurrentUser } from "@/lib/auth"
 import Corpus from "@/lib/corpus"
 import Licences from "@/lib/licenses"
 import Organization from "@/lib/organization"
@@ -24,6 +25,7 @@ vi.mock("@/lib/projects", async (importOriginal) => {
         ...original.default.Queries,
         getProject: vi.fn(),
         listCorpusOptions: vi.fn(),
+        listLinkedCorpora: vi.fn(),
       },
       Mutations: {
         ...original.default.Mutations,
@@ -76,9 +78,11 @@ vi.mock("@/lib/user", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/user")>()
   return {
     ...original,
-    default: { ...original.default, getSuperadmin: vi.fn() },
+    default: { ...original.default, isCurrentSuperadmin: vi.fn() },
   }
 })
+
+vi.mock("@/lib/auth", () => ({ getCurrentUser: vi.fn() }))
 
 vi.mock("@/lib/corpus", async (importOriginal) => {
   // Spread the original so constant exports (TYPE_ICONS) stay real.
@@ -99,6 +103,7 @@ vi.mock("@/lib/corpus", async (importOriginal) => {
 
 const detail: ProjectDetail = {
   id: "p1",
+  ownerId: "u1",
   name: "Peshitta Study",
   description: "Aramaic OT sources",
   status: "draft",
@@ -112,21 +117,7 @@ const detail: ProjectDetail = {
   commits: [],
   createdAt: "2026-07-01T00:00:00Z",
   updatedAt: "2026-07-02T00:00:00Z",
-  corpora: [
-    {
-      corpusId: "c1",
-      linkedAt: "2026-07-03T00:00:00Z",
-      corpus: {
-        uid: "u1",
-        name: "Peshitta OT",
-        language: "Aramaic",
-        type: "bible",
-        category: "religious",
-        version: "1.2.0",
-        available: true,
-      },
-    },
-  ],
+  corpora: [{ corpusId: "c1", name: "Peshitta OT", language: "Aramaic" }],
 }
 
 const catalogLicense = {
@@ -187,12 +178,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(Project.Queries.getProject).mockResolvedValue(detail)
   vi.mocked(Project.Mutations.assertEditable).mockResolvedValue()
-  vi.mocked(User.getSuperadmin).mockResolvedValue({
-    id: "u9",
-    name: "Emmanuel",
-    username: "manny",
-    email: "manny.defreitas7@gmail.com",
-  })
+  vi.mocked(User.isCurrentSuperadmin).mockResolvedValue(true)
+  vi.mocked(getCurrentUser).mockResolvedValue({ id: "u1", email: "user@example.org", name: null, avatarUrl: null, emailConfirmed: true })
+  vi.mocked(Project.Queries.listLinkedCorpora).mockResolvedValue(detail.corpora)
   vi.mocked(Licences.Catalog.listLicences).mockResolvedValue([catalogLicense, softwareLicense])
   const noMetadata = {
     corpusType: null,
@@ -239,22 +227,45 @@ beforeEach(() => {
       id: "c1",
       name: "Peshitta OT",
       language: "Aramaic",
-      type: "bible",
-      available: true,
       alreadyLinked: true,
     },
     {
       id: "c3",
       name: "Syriac Lexicon",
       language: "Syriac",
-      type: "lexicon",
-      available: true,
       alreadyLinked: false,
     },
   ])
 })
 
 describe("/project/:projectId workspace", () => {
+  it("keeps project panels available when the managed API is unavailable", async () => {
+    vi.mocked(Project.Queries.listLinkedCorpora).mockRejectedValue(new Error("offline"))
+    renderRoute()
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load the project's accessible corpora.")
+    expect(screen.getByRole("heading", { level: 1, name: "Peshitta Study" })).toBeInTheDocument()
+    expect(screen.getByText("No corpus attached")).toBeInTheDocument()
+    expect(Project.Queries.listCorpusOptions).toHaveBeenCalledWith("p1")
+  })
+
+  it("lets a member see authorized links without management controls", async () => {
+    vi.mocked(User.isCurrentSuperadmin).mockResolvedValue(false)
+    vi.mocked(getCurrentUser).mockResolvedValue({ id: "member", email: "member@example.org", name: null, avatarUrl: null, emailConfirmed: true })
+    renderRoute()
+    expect(await screen.findByText("Peshitta OT")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Add reference" })).toBeDisabled()
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument()
+    expect(Project.Queries.listCorpusOptions).not.toHaveBeenCalled()
+  })
+
+  it("lets the ordinary project owner manage corpus links", async () => {
+    vi.mocked(User.isCurrentSuperadmin).mockResolvedValue(false)
+    renderRoute()
+    expect(await screen.findByText("Peshitta OT")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Add reference" })).toBeEnabled()
+    expect(Project.Queries.listCorpusOptions).toHaveBeenCalledWith("p1")
+  })
+
   it("renders the project header, corpus section, and references", async () => {
     renderRoute()
     expect(

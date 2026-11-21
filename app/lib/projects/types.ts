@@ -54,16 +54,8 @@ export interface ProjectSummary {
 
 export interface CorpusLink {
   corpusId: string
-  linkedAt: string
-  corpus: {
-    uid: string
-    name: string
-    language: string | null
-    type: string | null
-    category: string | null
-    version: string
-    available: boolean
-  } | null
+  name: string
+  language: string | null
 }
 
 export type CorpusSource = "upload" | "huggingface"
@@ -122,6 +114,7 @@ export interface AttachedLicense {
 export type LicenseStatus = "active" | "retired" | "superseded"
 
 export interface ProjectDetail extends ProjectSummary {
+  ownerId: string | null
   /** Source languages for scriptural types; empty when not applicable. */
   languages: LanguageType[]
   category: CategoryType | null
@@ -139,8 +132,6 @@ export interface CorpusOption {
   id: string
   name: string
   language: string | null
-  type: string | null
-  available: boolean
   alreadyLinked: boolean
 }
 
@@ -197,9 +188,9 @@ export interface DocumentRow {
 }
 
 export interface ProjectDetailRow extends ProjectRow {
+  owner_id: string | null
   language: LanguageType[] | null
   category: CategoryType | null
-  corpus_documents: DocumentRow | null
   user_directory: CreatorRow | null
   organizations: { id: string; name: string; website: string | null } | null
   project_licences: {
@@ -207,17 +198,5 @@ export interface ProjectDetailRow extends ProjectRow {
     licences: LicenseRow | null
     user_directory: CreatorRow | null
   }[]
-  project_corpora: {
-    corpus_id: string
-    linked_at: string
-    corpora: {
-      uid: string
-      name: string
-      language: string | null
-      type: string | null
-      category: string | null
-      version: string
-      available: boolean
-    } | null
-  }[]
+
 }

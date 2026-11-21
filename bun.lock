@@ -17,9 +17,11 @@
         "clsx": "^2.1.1",
         "cuelume": "^0.2.2",
         "fflate": "^0.8.3",
+        "immer": "^11.1.18",
         "isbot": "^5",
         "isomorphic-git": "^1.41.7",
         "jotai": "3.0.0",
+        "jotai-immer": "^0.4.3",
         "lucide-react": "^1.33.0",
         "marked": "^18.0.10",
         "motion": "^13.1.1",
@@ -1086,6 +1088,8 @@
     "jiti": ["jiti@2.7.0", "", { "bin": { "jiti": "lib/jiti-cli.mjs" } }, "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ=="],
 
     "jotai": ["jotai@3.0.0", "", { "peerDependencies": { "@types/react": ">=18.0.0", "react": ">=18.0.0" }, "optionalPeers": ["@types/react", "react"] }, "sha512-KxhbmsJUp/tmrv6aZgO+nzB3H9K8C0xmk5i3aGkwy/EANg73DVBkggv3zVHaAi5PlNlQgTgP4uiVepo+JC+wSA=="],
+
+    "jotai-immer": ["jotai-immer@0.4.3", "", { "peerDependencies": { "immer": ">=9.0.0", "jotai": ">=2.0.0" } }, "sha512-sJWiSweR294aDA/jeH6bKSKYVxRqgfxnLWaZmKw0/Hd6iGKLN4TSB3AHpFWQFDf0W+P3sEIkROr0ALlWQfCSeA=="],
 
     "js-tokens": ["js-tokens@4.0.0", "", {}, "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="],
 

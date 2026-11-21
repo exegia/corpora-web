@@ -47,3 +47,24 @@ describe("listUsers", () => {
     await expect(User.listUsers()).rejects.toBeInstanceOf(Project.Errors.DataError)
   })
 })
+
+
+describe("isCurrentSuperadmin", () => {
+  it.each([true, false])("returns the trusted role %s", async (role) => {
+    const rpc = vi.fn().mockResolvedValue({ data: role, error: null })
+    vi.mocked(getSupabase).mockReturnValue({ rpc } as never)
+    await expect(User.isCurrentSuperadmin()).resolves.toBe(role)
+    expect(rpc).toHaveBeenCalledWith("corpora_project_superadmin")
+  })
+
+  it("fails closed for signed-out, invalid and unavailable sessions", async () => {
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: null, error: { message: "not signed in" } })
+      .mockResolvedValueOnce({ data: "true", error: null })
+      .mockRejectedValueOnce(new Error("offline"))
+    vi.mocked(getSupabase).mockReturnValue({ rpc } as never)
+    await expect(User.isCurrentSuperadmin()).resolves.toBe(false)
+    await expect(User.isCurrentSuperadmin()).resolves.toBe(false)
+    await expect(User.isCurrentSuperadmin()).resolves.toBe(false)
+  })
+})

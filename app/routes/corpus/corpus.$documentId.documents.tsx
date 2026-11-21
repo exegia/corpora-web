@@ -22,6 +22,7 @@ export default function CorpusDocumentsRoute() {
   return (
     <CorpusDetail.Reader
       archive={archive}
+      corpusId={document.id}
       key={section.title}
       onViewOccurrences={() =>
         navigate("../analytics", { preventScrollReset: true })

@@ -59,6 +59,17 @@ A push to `next` cuts (or refreshes) the branch from `next` plus a
 draft PR into `main` is already open, later promotions fast-forward that same
 branch and **keep its version**.
 
+Automation never `git push`es a commit it made. `make cut-release` and
+`make sync-lanes` build their merge and version commits locally, then
+`scripts/api-push.sh` recreates them through the GitHub git-data API as the
+automation App and moves the branch ref. GitHub signs those commits, so they
+show as **Verified**; a pushed CI commit is unsigned, and Vercel refuses to
+deploy an unverified commit (the release PR's Vercel check fails). The script
+checks that every rebuilt tree hashes to the local one before the ref moves,
+fast-forwards release branches only, and needs `jq` and an App token in
+`GH_TOKEN`. It changes no workflow file, so the App's **Workflows** permission
+matters only when the commits it recreates touch `.github/workflows/`.
+
 Last-minute fixes can still PR `<type>/<slug>` directly into that in-flight
 `release/v*` (same guard/check/review as `dev`). A push refreshes the draft
 into `main`.
@@ -150,3 +161,7 @@ summary rather than failing; the same is true of the preview deploy without
 `next.yml`, `pr-merged.yml` and the `wrapup` job all fail at their first step
 without it. A PR opened with `GITHUB_TOKEN` cannot trigger further workflows,
 so the release PR's own checks would never start.
+
+The release workflows and their setup action pin external actions to full commit SHAs,
+as required by the repository Actions policy. Preserve the version comments
+when updating those pins.

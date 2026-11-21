@@ -1,5 +1,4 @@
 import { useFetcher } from "react-router"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { ListRowProps } from "@/components/project/corpus/types"
 import type { ActionResult } from "@/components/project/types"
@@ -8,21 +7,15 @@ import type { ActionResult } from "@/components/project/types"
 export default function ListRow({ link, readOnly }: ListRowProps) {
     const fetcher = useFetcher<ActionResult>()
     const busy = fetcher.state !== "idle"
-    const stale = link.corpus === null || !link.corpus.available
 
     return (
         <li className="flex items-center justify-between gap-3 py-3">
             <div className="min-w-0">
                 <p className="flex items-center gap-2 text-sm font-medium">
-                    <span className="truncate">{link.corpus?.name ?? "Removed corpus"}</span>
-                    {stale && <Badge variant="secondary">Unavailable</Badge>}
+                    <span className="truncate">{link.name}</span>
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
-                    {link.corpus
-                        ? [link.corpus.language, link.corpus.type, `v${link.corpus.version}`]
-                              .filter(Boolean)
-                              .join(" · ")
-                        : "This corpus is no longer in your library."}
+                    {link.language ?? "—"}
                 </p>
                 {fetcher.data?.ok === false && fetcher.data.error && (
                     <p role="alert" className="text-xs text-destructive">

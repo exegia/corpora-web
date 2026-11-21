@@ -32,7 +32,7 @@ export default function LinkPicker({ options, disabled }: LinkPickerProps) {
                 <DialogPanel>
                     {options.length === 0 ? (
                         <p className="py-4 text-sm text-muted-foreground">
-                            Your library has no corpora yet. Add corpora in the Library area, then reference them here.
+                            No accessible corpora are available to link yet.
                         </p>
                     ) : (
                         <ul className="divide-y">

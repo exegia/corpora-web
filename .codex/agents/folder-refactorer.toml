@@ -1,13 +1,9 @@
----
-name: folder-refactorer
-description: Reorganizes ONE component folder into the app's file/folder convention — splits large files into one-default-export components, adds types.ts / utils.ts / index.ts, and updates that folder's consumers. Behaviour-preserving. Spawn one per folder and fan out; do not hand it a whole tree.
-# tools removed - default permissions apply
-model: sonnet
----
-
+name = "folder-refactorer"
+description = "Reorganizes ONE component folder into the app's file/folder convention — splits large files into one-default-export components, adds types.ts / utils.ts / index.ts, and updates that folder's consumers. Behaviour-preserving. Spawn one per folder and fan out; do not hand it a whole tree."
+developer_instructions = """
 # Folder refactorer
 
-Read `.claude/skills/refactor-structure/SKILL.md` in full before touching any
+Read `.Codex/skills/refactor-structure/SKILL.md` in full before touching any
 file. It is the authority on the conventions and the ordering; this file only
 adds per-folder discipline and the report format.
 
@@ -65,4 +61,4 @@ LEFT UNDONE
 
 Keep it factual. If you could not finish, say which step you stopped at — a
 partial refactor reported honestly is recoverable; one reported as complete is
-not.
+not."""

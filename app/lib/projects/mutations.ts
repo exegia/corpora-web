@@ -220,20 +220,4 @@ export async function deleteProject(id: string): Promise<void> {
   }
 }
 
-export async function linkCorpus(projectId: string, corpusId: string): Promise<void> {
-  const { error } = await getSupabase()
-    .from("project_corpora")
-    .insert({ project_id: projectId, corpus_id: corpusId })
-  if (error) fail("Could not link the corpus", error)
-  await touchProject(projectId)
-}
-
-export async function unlinkCorpus(projectId: string, corpusId: string): Promise<void> {
-  const { error } = await getSupabase()
-    .from("project_corpora")
-    .delete()
-    .eq("project_id", projectId)
-    .eq("corpus_id", corpusId)
-  if (error) fail("Could not unlink the corpus", error)
-  await touchProject(projectId)
-}
+export { linkCorpus, unlinkCorpus } from "./managed-corpora"

@@ -296,6 +296,35 @@ describe("fetchLicenceText", () => {
   })
 })
 
+describe("resolveLicenceText", () => {
+  it("returns downloaded text even when an ordinary user cannot cache it", async () => {
+    mockSupabase([
+      { data: detailRow, error: null },
+      { data: null, error: { message: "permission denied" } },
+    ])
+    const licence = await Licences.Catalog.getLicence("CC-BY-4.0")
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("Licence body", {
+      headers: { "content-type": "text/plain" },
+    })))
+    try {
+      await expect(Licences.Text.resolveLicenceText(licence)).resolves.toBe("Licence body")
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it("returns null if all sources fail", async () => {
+    mockSupabase([{ data: detailRow, error: null }])
+    const licence = await Licences.Catalog.getLicence("CC-BY-4.0")
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")))
+    try {
+      await expect(Licences.Text.resolveLicenceText(licence)).resolves.toBeNull()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
 describe("attachLicence", () => {
   it("inserts the attachment with the agreeing user and touches the project", async () => {
     const { builders } = mockSupabase([
