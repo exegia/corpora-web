@@ -274,6 +274,9 @@ promote-pr: ## Open or refresh the PR from dev into next (env: VERSION, BUMP, CH
 	rm -f "$$body"; \
 	gh pr merge "$$num" --auto --merge
 
+# The release and sync commits are made locally, then recreated through the GitHub
+# API by scripts/api-push.sh: a plain `git push` from CI lands them unsigned
+# ("Unverified"), and Vercel blocks deployments of unverified commits.
 cut-release: ## Cut or refresh release/v<VERSION> from origin/next (env: VERSION)
 	@set -eu; \
 	git fetch --quiet --force origin \
@@ -315,7 +318,7 @@ cut-release: ## Cut or refresh release/v<VERSION> from origin/next (env: VERSION
 	else \
 	  git commit --quiet -m "chore(release): open v$$version"; \
 	fi; \
-	git push --quiet -u origin "$$branch"; \
+	GH_REPO="$(GH_REPO)" scripts/api-push.sh "$$branch" HEAD; \
 	echo "updated $$branch"
 
 release-branch: ## Cut release/v<next> from origin/next (env: VERSION, BUMP)
@@ -337,7 +340,7 @@ sync-lanes: ## Merge origin/main into next and dev via PRs
 	    continue; \
 	  fi; \
 	  git merge --quiet --no-edit origin/main; \
-	  git push --force-with-lease --quiet -u origin "$$head"; \
+	  FORCE=1 GH_REPO="$(GH_REPO)" scripts/api-push.sh "$$head" HEAD; \
 	  body="$$(mktemp)"; \
 	  printf 'Sync **main** into `%s` after the production release.\n' "$$lane" > "$$body"; \
 	  num="$$(gh pr list --base "$$lane" --head "$$head" --state open --json number --jq '.[0].number // empty')"; \
