@@ -1,8 +1,8 @@
 import { getSupabase } from "@/lib/supabase"
 import { PROJECT_COLUMNS, PROJECT_DETAIL_COLUMNS, UNKNOWN_CREATOR } from "./constants"
 import type {
-    CorpusOption,
     LicenseRow,
+    DocumentRow,
     ProjectDetail,
     ProjectDetailRow,
     ProjectRow,
@@ -31,8 +31,26 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
   if (!data) return null
 
   const row = data as unknown as ProjectDetailRow
+  // Project rows are public; attachment identity is available only through
+  // the session-checked lookup and the document's own access policy.
+  let document: DocumentRow | null = null
+  try {
+    const lookup = await getSupabase().rpc("corpora_project_document_id", { p_project: id })
+    if (!lookup.error && typeof lookup.data === "string") {
+      const result = await getSupabase()
+        .from("corpus_documents")
+        .select(`id, name, source, path, filename, uploaded_at,
+          corpus_commits ( id, sha, message, author_name, author_email, branch, committed_at )`)
+        .eq("id", lookup.data)
+        .maybeSingle()
+      if (!result.error) document = result.data as DocumentRow | null
+    }
+  } catch {
+    // A signed-out or unavailable lookup must not block the public project.
+  }
   return {
     ...toSummary(row),
+    ownerId: row.owner_id ?? null,
     languages: row.language ?? [],
     category: row.category,
     creator: row.user_directory ?? UNKNOWN_CREATOR,
@@ -67,53 +85,22 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
           ? Number(b.agreedAt === null) - Number(a.agreedAt === null)
           : a.agreedAt.localeCompare(b.agreedAt),
       ),
-    corpora: row.project_corpora
-      .map((link) => ({
-        corpusId: link.corpus_id,
-        linkedAt: link.linked_at,
-        corpus: link.corpora,
-      }))
-      .sort((a, b) => a.linkedAt.localeCompare(b.linkedAt)),
-    corpus: row.corpus_documents
+    corpora: [],
+    corpus: document
       ? {
-          id: row.corpus_documents.id,
-          name: row.corpus_documents.name,
-          source: row.corpus_documents.source,
-          path: row.corpus_documents.path,
-          filename: row.corpus_documents.filename,
-          uploadedAt: row.corpus_documents.uploaded_at,
+          id: document.id,
+          name: document.name,
+          source: document.source,
+          path: document.path,
+          filename: document.filename,
+          uploadedAt: document.uploaded_at,
         }
       : null,
-    commits: (row.corpus_documents?.corpus_commits ?? [])
+    commits: (document?.corpus_commits ?? [])
       .map(toCommit)
       .sort((a, b) => (b.committedAt ?? "").localeCompare(a.committedAt ?? "")),
   }
 }
 
-// ---- Corpus links (US2) ---------------------------------------------------
-
-export async function listCorpusOptions(projectId: string): Promise<CorpusOption[]> {
-  const supabase = getSupabase()
-  const [corpora, links] = await Promise.all([
-    supabase
-      .from("corpora")
-      .select("id, name, language, type, available")
-      .order("name", { ascending: true }),
-    supabase.from("project_corpora").select("corpus_id").eq("project_id", projectId),
-  ])
-  if (corpora.error) fail("Could not load the corpus library", corpora.error)
-  if (links.error) fail("Could not load linked corpora", links.error)
-
-  const linked = new Set(
-    ((links.data ?? []) as { corpus_id: string }[]).map((l) => l.corpus_id),
-  )
-  return (
-    (corpora.data ?? []) as {
-      id: string
-      name: string
-      language: string | null
-      type: string | null
-      available: boolean
-    }[]
-  ).map((c) => ({ ...c, alreadyLinked: linked.has(c.id) }))
-}
+// Managed associations are loaded through the session-checked API.
+export { listCorpusOptions, listLinkedCorpora } from "./managed-corpora"

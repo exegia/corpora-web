@@ -115,10 +115,19 @@ Set these in Vercel → Project → Settings → Environment Variables (Producti
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | yes | Supabase project URL |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | yes | Publishable/anon key — browser-safe, protected by RLS |
-| `VITE_SUPERADMIN_EMAIL` | optional | Overrides the hard-coded superadmin fallback |
 
-Nothing else is read by the app. The site browses anonymously, so every page depends on
-Supabase RLS permitting the `anon` role.
+The hosted Supabase project must include the Corpora API's session and project-access
+migrations, including [`20261118041458_project_ownership_guard.sql`](https://github.com/exegia/corpora-api/blob/dev/supabase/migrations/20261118041458_project_ownership_guard.sql),
+and a privately configured superadmin record. The older migrations in this web repository
+alone do not provide the trusted role check. Without it, superadmin controls fail closed.
+Fresh-project bootstrap across the two migration histories is tracked separately; do not
+assume these hosted migrations can be applied to an arbitrary schema without review.
+
+Public catalogue reads may be anonymous; protected workspace operations require a live
+Supabase session and the database's access policies.
+The project corpus picker also requires the managed `/v1/projects/{project_id}/corpora`
+API routes at `VITE_CORPORA_API_URL`. Deploy the API before enabling the web picker;
+an unavailable API leaves the rest of the project page usable and displays an error.
 
 Locally, `.env` is committed **encrypted by dotenvx** and decrypted at run time with the
 private key in `.env.keys` (never committed). Vercel does not get that key — the

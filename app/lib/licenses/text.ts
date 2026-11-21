@@ -71,7 +71,14 @@ export function resolveLicenceText(
   if (licence.fullText !== null) return Promise.resolve(licence.fullText)
   return fetchLicenceText(licence)
     .then(async (fetched) => {
-      if (fetched) await saveLicenceText(licence.id, fetched)
+      if (fetched) {
+        // Caching is optional; ordinary signed-in readers cannot edit the catalog.
+        try {
+          await saveLicenceText(licence.id, fetched)
+        } catch {
+          // Preserve the downloaded text when the cache write is unavailable.
+        }
+      }
       return fetched
     })
     .catch(() => null)

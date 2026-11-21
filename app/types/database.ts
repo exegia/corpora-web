@@ -914,7 +914,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      corpora_project_document_id: {
+        Args: { p_project: string }
+        Returns: string | null
+      }
+      corpora_project_superadmin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       book_type:
