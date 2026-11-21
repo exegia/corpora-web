@@ -1,8 +1,9 @@
-import { useEffect, useId } from "react"
+import { useEffect, useId, useLayoutEffect } from "react"
 import { useFetcher } from "react-router"
 import { useAtomValue, useSetAtom } from "jotai"
 import type { ConversionEntry } from "@/lib/corpus"
 import {
+    claimConversionAtom,
     closeConversionPanelAtom,
     conversionDocumentIdAtom,
     conversionEntryAtom,
@@ -10,6 +11,7 @@ import {
     conversionRunningAtom,
     dismissConversionAtom,
     openConversionPanelAtom,
+    resetConversionAtom,
     retryConversionAtom,
     startConversionAtom,
     type ConversionPersistPayload,
@@ -37,8 +39,13 @@ export interface ConversionController {
  * route re-suspension (docs/data-loading.md). Mounted in AppLayout so the
  * run survives in-app navigation; the persisted `job_id` is what the detail
  * explorer uses after reload (`GET /convert/{job_id}/…`).
+ *
+ * `owner` is the signed-in user's id. The run is scoped to it: leaving the
+ * signed-in layout (sign-out) or a different user arriving under it drops
+ * the run and its retained file, so the atoms never carry one account's
+ * conversion into the next session on the same tab.
  */
-export function useConversion(): ConversionController {
+export function useConversion(owner: string | null = null): ConversionController {
     const conversionId = useId()
     const persistFetcher = useFetcher<{
         ok: boolean
@@ -57,6 +64,16 @@ export function useConversion(): ConversionController {
     const dismiss = useSetAtom(dismissConversionAtom)
     const startConversion = useSetAtom(startConversionAtom)
     const retryConversion = useSetAtom(retryConversionAtom)
+    const claim = useSetAtom(claimConversionAtom)
+    const reset = useSetAtom(resetConversionAtom)
+
+    // Layout effect: a run that belongs to someone else is gone before the
+    // first paint, not one frame later.
+    useLayoutEffect(() => {
+        claim(owner)
+    }, [claim, owner])
+    // Sign-out unmounts the signed-in layout; nothing survives it.
+    useEffect(() => () => reset(), [reset])
 
     // The revalidation this submit triggers refreshes the list without
     // re-suspending it.

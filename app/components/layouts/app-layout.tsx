@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { CorpusChat } from "@/components/corpus/chat"
 import { Outlet } from "react-router"
 import type { SessionUser } from "@/lib/auth"
@@ -18,8 +18,9 @@ export function AppLayout({ user }: { user?: SessionUser }) {
     useUISounds()
 
     // Conversion state lives on the layout so the header pill, the shell's
-    // right panel, and the Convert/Upload actions survive route changes.
-    const conversion = useConversion()
+    // right panel, and the Convert/Upload actions survive route changes. It
+    // is scoped to the signed-in user, so it does not survive a sign-out.
+    const conversion = useConversion(user?.id ?? null)
     const shell = useShellPanels()
     const { openPanel, setOpen, open, providerProps, resizePanel } = shell
 
@@ -28,14 +29,37 @@ export function AppLayout({ user }: { user?: SessionUser }) {
     // trigger and `openPanel` callers also move it). Sync on edges, not
     // values, so neither side overwrites a change the other just made.
     const requestedRef = useRef(conversion.panelOpen)
+    // Whose content the right panel holds. Only the conversion's own close may
+    // close the shell; once something else took the panel over, it is theirs.
+    const rightOwnerRef = useRef<"conversion" | "other">("other")
     useEffect(() => {
         const was = requestedRef.current
         requestedRef.current = conversion.panelOpen
         if (conversion.panelOpen && !was) {
+            rightOwnerRef.current = "conversion"
             resizePanel(CONVERSION_PANEL_WIDTH)
             openPanel("right", <Convert.PanelHost />)
-        } else if (!conversion.panelOpen && was) setOpen(false, "right")
+        } else if (!conversion.panelOpen && was && rightOwnerRef.current === "conversion") setOpen(false, "right")
     }, [conversion.panelOpen, openPanel, resizePanel, setOpen])
+
+    // What the tree below gets as the shell. Anyone else opening the right
+    // panel (Add to chat, the details editor) replaces the conversion's
+    // content, so the controller stands down — its next `openPanel()` is then
+    // a false-to-true edge again and Show progress takes the panel back.
+    const { closePanel } = conversion
+    const panelControls = useMemo<typeof shell>(
+        () => ({
+            ...shell,
+            openPanel: (...args: Parameters<typeof openPanel>) => {
+                if (args[0] === "right") {
+                    rightOwnerRef.current = "other"
+                    closePanel()
+                }
+                return openPanel(...args)
+            },
+        }),
+        [shell, openPanel, closePanel]
+    )
 
     // The way back: the shell's own trigger closed the panel, so the
     // controller must stand down too or its next `openPanel()` is a no-op.
@@ -71,7 +95,7 @@ export function AppLayout({ user }: { user?: SessionUser }) {
     }
 
     return (
-        <ShellPanelsContext.Provider value={shell}>
+        <ShellPanelsContext.Provider value={panelControls}>
             <CorpusChat.Provider>
             <ConversionContext.Provider value={conversion}>
                 <Layout.Main {...providerProps} className="pt-2!" variant="web" header={renderHeader()} panels={panels}>
